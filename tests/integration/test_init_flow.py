@@ -17,7 +17,8 @@ def test_init_creates_agent_file(tmp_path: Path) -> None:
 
     # Mock model downloader to avoid actual downloads in tests
     mock_downloader = MagicMock()
-    mock_downloader.download_if_needed.return_value = False
+    mock_downloader.are_models_cached.return_value = True  # Skip download
+    mock_downloader.download_if_needed.return_value = None
 
     service = InitService(
         filesystem=filesystem,
@@ -41,8 +42,7 @@ def test_init_creates_agent_file(tmp_path: Path) -> None:
     assert "raw_inbox/" in content
 
     # Verify downloader methods were called appropriately
-    # are_models_cached is always called to check status
-    mock_downloader.are_models_cached.assert_called()
+    mock_downloader.are_models_cached.assert_called_once()
 
 
 def test_init_creates_all_directories(tmp_path: Path) -> None:
@@ -52,7 +52,8 @@ def test_init_creates_all_directories(tmp_path: Path) -> None:
     agent_writer = VSCodeAgentWriter(filesystem=filesystem)
 
     mock_downloader = MagicMock()
-    mock_downloader.download_if_needed.return_value = False
+    mock_downloader.are_models_cached.return_value = True  # Skip download
+    mock_downloader.download_if_needed.return_value = None
 
     service = InitService(
         filesystem=filesystem,
@@ -75,7 +76,8 @@ def test_init_creates_manifest(tmp_path: Path) -> None:
     agent_writer = VSCodeAgentWriter(filesystem=filesystem)
 
     mock_downloader = MagicMock()
-    mock_downloader.download_if_needed.return_value = False
+    mock_downloader.are_models_cached.return_value = True  # Skip download
+    mock_downloader.download_if_needed.return_value = None
 
     service = InitService(
         filesystem=filesystem,

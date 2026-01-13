@@ -1,6 +1,6 @@
 # Story 1.4: Init Command CLI Integration
 
-Status: review
+Status: done
 Branch: feat/1-4-init-command-cli-integration
 
 ---
@@ -154,7 +154,7 @@ Claude Opus 4.5 (Amelia - Dev Agent)
 
 ### Debug Log References
 
-- Test run: 38 passed in 3.63s
+- Test run: 39 passed in 4.11s
 - Linting: All checks passed
 - Type checking: 0 errors, 0 warnings
 
@@ -175,8 +175,17 @@ Claude Opus 4.5 (Amelia - Dev Agent)
    - Progress indicators displayed correctly (✓ cached)
    - Next steps guidance shown correctly
 
+4. **Code Review Fixes (AI):**
+   - M1: Renamed misleading `test_init_progress_output_sequence` → `test_init_completes_all_steps_successfully`
+   - M2: Fixed download progress UX - removed redundant `success()` call, simplified to `info()` for cache path
+   - M3: Fixed integration test mocks - added `are_models_cached.return_value = True`, fixed return type
+   - M4: Added `test_init_service_progress_output_sequence_download` for non-cached path verification
+   - Removed unused `success` import from init_service.py
+
 ### File List
 
 **Files Modified:**
-- `tests/cli/test_init_cmd.py` - Added 2 new tests for AC2 and AC4
-- `tests/services/test_init_service.py` - Added 1 new test for progress sequence verification
+- `tests/cli/test_init_cmd.py` - Added 2 new tests for AC2 and AC4, renamed misleading test
+- `tests/services/test_init_service.py` - Added 2 tests for progress sequence verification (cached + download paths)
+- `tests/integration/test_init_flow.py` - Fixed mock setup for model downloader
+- `src/nest/services/init_service.py` - Simplified download progress output, removed unused import

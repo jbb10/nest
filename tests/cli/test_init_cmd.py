@@ -92,22 +92,22 @@ def test_no_duplicate_init_commands() -> None:
 
 
 @patch("nest.cli.init_cmd.create_init_service")
-def test_init_progress_output_sequence(
+def test_init_completes_all_steps_successfully(
     mock_create_service: MagicMock, tmp_path: Path
 ) -> None:
-    """Verify progress indicators are displayed during init (AC2)."""
+    """Verify init command completes all steps and shows success message."""
     # Mock service
     mock_service = MagicMock()
     mock_create_service.return_value = mock_service
 
     result = runner.invoke(app, ["init", "Nike", "--dir", str(tmp_path)])
 
-    # AC2: Progress spinners/checkmarks should show for each step
-    # The output should contain status messages (from status_start/status_done)
-    # Note: Rich console output may vary, but success path should complete
+    # Verify command completed successfully
     assert result.exit_code == 0
     # Verify success message appears (indicates all steps completed)
     assert 'Project "Nike" initialized!' in result.output
+    # Verify service.execute was called with correct args
+    mock_service.execute.assert_called_once()
 
 
 @patch("nest.cli.init_cmd.create_init_service")

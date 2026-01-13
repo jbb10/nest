@@ -12,7 +12,7 @@ from nest.adapters.protocols import (
     ModelDownloaderProtocol,
 )
 from nest.core.exceptions import NestError
-from nest.ui.messages import info, status_done, status_start, success
+from nest.ui.messages import info, status_done, status_start
 
 # Gitignore content
 GITIGNORE_COMMENT = (
@@ -106,10 +106,9 @@ class InitService:
             status_done("cached")
         else:
             status_done("downloading")
-            info("Downloading ML models (first-time setup)...")
             self._model_downloader.download_if_needed(progress=True)
             cache_path = self._model_downloader.get_cache_path()
-            success(f"Models cached at {cache_path}")
+            info(f"Models cached at {cache_path}")
 
     def _update_gitignore(self, target_dir: Path) -> None:
         """Update or create .gitignore with raw_inbox entry.
