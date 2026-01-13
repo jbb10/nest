@@ -11,8 +11,8 @@ from nest.adapters.protocols import (
     ManifestProtocol,
     ModelDownloaderProtocol,
 )
-from nest.core.exceptions import ModelError, NestError
-from nest.ui.messages import info, success
+from nest.core.exceptions import NestError
+from nest.ui.messages import info, status_done, status_start
 
 # Gitignore content
 GITIGNORE_COMMENT = (
@@ -81,7 +81,8 @@ class InitService:
                 "Nest project already exists. Use `nest sync` to process documents."
             )
 
-        # Create directories
+        # Create directories with progress
+        status_start("Creating project structure")
         for dir_name in INIT_DIRECTORIES:
             dir_path = target_dir / dir_name
             self._filesystem.create_directory(dir_path)
@@ -89,25 +90,25 @@ class InitService:
         # Create manifest
         self._manifest.create(target_dir, project_name.strip())
 
-        # Generate agent file
-        agent_path = target_dir / ".github" / "agents" / "nest.agent.md"
-        self._agent_writer.generate(project_name.strip(), agent_path)
-
-        # Download ML models if needed
-        try:
-            if self._model_downloader.are_models_cached():
-                info("ML models already cached ✓")
-            else:
-                info("Downloading ML models (first-time setup)...")
-                self._model_downloader.download_if_needed(progress=True)
-                cache_path = self._model_downloader.get_cache_path()
-                success(f"Models cached at {cache_path}")
-        except ModelError:
-            # Re-raise to be handled by CLI layer
-            raise
-
         # Handle gitignore
         self._update_gitignore(target_dir)
+        status_done()
+
+        # Generate agent file with progress
+        status_start("Generating agent file")
+        agent_path = target_dir / ".github" / "agents" / "nest.agent.md"
+        self._agent_writer.generate(project_name.strip(), agent_path)
+        status_done()
+
+        # Download ML models if needed
+        status_start("Checking ML models")
+        if self._model_downloader.are_models_cached():
+            status_done("cached")
+        else:
+            status_done("downloading")
+            self._model_downloader.download_if_needed(progress=True)
+            cache_path = self._model_downloader.get_cache_path()
+            info(f"Models cached at {cache_path}")
 
     def _update_gitignore(self, target_dir: Path) -> None:
         """Update or create .gitignore with raw_inbox entry.

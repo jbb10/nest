@@ -410,3 +410,26 @@ None - implementation proceeded smoothly following TDD approach.
 - `tests/conftest.py` - Added MockModelDownloader fixtures
 - `tests/services/test_init_service.py` - Updated all tests with model_downloader param
 - `tests/integration/test_init_flow.py` - Updated integration tests with mocked downloader
+
+## Dev Agent Record
+
+### File List
+- src/nest/adapters/protocols.py
+- src/nest/adapters/docling_downloader.py
+- src/nest/services/init_service.py
+- src/nest/ui/messages.py
+- src/nest/cli/init_cmd.py
+- src/nest/cli/main.py
+- tests/adapters/test_docling_downloader.py
+- tests/services/test_init_service.py
+- tests/integration/test_init_flow.py
+- tests/cli/test_init_cmd.py
+
+### Change Log
+- **ModelDownloaderProtocol**: Added content to `src/nest/adapters/protocols.py`.
+- **DoclingModelDownloader**: Created `src/nest/adapters/docling_downloader.py` with retry logic and cleanup.
+- **InitService**: Updated `src/nest/services/init_service.py` to use `ModelDownloaderProtocol`.
+- **UI Messages**: Updated `src/nest/ui/messages.py` with `status_start` and `status_done` helpers.
+- **Init Command**: Updated `src/nest/cli/init_cmd.py` to wire downloader and handle errors.
+- **Main CLI**: Updated `src/nest/cli/main.py` entry point.
+- **Documentation**: Updated `_bmad-output/implementation-artifacts/1-3-ml-model-download-and-caching.md` with File List.
