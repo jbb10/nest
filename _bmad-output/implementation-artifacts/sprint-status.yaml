@@ -45,8 +45,8 @@ development_status:
   # FR1, FR2, FR3, FR4 - nest init command
   # ============================================================
   epic-1: in-progress
-  1-1-project-scaffolding: ready-for-dev
-  1-2-vs-code-agent-file-generation: backlog
+  1-1-project-scaffolding: done
+  1-2-vs-code-agent-file-generation: review
   1-3-ml-model-download-and-caching: backlog
   1-4-init-command-cli-integration: backlog
   epic-1-retrospective: optional
