@@ -1,0 +1,7 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Raw documents excluded from version control (processed versions in processed_context/)
+raw_inbox/
