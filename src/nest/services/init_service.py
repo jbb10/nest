@@ -9,6 +9,7 @@ from nest.adapters.protocols import (
     AgentWriterProtocol,
     FileSystemProtocol,
     ManifestProtocol,
+    ModelDownloaderProtocol,
 )
 from nest.core.exceptions import NestError
 
@@ -41,6 +42,7 @@ class InitService:
         filesystem: FileSystemProtocol,
         manifest: ManifestProtocol,
         agent_writer: AgentWriterProtocol,
+        model_downloader: ModelDownloaderProtocol,
     ) -> None:
         """Initialize the service with required adapters.
 
@@ -48,10 +50,12 @@ class InitService:
             filesystem: Adapter for filesystem operations.
             manifest: Adapter for manifest operations.
             agent_writer: Adapter for agent file generation.
+            model_downloader: Adapter for ML model downloads.
         """
         self._filesystem = filesystem
         self._manifest = manifest
         self._agent_writer = agent_writer
+        self._model_downloader = model_downloader
 
     def execute(self, project_name: str, target_dir: Path) -> None:
         """Execute project initialization.
@@ -87,6 +91,9 @@ class InitService:
         # Generate agent file
         agent_path = target_dir / ".github" / "agents" / "nest.agent.md"
         self._agent_writer.generate(project_name.strip(), agent_path)
+
+        # Download ML models if needed
+        self._model_downloader.download_if_needed(progress=True)
 
         # Handle gitignore
         self._update_gitignore(target_dir)
