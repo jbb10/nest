@@ -101,3 +101,40 @@ class MockAgentWriter:
 def mock_agent_writer() -> MockAgentWriter:
     """Provide a fresh MockAgentWriter instance."""
     return MockAgentWriter()
+
+
+class MockModelDownloader:
+    """Mock model downloader for testing.
+
+    Implements ModelDownloaderProtocol for unit tests without real downloads.
+    """
+
+    def __init__(self, *, models_cached: bool = False) -> None:
+        self._cached = models_cached
+        self.download_called = False
+        self.download_progress = True
+
+    def are_models_cached(self) -> bool:
+        return self._cached
+
+    def download_if_needed(self, progress: bool = True) -> bool:
+        self.download_called = True
+        self.download_progress = progress
+        if self._cached:
+            return False  # Already cached, no download
+        return True  # Downloaded
+
+    def get_cache_path(self) -> Path:
+        return Path.home() / ".cache" / "docling" / "models"
+
+
+@pytest.fixture
+def mock_model_downloader() -> MockModelDownloader:
+    """Provide a fresh MockModelDownloader instance."""
+    return MockModelDownloader()
+
+
+@pytest.fixture
+def mock_model_downloader_cached() -> MockModelDownloader:
+    """Provide a MockModelDownloader with models already cached."""
+    return MockModelDownloader(models_cached=True)

@@ -4,6 +4,7 @@ from typing import Annotated
 
 import typer
 
+from nest.adapters.docling_downloader import DoclingModelDownloader
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.agents.vscode_writer import VSCodeAgentWriter
@@ -30,11 +31,13 @@ def init_command(
         filesystem = FileSystemAdapter()
         manifest = ManifestAdapter()
         agent_writer = VSCodeAgentWriter(filesystem=filesystem)
+        model_downloader = DoclingModelDownloader()
 
         service = InitService(
             filesystem=filesystem,
             manifest=manifest,
             agent_writer=agent_writer,
+            model_downloader=model_downloader,
         )
 
         # Execute initialization

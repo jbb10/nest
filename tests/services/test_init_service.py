@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from conftest import MockAgentWriter, MockFileSystem, MockManifest
+from conftest import (
+    MockAgentWriter,
+    MockFileSystem,
+    MockManifest,
+    MockModelDownloader,
+)
 from nest.core.exceptions import NestError
 from nest.services.init_service import InitService
 
@@ -12,12 +17,14 @@ def test_init_service_calls_agent_writer(
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that InitService calls agent_writer.generate() with correct args."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
     target_dir = Path("/project")
 
@@ -34,12 +41,14 @@ def test_init_service_strips_project_name_whitespace(
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that project name is stripped before passing to agent writer."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
 
     service.execute("  Nike  ", Path("/project"))
@@ -52,12 +61,14 @@ def test_init_service_rejects_empty_project_name(
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that empty project name raises NestError."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
 
     with pytest.raises(NestError, match="Project name required"):
@@ -68,12 +79,14 @@ def test_init_service_rejects_whitespace_only_project_name(
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that whitespace-only project name raises NestError."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
 
     with pytest.raises(NestError, match="Project name required"):
@@ -84,12 +97,14 @@ def test_init_service_rejects_existing_project(
     mock_filesystem: MockFileSystem,
     mock_manifest_exists: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that existing project raises NestError."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest_exists,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
 
     with pytest.raises(NestError, match="already exists"):
@@ -100,12 +115,14 @@ def test_init_service_creates_all_directories(
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that InitService creates all required directories."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
     target_dir = Path("/project")
 
@@ -121,12 +138,14 @@ def test_init_service_creates_manifest(
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that InitService creates manifest with correct project name."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
 
     service.execute("Nike", Path("/project"))
@@ -140,12 +159,14 @@ def test_init_service_creates_gitignore(
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that InitService creates .gitignore with raw_inbox entry."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
     target_dir = Path("/project")
 
@@ -161,6 +182,7 @@ def test_init_service_appends_to_existing_gitignore(
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that InitService appends to existing .gitignore."""
     target_dir = Path("/project")
@@ -174,6 +196,7 @@ def test_init_service_appends_to_existing_gitignore(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
 
     service.execute("Nike", target_dir)
@@ -187,6 +210,7 @@ def test_init_service_skips_gitignore_if_entry_exists(
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
 ) -> None:
     """Test that InitService doesn't duplicate raw_inbox entry."""
     target_dir = Path("/project")
@@ -200,9 +224,51 @@ def test_init_service_skips_gitignore_if_entry_exists(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
         agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
     )
 
     service.execute("Nike", target_dir)
 
     # Should not have written to gitignore since entry exists
     assert gitignore_path not in mock_filesystem.written_files
+
+
+def test_init_service_downloads_models_if_needed(
+    mock_filesystem: MockFileSystem,
+    mock_manifest: MockManifest,
+    mock_agent_writer: MockAgentWriter,
+    mock_model_downloader: MockModelDownloader,
+) -> None:
+    """Test that InitService calls model downloader during init."""
+    service = InitService(
+        filesystem=mock_filesystem,
+        manifest=mock_manifest,
+        agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader,
+    )
+
+    service.execute("Nike", Path("/project"))
+
+    assert mock_model_downloader.download_called is True
+    assert mock_model_downloader.download_progress is True
+
+
+def test_init_service_skips_download_when_models_cached(
+    mock_filesystem: MockFileSystem,
+    mock_manifest: MockManifest,
+    mock_agent_writer: MockAgentWriter,
+    mock_model_downloader_cached: MockModelDownloader,
+) -> None:
+    """Test that InitService skips download when models already cached."""
+    service = InitService(
+        filesystem=mock_filesystem,
+        manifest=mock_manifest,
+        agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader_cached,
+    )
+
+    service.execute("Nike", Path("/project"))
+
+    # are_models_cached() returns True, so download_if_needed() should not be called
+    assert mock_model_downloader_cached.download_called is False
+

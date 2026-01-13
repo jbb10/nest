@@ -9,8 +9,10 @@ from nest.adapters.protocols import (
     AgentWriterProtocol,
     FileSystemProtocol,
     ManifestProtocol,
+    ModelDownloaderProtocol,
 )
-from nest.core.exceptions import NestError
+from nest.core.exceptions import ModelError, NestError
+from nest.ui.messages import info, success
 
 # Gitignore content
 GITIGNORE_COMMENT = (
@@ -41,6 +43,7 @@ class InitService:
         filesystem: FileSystemProtocol,
         manifest: ManifestProtocol,
         agent_writer: AgentWriterProtocol,
+        model_downloader: ModelDownloaderProtocol,
     ) -> None:
         """Initialize the service with required adapters.
 
@@ -48,10 +51,12 @@ class InitService:
             filesystem: Adapter for filesystem operations.
             manifest: Adapter for manifest operations.
             agent_writer: Adapter for agent file generation.
+            model_downloader: Adapter for ML model downloads.
         """
         self._filesystem = filesystem
         self._manifest = manifest
         self._agent_writer = agent_writer
+        self._model_downloader = model_downloader
 
     def execute(self, project_name: str, target_dir: Path) -> None:
         """Execute project initialization.
@@ -87,6 +92,19 @@ class InitService:
         # Generate agent file
         agent_path = target_dir / ".github" / "agents" / "nest.agent.md"
         self._agent_writer.generate(project_name.strip(), agent_path)
+
+        # Download ML models if needed
+        try:
+            if self._model_downloader.are_models_cached():
+                info("ML models already cached ✓")
+            else:
+                info("Downloading ML models (first-time setup)...")
+                self._model_downloader.download_if_needed(progress=True)
+                cache_path = self._model_downloader.get_cache_path()
+                success(f"Models cached at {cache_path}")
+        except ModelError:
+            # Re-raise to be handled by CLI layer
+            raise
 
         # Handle gitignore
         self._update_gitignore(target_dir)

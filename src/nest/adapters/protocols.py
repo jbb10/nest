@@ -143,3 +143,42 @@ class AgentWriterProtocol(Protocol):
             IOError: If file cannot be written.
         """
         ...
+
+
+@runtime_checkable
+class ModelDownloaderProtocol(Protocol):
+    """Protocol for ML model download operations.
+
+    Implementations handle checking cache status and downloading
+    required models for document processing.
+    """
+
+    def are_models_cached(self) -> bool:
+        """Check if required models are already cached.
+
+        Returns:
+            True if all required models are present, False otherwise.
+        """
+        ...
+
+    def download_if_needed(self, progress: bool = True) -> bool:
+        """Download models if not already cached.
+
+        Args:
+            progress: Whether to show download progress bars.
+
+        Returns:
+            True if download occurred, False if already cached.
+
+        Raises:
+            ModelError: If download fails after retries.
+        """
+        ...
+
+    def get_cache_path(self) -> Path:
+        """Get the path to the model cache directory.
+
+        Returns:
+            Path to the cache directory.
+        """
+        ...
