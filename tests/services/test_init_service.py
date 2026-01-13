@@ -269,6 +269,6 @@ def test_init_service_skips_download_when_models_cached(
 
     service.execute("Nike", Path("/project"))
 
-    # Download method is called but returns False (cached)
-    assert mock_model_downloader_cached.download_called is True
+    # are_models_cached() returns True, so download_if_needed() should not be called
+    assert mock_model_downloader_cached.download_called is False
 

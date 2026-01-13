@@ -154,3 +154,24 @@ class TestDoclingModelDownloader:
         # Verify exponential backoff: 1s, 2s
         assert mock_sleep.call_args_list[0][0][0] == 1  # 2^0
         assert mock_sleep.call_args_list[1][0][0] == 2  # 2^1
+
+    @patch("nest.adapters.docling_downloader.shutil.disk_usage")
+    def test_download_raises_error_on_insufficient_disk_space(
+        self, mock_disk_usage: MagicMock, tmp_path: Path
+    ) -> None:
+        """Test ModelError raised when insufficient disk space available."""
+        downloader = DoclingModelDownloader()
+
+        # Simulate insufficient disk space (1GB free, need 2.5GB)
+        mock_usage = MagicMock()
+        mock_usage.free = 1024 * 1024 * 1024  # 1GB in bytes
+        mock_disk_usage.return_value = mock_usage
+
+        with patch("nest.adapters.docling_downloader.settings") as mock_settings:
+            mock_settings.cache_dir = tmp_path
+
+            with pytest.raises(ModelError) as exc_info:
+                downloader.download_if_needed(progress=True)
+
+        assert "Insufficient disk space" in str(exc_info.value)
+        assert "2500MB required" in str(exc_info.value)

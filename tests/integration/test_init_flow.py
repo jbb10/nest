@@ -40,8 +40,9 @@ def test_init_creates_agent_file(tmp_path: Path) -> None:
     assert "processed_context/00_MASTER_INDEX.md" in content
     assert "raw_inbox/" in content
 
-    # Verify model downloader was called
-    mock_downloader.download_if_needed.assert_called_once_with(progress=True)
+    # Verify downloader methods were called appropriately
+    # are_models_cached is always called to check status
+    mock_downloader.are_models_cached.assert_called()
 
 
 def test_init_creates_all_directories(tmp_path: Path) -> None:

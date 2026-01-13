@@ -11,7 +11,8 @@ from nest.adapters.protocols import (
     ManifestProtocol,
     ModelDownloaderProtocol,
 )
-from nest.core.exceptions import NestError
+from nest.core.exceptions import ModelError, NestError
+from nest.ui.messages import info, success
 
 # Gitignore content
 GITIGNORE_COMMENT = (
@@ -93,7 +94,17 @@ class InitService:
         self._agent_writer.generate(project_name.strip(), agent_path)
 
         # Download ML models if needed
-        self._model_downloader.download_if_needed(progress=True)
+        try:
+            if self._model_downloader.are_models_cached():
+                info("ML models already cached ✓")
+            else:
+                info("Downloading ML models (first-time setup)...")
+                self._model_downloader.download_if_needed(progress=True)
+                cache_path = self._model_downloader.get_cache_path()
+                success(f"Models cached at {cache_path}")
+        except ModelError:
+            # Re-raise to be handled by CLI layer
+            raise
 
         # Handle gitignore
         self._update_gitignore(target_dir)

@@ -362,26 +362,35 @@ None - implementation proceeded smoothly following TDD approach.
 
 **Implementation Summary:**
 - ✅ All 7 tasks completed following red-green-refactor cycle
-- ✅ 29 tests passing (8 new tests for DoclingModelDownloader)
+- ✅ 30 tests passing (9 tests for DoclingModelDownloader, +1 disk space test)
 - ✅ All linting checks passing
 - ✅ All type checks passing (pyright strict mode)
 - ✅ Docling dependency (v2.0+) added to pyproject.toml
 
+**Code Review Fixes Applied:**
+- ✅ Added user feedback messages for AC1/AC2 ("Downloading ML models...", "Models cached at...")
+- ✅ Added disk space check before download (AC4)
+- ✅ Added disk space error test
+- ✅ Added uv.lock to File List
+- ✅ Improved docstrings and constants
+- ✅ All tests updated and passing
+
 **Key Implementation Decisions:**
-1. **No separate ModelService** - Progress display delegated to Docling's built-in `progress=True` parameter
-2. **Retry logic** - Custom exponential backoff implementation (cleaner than adding tenacity dependency)
-3. **Cache detection** - Checks for `docling-project--docling-models` folder presence
-4. **CLI integration** - Updated both `main.py` and `init_cmd.py` composition roots
-5. **Test mocks** - Added `MockModelDownloader` to `conftest.py` for reusable fixtures
+1. **User feedback in InitService** - Console messages show download status and cache location
+2. **Disk space check** - Validates 2.5GB free space before download attempt
+3. **Retry logic** - Custom exponential backoff implementation (cleaner than adding tenacity dependency)
+4. **Cache detection** - Checks for `docling-project--docling-models` folder presence
+5. **CLI integration** - Updated both `main.py` and `init_cmd.py` composition roots
+6. **Test mocks** - Added `MockModelDownloader` to `conftest.py` for reusable fixtures
 
 **Acceptance Criteria Coverage:**
-- AC1: ✅ First-time download with progress (via Docling's built-in progress bars)
-- AC2: ✅ Cached models skipped (are_models_cached() check)
+- AC1: ✅ First-time download with progress + user messages ("Downloading ML models...", "Models cached at ~/.cache/docling/")
+- AC2: ✅ Cached models skipped + user message ("ML models already cached ✓")
 - AC3: ✅ Network error handling with 3 retries and ModelError
-- AC4: ✅ Error handling infrastructure in place (Docling handles disk space internally)
+- AC4: ✅ Disk space validation before download with clear error messages
 
 **Testing Strategy:**
-- Unit tests: DoclingModelDownloader adapter (8 tests)
+- Unit tests: DoclingModelDownloader adapter (9 tests including disk space)
 - Integration tests: InitService with model downloader
 - All existing tests updated to include mock_model_downloader fixture
 
@@ -397,6 +406,7 @@ None - implementation proceeded smoothly following TDD approach.
 - `src/nest/cli/main.py` - Added DoclingModelDownloader to composition root
 - `src/nest/cli/init_cmd.py` - Added DoclingModelDownloader to composition root
 - `pyproject.toml` - Added docling>=2.0.0 dependency
+- `uv.lock` - Updated dependencies lockfile
 - `tests/conftest.py` - Added MockModelDownloader fixtures
 - `tests/services/test_init_service.py` - Updated all tests with model_downloader param
 - `tests/integration/test_init_flow.py` - Updated integration tests with mocked downloader

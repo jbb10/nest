@@ -3,6 +3,7 @@
 Wraps Docling's download_models() utility for ML model management.
 """
 
+import shutil
 import time
 from pathlib import Path
 
@@ -15,8 +16,9 @@ from nest.core.exceptions import ModelError
 class DoclingModelDownloader:
     """Adapter for downloading and caching Docling ML models.
 
-    Uses Docling's built-in model downloader with retry logic for
-    network failures. Manages model cache at ~/.cache/docling/models/.
+    Uses Docling's built-in model downloader with exponential backoff
+    retry logic (3 attempts) for network failures. Downloads ~2GB of
+    models to ~/.cache/docling/models/.
     """
 
     DEFAULT_MODELS = {
@@ -28,9 +30,12 @@ class DoclingModelDownloader:
     }
 
     MAX_RETRIES = 3
+    # Docling's Hugging Face cache folder name
     REQUIRED_CACHE_FOLDERS = [
         "docling-project--docling-models",
     ]
+    # Approximate total size of all models in MB
+    REQUIRED_DISK_SPACE_MB = 2500
 
     def are_models_cached(self) -> bool:
         """Check if required models are already cached.
@@ -72,6 +77,17 @@ class DoclingModelDownloader:
         """
         return settings.cache_dir / "models"
 
+    def check_disk_space(self) -> bool:
+        """Check if sufficient disk space is available for model download.
+
+        Returns:
+            True if sufficient space (2.5GB+) available, False otherwise.
+        """
+        cache_dir = settings.cache_dir
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        free_mb = shutil.disk_usage(cache_dir).free // (1024 * 1024)
+        return free_mb >= self.REQUIRED_DISK_SPACE_MB
+
     def _download_with_retry(self, progress: bool) -> None:
         """Download models with exponential backoff retry logic.
 
@@ -79,8 +95,15 @@ class DoclingModelDownloader:
             progress: Whether to show download progress bars.
 
         Raises:
-            ModelError: If all retry attempts fail.
+            ModelError: If all retry attempts fail or insufficient disk space.
         """
+        # Check disk space before attempting download
+        if not self.check_disk_space():
+            raise ModelError(
+                f"Insufficient disk space for ML models. "
+                f"At least {self.REQUIRED_DISK_SPACE_MB}MB required in {settings.cache_dir}"
+            )
+
         last_exception: Exception | None = None
 
         for attempt in range(self.MAX_RETRIES):
