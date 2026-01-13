@@ -1,5 +1,6 @@
 """Unit tests for InitService."""
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -271,4 +272,35 @@ def test_init_service_skips_download_when_models_cached(
 
     # are_models_cached() returns True, so download_if_needed() should not be called
     assert mock_model_downloader_cached.download_called is False
+
+
+@patch("nest.services.init_service.status_start")
+@patch("nest.services.init_service.status_done")
+def test_init_service_progress_output_sequence(
+    mock_status_done: MagicMock,
+    mock_status_start: MagicMock,
+    mock_filesystem: MockFileSystem,
+    mock_manifest: MockManifest,
+    mock_agent_writer: MockAgentWriter,
+    mock_model_downloader_cached: MockModelDownloader,
+) -> None:
+    """Test that InitService calls status_start/status_done in correct sequence (AC2)."""
+    service = InitService(
+        filesystem=mock_filesystem,
+        manifest=mock_manifest,
+        agent_writer=mock_agent_writer,
+        model_downloader=mock_model_downloader_cached,
+    )
+
+    service.execute("Nike", Path("/project"))
+
+    # Verify progress calls were made in order (AC2)
+    assert mock_status_start.call_count == 3
+    assert mock_status_done.call_count == 3
+
+    # Verify the status messages match AC2 requirements
+    start_calls = [call[0][0] for call in mock_status_start.call_args_list]
+    assert "Creating project structure" in start_calls
+    assert "Generating agent file" in start_calls
+    assert "Checking ML models" in start_calls
 

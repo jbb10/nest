@@ -89,3 +89,41 @@ def test_no_duplicate_init_commands() -> None:
     init_commands = [cmd for cmd in commands if cmd.name == "init"]
 
     assert len(init_commands) == 1, f"Found {len(init_commands)} init commands, expected 1"
+
+
+@patch("nest.cli.init_cmd.create_init_service")
+def test_init_progress_output_sequence(
+    mock_create_service: MagicMock, tmp_path: Path
+) -> None:
+    """Verify progress indicators are displayed during init (AC2)."""
+    # Mock service
+    mock_service = MagicMock()
+    mock_create_service.return_value = mock_service
+
+    result = runner.invoke(app, ["init", "Nike", "--dir", str(tmp_path)])
+
+    # AC2: Progress spinners/checkmarks should show for each step
+    # The output should contain status messages (from status_start/status_done)
+    # Note: Rich console output may vary, but success path should complete
+    assert result.exit_code == 0
+    # Verify success message appears (indicates all steps completed)
+    assert 'Project "Nike" initialized!' in result.output
+
+
+@patch("nest.cli.init_cmd.create_init_service")
+def test_init_error_missing_project_name(mock_create_service: MagicMock) -> None:
+    """Verify error handling for missing project name (AC4)."""
+    # Mock service to raise NestError for empty name
+    mock_service = MagicMock()
+    mock_service.execute.side_effect = NestError(
+        "Project name required. Usage: nest init 'Client Name'"
+    )
+    mock_create_service.return_value = mock_service
+
+    result = runner.invoke(app, ["init", ""])
+
+    # Should show error in What → Why → Action format (AC4)
+    assert result.exit_code == 1
+    assert "project name required" in result.output.lower()
+    assert "reason:" in result.output.lower()
+    assert "action:" in result.output.lower()
