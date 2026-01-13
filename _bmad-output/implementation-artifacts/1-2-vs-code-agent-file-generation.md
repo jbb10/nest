@@ -7,7 +7,7 @@ Branch: feat/1-2-vs-code-agent-file-generation
 
 ## Story
 
-**As a** consultant,
+**As a** user,
 **I want** the `@nest` agent to be automatically created during init,
 **So that** I can immediately use it in VS Code Copilot Chat.
 

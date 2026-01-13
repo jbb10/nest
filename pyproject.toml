@@ -1,7 +1,7 @@
 [project]
 name = "nest"
 version = "1.0.0"
-description = "AI-powered document context tool for consultants"
+description = "AI-powered document context tool for projects"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

@@ -149,7 +149,7 @@ Given the specific technology stack (Typer + Rich + Docling + uv), general Pytho
 | **Testing** | pytest | Python standard, excellent plugin ecosystem |
 | **Type Checking** | Pyright (strict) | Matches VSCode/Pylance, fast, strict by default |
 | **Linting/Formatting** | Ruff | Modern, fast (Rust-based), replaces flake8+black+isort |
-| **CI Platform** | Azure Pipelines | Matches Azure DevOps distribution |
+| **CI Platform** | GitHub Actions | Matches GitHub distribution |
 
 ### Branching Strategy: Trunk-Based with Release Tags
 
@@ -214,7 +214,7 @@ BREAKING CHANGE: Agent files now use .agent.md extension
 ### CI Strategy
 
 **Script-Based Architecture:**
-All CI logic lives in scripts that run both locally (for AI agents) and in Azure Pipelines.
+All CI logic lives in scripts that run both locally (for AI agents) and in GitHub Actions.
 
 ```
 scripts/
@@ -224,51 +224,54 @@ scripts/
 └── ci-integration.sh   # Docling processing tests (matrix: per Python version)
 ```
 
-**Azure Pipeline (`azure-pipelines.yml`):**
+**GitHub Actions (`.github/workflows/ci.yml`):**
 
 ```yaml
-trigger:
-  branches:
-    include: [main]
-  tags:
-    include: ['v*']
+name: CI
 
-stages:
-  - stage: Validate
-    jobs:
-      - job: Lint
-        pool: { vmImage: 'ubuntu-latest' }
-        steps:
-          - script: ./scripts/ci-lint.sh
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
 
-      - job: TypeCheck
-        pool: { vmImage: 'ubuntu-latest' }
-        steps:
-          - script: ./scripts/ci-typecheck.sh
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/ci-lint.sh
 
-      - job: Test
-        pool: { vmImage: 'ubuntu-latest' }
-        strategy:
-          matrix:
-            Python310: { pythonVersion: '3.10' }
-            Python311: { pythonVersion: '3.11' }
-            Python312: { pythonVersion: '3.12' }
-        steps:
-          - task: UsePythonVersion@0
-            inputs: { versionSpec: '$(pythonVersion)' }
-          - script: ./scripts/ci-test.sh
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/ci-typecheck.sh
 
-      - job: Integration
-        pool: { vmImage: 'ubuntu-latest' }
-        strategy:
-          matrix:
-            Python310: { pythonVersion: '3.10' }
-            Python311: { pythonVersion: '3.11' }
-            Python312: { pythonVersion: '3.12' }
-        steps:
-          - task: UsePythonVersion@0
-            inputs: { versionSpec: '$(pythonVersion)' }
-          - script: ./scripts/ci-integration.sh
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: ./scripts/ci-test.sh
+
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: ./scripts/ci-integration.sh
 ```
 
 **Local Execution (AI Agents):**
@@ -284,7 +287,7 @@ done
 
 ### CD Strategy: Local Release with Human Gate
 
-**Releases are executed from developer terminal, NOT from ADO pipeline.**
+**Releases are executed from developer terminal, NOT from GitHub Actions pipeline.**
 
 **`scripts/release.sh` Workflow:**
 
@@ -329,7 +332,7 @@ done
 **Critical:** The `latest` tag is ALWAYS moved to point to the newest release. This ensures `uv tool install ...@latest` gets the most recent stable version.
 
 **Post-Push:**
-ADO pipeline triggers on tag push and runs release validation (same CI suite) as safety confirmation.
+GitHub Actions triggers on tag push and runs release validation (same CI suite) as safety confirmation.
 
 **git-cliff Configuration (`cliff.toml`):**
 
@@ -375,7 +378,7 @@ commit_parsers = [
 **Schema:**
 ```toml
 [install]
-source = "git+https://dev.azure.com/org/project/_git/nest"
+source = "git+https://github.com/jbjornsson/nest"
 installed_version = "1.2.0"
 installed_at = "2026-01-12T10:30:00Z"
 ```
@@ -422,7 +425,7 @@ $ nest update
 
 **Initial Install:**
 ```bash
-$ uv tool install git+https://dev.azure.com/org/project/_git/nest@latest
+$ uv tool install git+https://github.com/jbjornsson/nest@latest
 
 Installing nest v1.2.0...
 ✓ Installed nest
@@ -1066,8 +1069,7 @@ def process(path):  # No types
 nest/
 ├── .github/
 │   └── workflows/
-│       └── (ADO pipeline in azure-pipelines.yml instead)
-├── azure-pipelines.yml              # CI pipeline definition
+│       └── ci.yml                   # CI workflow definition
 ├── cliff.toml                       # git-cliff changelog config
 ├── pyproject.toml                   # Package definition, dependencies, tool config
 ├── README.md                        # Project overview, installation, usage
@@ -1285,7 +1287,7 @@ class AgentWriterProtocol(Protocol):
 |------|--------|
 | `pyproject.toml` | Package metadata, dependencies, tool config (Ruff, Pyright, pytest) |
 | `cliff.toml` | Changelog generation from conventional commits |
-| `azure-pipelines.yml` | CI pipeline: lint, typecheck, test matrix |
+| `.github/workflows/ci.yml` | CI workflow: lint, typecheck, test matrix |
 | `scripts/release.sh` | Release workflow with human approval gate |
 | `src/nest/cli/main.py` | Typer app definition, composition root |
 | `src/nest/core/exceptions.py` | `NestError`, `ProcessingError`, `ConfigError`, etc. |
@@ -1433,7 +1435,7 @@ Project structure fully supports architectural decisions:
 **✅ Architectural Decisions**
 - [x] Critical decisions documented (structure, DI, error handling)
 - [x] Technology stack fully specified (Python 3.10+, Typer, Rich, Docling, Pydantic)
-- [x] CI/CD strategy defined (Azure Pipelines + local scripts)
+- [x] CI/CD strategy defined (GitHub Actions + local scripts)
 - [x] Release process documented (trunk-based, conventional commits, git-cliff)
 
 **✅ Implementation Patterns**

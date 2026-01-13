@@ -16,7 +16,7 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 
 ### Functional Requirements
 
-**FR1:** `nest init "Client Name"` creates project structure with `raw_inbox/`, `processed_context/` directories
+**FR1:** `nest init "Project Name"` creates project structure with `raw_inbox/`, `processed_context/` directories
 **FR2:** `nest init` creates `.github/agents/nest.agent.md` in VS Code Custom Agent format (frontmatter + instructions)
 **FR3:** `nest init` creates empty `.nest_manifest.json` manifest file
 **FR4:** `nest init` downloads Docling ML models (~1.5-2GB) if not already cached, with progress display
@@ -64,7 +64,7 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 - Testing: pytest with coverage
 - Type checking: Pyright (strict mode)
 - Linting/Formatting: Ruff
-- CI: Azure Pipelines with matrix testing (Python 3.10, 3.11, 3.12)
+- CI: GitHub Actions with matrix testing (Python 3.10, 3.11, 3.12)
 
 **From Architecture — CI/CD:**
 - Script-based CI: `scripts/ci-lint.sh`, `ci-typecheck.sh`, `ci-test.sh`, `ci-integration.sh`
@@ -117,7 +117,7 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 ## Epic List
 
 ### Epic 1: Project Initialization
-As a consultant starting a new client project, I can run a single command to create a smart, AI-ready folder structure so I'm immediately set up to start adding documents.
+As a user starting a new project, I can run a single command to create a smart, AI-ready folder structure so I'm immediately set up to start adding documents.
 
 **FRs covered:** FR1, FR2, FR3, FR4
 
@@ -130,7 +130,7 @@ As a consultant starting a new client project, I can run a single command to cre
 ---
 
 ### Epic 2: Document Processing & Sync
-As a user with client documents, I can drop them into a folder and have them automatically converted into AI-readable Markdown, so my Copilot agent can understand them.
+As a user with project documents, I can drop them into a folder and have them automatically converted into AI-readable Markdown, so my Copilot agent can understand them.
 
 **FRs covered:** FR5, FR6, FR7, FR8, FR9, FR10, FR11, FR12, FR13, FR14
 
@@ -174,12 +174,12 @@ As a user, I can keep my Nest installation up-to-date and ensure my agent templa
 
 ## Epic 1: Project Initialization
 
-As a consultant starting a new client project, I can run a single command to create a smart, AI-ready folder structure so I'm immediately set up to start adding documents.
+As a user starting a new project, I can run a single command to create a smart, AI-ready folder structure so I'm immediately set up to start adding documents.
 
 ### Story 1.1: Project Scaffolding
 
-**As a** consultant starting a new project,
-**I want** to run `nest init "Client Name"` and have the basic folder structure created,
+**As a** user starting a new project,
+**I want** to run `nest init "Project Name"` and have the basic folder structure created,
 **So that** I have a properly organized workspace ready for documents.
 
 **Acceptance Criteria:**
@@ -212,7 +212,7 @@ As a consultant starting a new client project, I can run a single command to cre
 
 **Given** I run `nest init` without a project name
 **When** the command executes
-**Then** an error is displayed: "Project name required. Usage: nest init 'Client Name'"
+**Then** an error is displayed: "Project name required. Usage: nest init 'Project Name'"
 
 **Given** I run `nest init` in a directory that already has `.nest_manifest.json`
 **When** the command executes
@@ -222,7 +222,7 @@ As a consultant starting a new client project, I can run a single command to cre
 
 ### Story 1.2: VS Code Agent File Generation
 
-**As a** consultant,
+**As a** user,
 **I want** the `@nest` agent to be automatically created during init,
 **So that** I can immediately use it in VS Code Copilot Chat.
 
@@ -335,7 +335,7 @@ Supported formats: PDF, DOCX, PPTX, XLSX, HTML
 
 ## Epic 2: Document Processing & Sync
 
-As a user with client documents, I can drop them into a folder and have them automatically converted into AI-readable Markdown, so my Copilot agent can understand them.
+As a user with project documents, I can drop them into a folder and have them automatically converted into AI-readable Markdown, so my Copilot agent can understand them.
 
 ### Story 2.1: File Discovery & Checksum Engine
 
@@ -856,7 +856,7 @@ As a user, I can keep my Nest installation up-to-date and ensure my agent templa
 **Then** `~/.config/nest/config.toml` is created with:
 ```toml
 [install]
-source = "git+https://dev.azure.com/org/project/_git/nest"
+source = "git+https://github.com/jbjornsson/nest"
 installed_version = "1.0.0"
 installed_at = "2026-01-12T10:30:00Z"
 ```
@@ -965,7 +965,7 @@ $ nest update
 ```
 ✓ Updated to version 1.4.0
 
-  What's new: https://dev.azure.com/.../CHANGELOG.md
+  What's new: https://github.com/jbjornsson/nest/blob/main/CHANGELOG.md
 ```
 
 ---

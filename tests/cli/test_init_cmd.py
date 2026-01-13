@@ -116,7 +116,7 @@ def test_init_error_missing_project_name(mock_create_service: MagicMock) -> None
     # Mock service to raise NestError for empty name
     mock_service = MagicMock()
     mock_service.execute.side_effect = NestError(
-        "Project name required. Usage: nest init 'Client Name'"
+        "Project name required. Usage: nest init 'Project Name'"
     )
     mock_create_service.return_value = mock_service
 

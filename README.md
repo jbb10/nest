@@ -1,6 +1,6 @@
 # Nest
 
-AI-powered document context tool for consultants.
+AI-powered document context tool for projects.
 
 ## Overview
 

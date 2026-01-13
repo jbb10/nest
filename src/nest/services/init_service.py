@@ -73,7 +73,7 @@ class InitService:
         """
         # Validate project name
         if not project_name or not project_name.strip():
-            raise NestError("Project name required. Usage: nest init 'Client Name'")
+            raise NestError("Project name required. Usage: nest init 'Project Name'")
 
         # Check for existing project
         if self._manifest.exists(target_dir):

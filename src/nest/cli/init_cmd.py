@@ -34,7 +34,7 @@ def create_init_service() -> InitService:
 
 def init_command(
     project_name: Annotated[
-        str, typer.Argument(help="The project/client name (e.g., 'Nike')")
+        str, typer.Argument(help="The project name (e.g., 'Nike')")
     ],
     target_dir: Annotated[
         Path | None,
@@ -87,7 +87,7 @@ def init_command(
             )
         elif "Project name required" in error_msg:
             console.print("  [dim]Reason: No project name was provided[/dim]")
-            console.print("  [dim]Action: nest init 'Client Name'[/dim]")
+            console.print("  [dim]Action: nest init 'Project Name'[/dim]")
         else:
             # Generic action for other errors
             console.print(f"  [dim]Reason: {error_msg}[/dim]")

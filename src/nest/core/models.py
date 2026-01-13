@@ -4,9 +4,13 @@ These Pydantic models define the structure of core business entities.
 """
 
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+# Type alias for file change status during discovery
+FileStatus = Literal["new", "modified", "unchanged"]
 
 
 class FileEntry(BaseModel):
@@ -41,3 +45,46 @@ class Manifest(BaseModel):
     project_name: str
     last_sync: datetime | None = None
     files: dict[str, FileEntry] = Field(default_factory=dict)
+
+
+class DiscoveredFile(BaseModel):
+    """Represents a file discovered during sync with its status.
+
+    Attributes:
+        path: Absolute path to the discovered file.
+        status: Change status compared to manifest (new/modified/unchanged).
+        checksum: SHA-256 hash of the file content.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    path: Path
+    status: FileStatus
+    checksum: str
+
+
+class DiscoveryResult(BaseModel):
+    """Result of file discovery operation.
+
+    Groups discovered files by their change status for efficient
+    batch processing during sync.
+
+    Attributes:
+        new_files: Files not present in manifest.
+        modified_files: Files with different checksums than manifest.
+        unchanged_files: Files with matching checksums (to be skipped).
+    """
+
+    new_files: list[DiscoveredFile] = Field(default_factory=lambda: [])
+    modified_files: list[DiscoveredFile] = Field(default_factory=lambda: [])
+    unchanged_files: list[DiscoveredFile] = Field(default_factory=lambda: [])
+
+    @property
+    def pending_count(self) -> int:
+        """Count of files requiring processing (new + modified)."""
+        return len(self.new_files) + len(self.modified_files)
+
+    @property
+    def total_count(self) -> int:
+        """Total count of all discovered files."""
+        return len(self.new_files) + len(self.modified_files) + len(self.unchanged_files)

@@ -4,29 +4,29 @@
 | :--- | :--- |
 | **Version** | 1.0.0 |
 | **Status** | **Draft / Ready for Development** |
-| **Target User** | Consultants, Analysts, Developers |
+| **Target User** | Project Teams, Analysts, Developers |
 | **Platform** | macOS / Linux / Windows (via Python CLI) |
 | **Integration** | VS Code (GitHub Copilot) |
 
 ---
 
 ## 1. Executive Summary
-**Nest** is a lightweight CLI tool that creates a "Project Brain" from raw documents. It ingests client files (PDF, Excel, PPTX), converts them into AI-optimized Markdown, and generates a specialized **VS Code Copilot Agent** (`@nest`) that has deep knowledge of that specific project.
+**Nest** is a lightweight CLI tool that creates a "Project Brain" from raw documents. It ingests project files (PDF, Excel, PPTX), converts them into AI-optimized Markdown, and generates a specialized **VS Code Copilot Agent** (`@nest`) that has deep knowledge of that specific project.
 
-**Core Philosophy:** "Global Tool, Local Intelligence." The logic lives on the user's machine; the intelligence lives in the client's folder.
+**Core Philosophy:** "Global Tool, Local Intelligence." The logic lives on the user's machine; the intelligence lives in the project's folder.
 
 ---
 
 ## 2. User Stories
 
 ### 2.1 The Setup
-> As a consultant starting a new project, I want to run a single command to scaffold a "smart" folder structure so that I don't have to manually organize my files or write prompt instructions.
+> As a user starting a new project, I want to run a single command to scaffold a "smart" folder structure so that I don't have to manually organize my files or write prompt instructions.
 
 ### 2.2 The Ingestion
-> As a user with 50+ client PDFs, I want to drop them into a folder and have them automatically converted into clean, readable text so that my AI agent can actually understand them without hallucinations.
+> As a user with 50+ project PDFs, I want to drop them into a folder and have them automatically converted into clean, readable text so that my AI agent can actually understand them without hallucinations.
 
 ### 2.3 The Interaction
-> As a developer working in VS Code, I want to select a `@nest` agent from my Copilot dropdown when I have a specific question about the client's documents, but I want to switch back to the standard `@workspace` agent when I am just writing Python code, so I don't get irrelevant context.
+> As a developer working in VS Code, I want to select a `@nest` agent from my Copilot dropdown when I have a specific question about the project's documents, but I want to switch back to the standard `@workspace` agent when I am just writing Python code, so I don't get irrelevant context.
 
 ---
 
@@ -36,7 +36,7 @@
 Nest operates as a global CLI that manages local files. It does not run a background daemon.
 
 ```text
-my-client-project/
+my-project/
 ├── .github/
 │   └── agents/
 │       └── nest.agent.md       <-- The "Persona" (VS Code picks this up automatically)
@@ -59,8 +59,8 @@ my-client-project/
 * `uv` must be installed on the user's machine. Users without `uv` should follow [uv installation instructions](https://docs.astral.sh/uv/getting-started/installation/).
 
 **Distribution Channel:**
-* Primary: Corporate Azure DevOps Git repository (internal distribution).
-* Installation command: `uv tool install git+https://dev.azure.com/org/project/_git/nest`
+* Primary: Public GitHub repository.
+* Installation command: `uv tool install git+https://github.com/jbjornsson/nest`
 
 **First-Run Model Download:**
 * Docling requires ML models (~1.5-2GB) for document processing.
@@ -77,7 +77,7 @@ my-client-project/
 ## 4. Feature Specifications
 
 ### 4.1 Command: `nest init`
-**Trigger:** `nest init "Client Name"`
+**Trigger:** `nest init "Project Name"`
 **Behavior:**
 1.  Creates directories: `raw_inbox/`, `processed_context/`.
 2.  Creates `.github/agents/nest.agent.md`.
@@ -100,11 +100,11 @@ $ nest init "Nike"
 ```markdown
 ---
 name: nest
-description: Expert analyst for [Client Name] project documents
+description: Expert analyst for [Project Name] project documents
 icon: book
 ---
 # ROLE
-You are the dedicated AI analyst for [Client Name].
+You are the dedicated AI analyst for [Project Name].
 Your goal is to assist the user by navigating and synthesizing the project documentation located in `processed_context/`.
 
 # KNOWLEDGE BASE

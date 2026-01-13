@@ -182,3 +182,37 @@ class ModelDownloaderProtocol(Protocol):
             Path to the cache directory.
         """
         ...
+
+
+@runtime_checkable
+class FileDiscoveryProtocol(Protocol):
+    """Protocol for file discovery operations.
+
+    Implementations handle recursive file discovery with extension filtering.
+    Used to find documents in raw_inbox/ for processing.
+    """
+
+    def discover(self, directory: Path, extensions: set[str]) -> list[Path]:
+        """Discover files recursively in a directory, filtered by extension.
+
+        Searches the given directory and all subdirectories for files
+        matching the specified extensions. Hidden files and directories
+        (starting with '.') are excluded.
+
+        Args:
+            directory: Root directory to search.
+            extensions: Set of allowed file extensions (e.g., {".pdf", ".docx"}).
+                        Extensions should be lowercase with leading dot.
+
+        Returns:
+            Sorted list of absolute paths to discovered files.
+            Sorting ensures deterministic ordering.
+
+        Example:
+            >>> adapter = FileDiscoveryAdapter()
+            >>> files = adapter.discover(
+            ...     Path("raw_inbox"),
+            ...     {".pdf", ".docx"}
+            ... )
+        """
+        ...

@@ -7,8 +7,8 @@ Branch: feat/1-1-project-scaffolding
 
 ## Story
 
-**As a** consultant starting a new project,
-**I want** to run `nest init "Client Name"` and have the basic folder structure created,
+**As a** user starting a new project,
+**I want** to run `nest init "Project Name"` and have the basic folder structure created,
 **So that** I have a properly organized workspace ready for documents.
 
 ---
@@ -51,7 +51,7 @@ Branch: feat/1-1-project-scaffolding
 ### AC5: Missing Project Name Error
 **Given** I run `nest init` without a project name
 **When** the command executes
-**Then** an error is displayed: "Project name required. Usage: nest init 'Client Name'"
+**Then** an error is displayed: "Project name required. Usage: nest init 'Project Name'"
 
 ### AC6: Existing Project Error
 **Given** I run `nest init` in a directory that already has `.nest_manifest.json`
