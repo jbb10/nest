@@ -12,7 +12,7 @@ from nest.adapters.docling_downloader import DoclingModelDownloader
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.agents.vscode_writer import VSCodeAgentWriter
-from nest.core.exceptions import NestError
+from nest.core.exceptions import ModelError, NestError
 from nest.services.init_service import InitService
 from nest.ui.messages import error, get_console, success
 
@@ -65,8 +65,31 @@ def init_command(
         console.print()
         console.print("[dim]Supported formats: PDF, DOCX, PPTX, XLSX, HTML[/dim]")
 
+    except ModelError as e:
+        # What → Why → Action format for model errors
+        error("Cannot download ML models")
+        console.print(f"  [dim]Reason: {e}[/dim]")
+        console.print(
+            "  [dim]Action: Check your internet connection and run "
+            "[cyan]nest init[/cyan] again[/dim]"
+        )
+        raise typer.Exit(1) from None
+
     except NestError as e:
-        error(str(e))
-        if "already exists" in str(e):
-            console.print("  [dim]Use `nest sync` to process documents instead.[/dim]")
+        error_msg = str(e)
+        error(error_msg.split(".")[0])  # First sentence as "What"
+
+        # Provide context-specific guidance (What → Why → Action)
+        if "already exists" in error_msg:
+            console.print("  [dim]Reason: .nest_manifest.json found in this directory[/dim]")
+            console.print(
+                "  [dim]Action: Use [cyan]nest sync[/cyan] to process documents instead[/dim]"
+            )
+        elif "Project name required" in error_msg:
+            console.print("  [dim]Reason: No project name was provided[/dim]")
+            console.print("  [dim]Action: nest init 'Client Name'[/dim]")
+        else:
+            # Generic action for other errors
+            console.print(f"  [dim]Reason: {error_msg}[/dim]")
+
         raise typer.Exit(1) from None

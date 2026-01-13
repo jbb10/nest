@@ -126,7 +126,14 @@ class DoclingModelDownloader:
                     time.sleep(2 ** attempt)
 
         # All retries exhausted
+        self._cleanup_partial_download()
         raise ModelError(
             "Failed to download ML models after 3 attempts. "
             "Check your internet connection and try again."
         ) from last_exception
+
+    def _cleanup_partial_download(self) -> None:
+        """Clean up partial downloads on failure."""
+        cache_dir = self.get_cache_path()
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir, ignore_errors=True)
