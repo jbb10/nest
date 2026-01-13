@@ -7,6 +7,7 @@ import typer
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.agents.vscode_writer import VSCodeAgentWriter
+from nest.core.exceptions import NestError
 from nest.services.init_service import InitService
 from nest.ui.messages import error, success
 
@@ -42,13 +43,14 @@ def init_command(
 
         # Success message
         success(f"Nest project '{project_name}' initialized")
+        typer.echo("  Created .github/agents/nest.agent.md")
         typer.echo("")
         typer.echo("Next steps:")
         typer.echo("  1. Add documents to raw_inbox/")
         typer.echo("  2. Run 'nest sync' to process documents")
         typer.echo("  3. Use @nest in VS Code Copilot Chat to query documents")
 
-    except Exception as e:
+    except NestError as e:
         error(str(e))
         raise typer.Exit(1) from e
 

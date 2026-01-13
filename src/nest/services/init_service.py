@@ -116,7 +116,3 @@ class InitService:
                 gitignore_path,
                 f"{GITIGNORE_COMMENT}\n{GITIGNORE_ENTRY}\n",
             )
-
-
-# Re-export NestError for convenience
-__all__ = ["InitService", "NestError"]

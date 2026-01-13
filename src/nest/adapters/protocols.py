@@ -5,11 +5,12 @@ Services depend on these protocols, not concrete implementations.
 """
 
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from nest.core.models import Manifest
 
 
+@runtime_checkable
 class ManifestProtocol(Protocol):
     """Protocol for manifest file operations.
 
@@ -64,6 +65,7 @@ class ManifestProtocol(Protocol):
         ...
 
 
+@runtime_checkable
 class FileSystemProtocol(Protocol):
     """Protocol for filesystem operations.
 
@@ -122,6 +124,7 @@ class FileSystemProtocol(Protocol):
         ...
 
 
+@runtime_checkable
 class AgentWriterProtocol(Protocol):
     """Protocol for generating agent instruction files.
 

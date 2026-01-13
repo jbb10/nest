@@ -1,6 +1,6 @@
 # Story 1.2: VS Code Agent File Generation
 
-Status: review
+Status: done
 Branch: feat/1-2-vs-code-agent-file-generation
 
 ---
@@ -509,7 +509,7 @@ No critical issues encountered. Implementation followed red-green-refactor cycle
 - ✅ Updated InitService to accept and call agent_writer during project initialization
 - ✅ Wired VSCodeAgentWriter into CLI composition root in main.py
 - ✅ Added jinja2>=3.1.0 dependency and configured package to include template files
-- ✅ Created comprehensive unit tests (4 tests) and integration tests (3 tests) - all passing
+- ✅ Created comprehensive unit tests (6 agent + 10 service) and integration tests (3 tests) - 19 total passing
 - ✅ Agent file correctly interpolates project name throughout template
 - ✅ Directory auto-creation works correctly (.github/agents/ created if missing)
 - ✅ All acceptance criteria validated and met
@@ -539,12 +539,26 @@ No critical issues encountered. Implementation followed red-green-refactor cycle
 - src/nest/adapters/manifest.py
 - tests/agents/__init__.py
 - tests/agents/test_vscode_writer.py
+- tests/services/__init__.py (code review)
+- tests/services/test_init_service.py (code review)
 - tests/integration/__init__.py
 - tests/integration/test_init_flow.py
 - README.md
 
 **Modified Files:**
-- src/nest/adapters/protocols.py (added AgentWriterProtocol)
+- src/nest/adapters/protocols.py (added AgentWriterProtocol, @runtime_checkable decorators)
 - src/nest/services/init_service.py (added agent_writer parameter and call)
+- src/nest/cli/main.py (added agent file creation message, narrowed exception handling)
+- tests/conftest.py (added MockAgentWriter fixture)
 - pyproject.toml (added jinja2 dependency and template file inclusion)
-- _bmad-output/implementation-artifacts/sprint-status.yaml (marked story in-progress)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (marked story done)
+
+### Code Review Fixes Applied
+
+- Created missing tests/services/test_init_service.py (10 tests) - Task 7.4 was incomplete
+- Moved MockFileSystem to conftest.py, removed duplication from test_vscode_writer.py
+- Added MockAgentWriter to conftest.py for shared test fixtures
+- Updated CLI to mention agent file creation on init success
+- Added @runtime_checkable to all protocols for isinstance() support
+- Narrowed CLI exception handling from Exception to NestError
+- Added special character handling test for project names
