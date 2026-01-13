@@ -1,0 +1,92 @@
+# generated: 2026-01-13
+# project: nest
+# project_key: nest
+# tracking_system: file-system
+# story_location: "{project-root}/_bmad-output/implementation-artifacts"
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-01-13
+project: nest
+project_key: nest
+tracking_system: file-system
+story_location: "_bmad-output/implementation-artifacts"
+
+development_status:
+  # ============================================================
+  # Epic 1: Project Initialization
+  # FR1, FR2, FR3, FR4 - nest init command
+  # ============================================================
+  epic-1: in-progress
+  1-1-project-scaffolding: ready-for-dev
+  1-2-vs-code-agent-file-generation: backlog
+  1-3-ml-model-download-and-caching: backlog
+  1-4-init-command-cli-integration: backlog
+  epic-1-retrospective: optional
+
+  # ============================================================
+  # Epic 2: Document Processing & Sync
+  # FR5-FR14 - nest sync command
+  # ============================================================
+  epic-2: backlog
+  2-1-file-discovery-and-checksum-engine: backlog
+  2-2-docling-document-processing: backlog
+  2-3-output-mirroring-and-file-writing: backlog
+  2-4-manifest-tracking-and-updates: backlog
+  2-5-master-index-generation: backlog
+  2-6-orphan-cleanup: backlog
+  2-7-sync-command-flags-and-error-handling: backlog
+  2-8-sync-command-cli-integration: backlog
+  epic-2-retrospective: optional
+
+  # ============================================================
+  # Epic 3: Project Visibility & Health
+  # FR18-FR22 - nest status & nest doctor commands
+  # ============================================================
+  epic-3: backlog
+  3-1-project-status-display: backlog
+  3-2-environment-validation: backlog
+  3-3-ml-model-validation: backlog
+  3-4-project-state-validation: backlog
+  3-5-issue-remediation: backlog
+  3-6-doctor-command-cli-integration: backlog
+  epic-3-retrospective: optional
+
+  # ============================================================
+  # Epic 4: Tool Updates & Maintenance
+  # FR15-FR17 - nest update command
+  # ============================================================
+  epic-4: backlog
+  4-1-user-config-management: backlog
+  4-2-version-discovery-and-comparison: backlog
+  4-3-interactive-version-selection: backlog
+  4-4-agent-template-migration-check: backlog
+  4-5-update-command-cli-integration: backlog
+  epic-4-retrospective: optional
