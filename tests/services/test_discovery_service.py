@@ -280,3 +280,58 @@ class TestDiscoveryService:
 
         # Assert
         mock_manifest.load.assert_called_once_with(tmp_path)
+
+    def test_handles_missing_manifest_gracefully(self, tmp_path: Path) -> None:
+        """Verify missing manifest (first run) is treated as empty."""
+        # Arrange
+        raw_inbox = tmp_path / "raw_inbox"
+        raw_inbox.mkdir()
+        pdf_file = raw_inbox / "doc.pdf"
+        pdf_file.write_bytes(b"content")
+
+        mock_discovery = Mock(spec=FileDiscoveryProtocol)
+        mock_discovery.discover.return_value = [pdf_file]
+
+        # Mock manifest to raise FileNotFoundError
+        mock_manifest = Mock(spec=ManifestProtocol)
+        mock_manifest.load.side_effect = FileNotFoundError
+
+        service = DiscoveryService(
+            file_discovery=mock_discovery,
+            manifest=mock_manifest,
+        )
+
+        # Act
+        result = service.discover_changes(tmp_path)
+
+        # Assert
+        assert len(result.new_files) == 1
+        assert result.new_files[0].status == "new"
+
+    def test_skips_file_on_read_error(self, tmp_path: Path) -> None:
+        """Verify files are skipped if read fails (e.g., locked)."""
+        from unittest.mock import patch
+
+        # Arrange
+        raw_inbox = tmp_path / "raw_inbox"
+        raw_inbox.mkdir()
+        pdf_file = raw_inbox / "doc.pdf"
+
+        mock_discovery = Mock(spec=FileDiscoveryProtocol)
+        mock_discovery.discover.return_value = [pdf_file]
+
+        mock_manifest = Mock(spec=ManifestProtocol)
+        mock_manifest.load.side_effect = FileNotFoundError
+
+        service = DiscoveryService(
+            file_discovery=mock_discovery,
+            manifest=mock_manifest,
+        )
+
+        # Act
+        with patch("nest.services.discovery_service.compute_sha256") as mock_checksum:
+            mock_checksum.side_effect = PermissionError("Locked")
+            result = service.discover_changes(tmp_path)
+
+        # Assert
+        assert result.total_count == 0

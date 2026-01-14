@@ -38,7 +38,13 @@ class FileChangeDetector:
             - "new": Not present in manifest
             - "modified": Present but checksum differs
             - "unchanged": Present with matching checksum
+        
+        Raises:
+            ValueError: If path is absolute (must be relative to project root).
         """
+        if path.is_absolute():
+            raise ValueError(f"Path must be relative, got: {path}")
+
         # Normalize path to use forward slashes consistently
         path_key = path.as_posix()
 

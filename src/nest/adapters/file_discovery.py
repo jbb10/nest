@@ -38,8 +38,8 @@ class FileDiscoveryAdapter(FileDiscoveryProtocol):
         discovered: list[Path] = []
 
         for path in directory.rglob("*"):
-            # Skip directories
-            if path.is_dir():
+            # Ensure it's a regular file (skips directories, sockets, devices, etc.)
+            if not path.is_file():
                 continue
 
             # Skip hidden files (name starts with .)

@@ -44,11 +44,16 @@ class DiscoveryService:
             DiscoveryResult containing lists of new, modified, and unchanged files.
         """
         # Load manifest to get existing file entries
-        manifest = self._manifest.load(project_dir)
+        try:
+            manifest = self._manifest.load(project_dir)
+            manifest_files = manifest.files
+        except FileNotFoundError:
+            # Manifest doesn't exist yet (first run) or is missing
+            manifest_files = {}
 
         # Build checksum lookup from manifest
         manifest_checksums: dict[str, str] = {
-            path: entry.sha256 for path, entry in manifest.files.items()
+            path: entry.sha256 for path, entry in manifest_files.items()
         }
 
         # Create change detector with manifest data
@@ -65,7 +70,11 @@ class DiscoveryService:
 
         for file_path in discovered_paths:
             # Compute checksum
-            checksum = compute_sha256(file_path)
+            try:
+                checksum = compute_sha256(file_path)
+            except (OSError, PermissionError):
+                # Skip files that cannot be read (e.g., locked, deleted race condition)
+                continue
 
             # Get relative path for manifest comparison
             relative_path = file_path.relative_to(project_dir)

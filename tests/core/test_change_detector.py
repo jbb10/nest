@@ -110,3 +110,15 @@ class TestFileChangeDetector:
         assert detector.classify(Path("raw_inbox/report_v2.pdf"), "hash_b") == "unchanged"
         assert detector.classify(Path("raw_inbox/report.pdf"), "hash_b") == "modified"
         assert detector.classify(Path("raw_inbox/report_new.pdf"), "hash_c") == "new"
+
+    def test_raises_error_for_absolute_path(self) -> None:
+        """Verify ValueError is raised if path is absolute."""
+        import pytest
+
+        # Arrange
+        detector = FileChangeDetector({})
+        abs_path = Path("/absolute/path/doc.pdf")
+
+        # Act & Assert
+        with pytest.raises(ValueError, match="Path must be relative"):
+            detector.classify(abs_path, "hash")

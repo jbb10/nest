@@ -177,3 +177,16 @@ class TestFileDiscoveryAdapter:
         assert len(result) == 5
         suffixes = {p.suffix.lower() for p in result}
         assert suffixes == extensions
+
+    def test_skips_directories_matching_extension(self, tmp_path: Path) -> None:
+        """Verify directories are skipped even if they end with extension."""
+        # Arrange
+        (tmp_path / "doc.pdf").mkdir()
+
+        adapter = FileDiscoveryAdapter()
+
+        # Act
+        result = adapter.discover(tmp_path, {".pdf"})
+
+        # Assert
+        assert len(result) == 0
