@@ -7,7 +7,37 @@ Services depend on these protocols, not concrete implementations.
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
-from nest.core.models import Manifest
+from nest.core.models import Manifest, ProcessingResult
+
+
+@runtime_checkable
+class DocumentProcessorProtocol(Protocol):
+    """Protocol for document processing operations.
+
+    Implementations handle converting documents (PDF, DOCX, PPTX, XLSX, HTML)
+    to Markdown format for LLM consumption.
+
+    Note:
+        Output Markdown should exclude base64-encoded images to keep
+        content token-efficient for LLM context usage.
+    """
+
+    def process(self, source: Path, output: Path) -> ProcessingResult:
+        """Convert a document to Markdown.
+
+        Args:
+            source: Path to the source document file.
+            output: Path where Markdown output should be written.
+
+        Returns:
+            ProcessingResult indicating success, failure, or skip status.
+            On failure, the error field contains the error message.
+
+        Note:
+            Individual file failures should NOT raise exceptions.
+            Instead, return a ProcessingResult with status="failed".
+        """
+        ...
 
 
 @runtime_checkable

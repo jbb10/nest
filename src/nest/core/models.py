@@ -12,6 +12,30 @@ from pydantic import BaseModel, ConfigDict, Field
 # Type alias for file change status during discovery
 FileStatus = Literal["new", "modified", "unchanged"]
 
+# Type alias for processing status
+ProcessingStatus = Literal["success", "skipped", "failed"]
+
+
+class ProcessingResult(BaseModel):
+    """Result of a document processing operation.
+
+    Returned by DocumentProcessorProtocol implementations to indicate
+    success, failure, or skip status for individual file processing.
+
+    Attributes:
+        source_path: Path to the source document that was processed.
+        status: Processing outcome (success/skipped/failed).
+        output_path: Path to the generated Markdown file (if successful).
+        error: Error message describing failure (if status is "failed").
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    source_path: Path
+    status: ProcessingStatus
+    output_path: Path | None = None
+    error: str | None = None
+
 
 class FileEntry(BaseModel):
     """Represents a processed file entry in the manifest.

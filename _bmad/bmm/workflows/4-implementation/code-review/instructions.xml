@@ -224,4 +224,34 @@
     </output>
   </step>
 
+  <step n="6" goal="Git commit and branch finalization">
+    <critical>NEVER skip this step - all changes must be committed</critical>
+
+    <action>Run `git status --short` to review all changes</action>
+    <action>Remove any test artifacts (e.g., .nest_errors.log) that shouldn't be committed</action>
+
+    <check if="{{fixed_count}} > 0">
+      <action>Stage all changes: `git add -A`</action>
+      <action>Commit with message following conventional commits:
+        ```
+        fix({{story_key}}): code review fixes - [brief summary]
+
+        - [List each fix applied]
+        - [Include test additions]
+
+        All tests passing.
+        ```
+      </action>
+      <output>📦 Changes committed to branch: feat/{{story_key}}</output>
+    </check>
+
+    <check if="{{fixed_count}} == 0 AND {{action_count}} > 0">
+      <action>Stage story file changes only</action>
+      <action>Commit with message: `docs({{story_key}}): add code review action items`</action>
+    </check>
+
+    <action>Run `git log --oneline -3` to confirm commit</action>
+    <output>🌿 Branch `feat/{{story_key}}` ready for merge to main</output>
+  </step>
+
 </workflow>
