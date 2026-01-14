@@ -5,7 +5,7 @@ Tests the pure path manipulation functions used for output mirroring.
 
 from pathlib import Path
 
-from nest.core.paths import mirror_path, relative_to_project
+from nest.core.paths import mirror_path, relative_to_project, source_path_to_manifest_key
 
 
 class TestMirrorPath:
@@ -127,3 +127,53 @@ class TestRelativeToProject:
         result = relative_to_project(path, project_root)
 
         assert result == "processed_context/legal/2024/q1/report.md"
+
+
+class TestSourcePathToManifestKey:
+    """Tests for source_path_to_manifest_key function."""
+
+    def test_returns_forward_slash_path(self) -> None:
+        """AC #1: Returns forward-slash separated manifest key."""
+        source = Path("/project/raw_inbox/contracts/2024/alpha.pdf")
+        raw_inbox = Path("/project/raw_inbox")
+
+        result = source_path_to_manifest_key(source, raw_inbox)
+
+        assert result == "contracts/2024/alpha.pdf"
+        assert "\\" not in result  # No backslashes
+
+    def test_nested_subdirectories(self) -> None:
+        """Nested subdirectory structure preserved in key."""
+        source = Path("/project/raw_inbox/legal/contracts/2024/q1/client-a/agreement.pdf")
+        raw_inbox = Path("/project/raw_inbox")
+
+        result = source_path_to_manifest_key(source, raw_inbox)
+
+        assert result == "legal/contracts/2024/q1/client-a/agreement.pdf"
+
+    def test_file_at_raw_inbox_root(self) -> None:
+        """File directly at raw_inbox root level (no subdirs)."""
+        source = Path("/project/raw_inbox/document.pdf")
+        raw_inbox = Path("/project/raw_inbox")
+
+        result = source_path_to_manifest_key(source, raw_inbox)
+
+        assert result == "document.pdf"
+
+    def test_preserves_original_extension(self) -> None:
+        """Original file extension is preserved in key."""
+        raw_inbox = Path("/project/raw_inbox")
+
+        for ext in [".pdf", ".docx", ".xlsx", ".pptx", ".html"]:
+            source = Path(f"/project/raw_inbox/file{ext}")
+            result = source_path_to_manifest_key(source, raw_inbox)
+            assert result == f"file{ext}"
+
+    def test_handles_spaces_in_filename(self) -> None:
+        """Spaces in filename are preserved."""
+        source = Path("/project/raw_inbox/My Important Document.pdf")
+        raw_inbox = Path("/project/raw_inbox")
+
+        result = source_path_to_manifest_key(source, raw_inbox)
+
+        assert result == "My Important Document.pdf"

@@ -81,7 +81,7 @@ class ManifestProtocol(Protocol):
 
         Raises:
             FileNotFoundError: If manifest file doesn't exist.
-            json.JSONDecodeError: If manifest file is invalid JSON.
+            ManifestError: If manifest file is invalid JSON or has invalid structure.
         """
         ...
 

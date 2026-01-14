@@ -59,7 +59,7 @@ development_status:
   2-1-file-discovery-and-checksum-engine: done
   2-2-docling-document-processing: done
   2-3-output-mirroring-and-file-writing: done
-  2-4-manifest-tracking-and-updates: backlog
+  2-4-manifest-tracking-and-updates: review
   2-5-master-index-generation: backlog
   2-6-orphan-cleanup: backlog
   2-7-sync-command-flags-and-error-handling: backlog
