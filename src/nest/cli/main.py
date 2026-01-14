@@ -18,9 +18,8 @@ def sync_command() -> None:
     from nest.ui.messages import error
 
     error(
-        what="Sync not implemented",
-        why="This command is coming in a future release",
-        action="Use `nest init` first, then wait for sync support",
+        "Sync not implemented. This command is coming in a future release. "
+        "Use `nest init` first, then wait for sync support."
     )
     raise typer.Exit(code=1)
 

@@ -33,6 +33,9 @@ def mirror_path(
 
     Returns:
         Absolute path to output file in target directory.
+
+    Raises:
+        ValueError: If source is not under source_root.
     """
     # Get path relative to source root
     relative = source.relative_to(source_root)
@@ -56,6 +59,9 @@ def relative_to_project(path: Path, project_root: Path) -> str:
 
     Returns:
         Forward-slash separated relative path string (portable).
+
+    Raises:
+        ValueError: If path is not under project_root.
 
     Example:
         path = Path("/project/processed_context/contracts/alpha.md")

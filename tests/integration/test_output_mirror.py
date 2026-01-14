@@ -7,8 +7,6 @@ using temporary directories on the real filesystem.
 from pathlib import Path
 from unittest.mock import Mock
 
-import pytest
-
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.protocols import DocumentProcessorProtocol
 from nest.core.models import ProcessingResult
@@ -158,7 +156,7 @@ class TestOutputMirrorIntegration:
         service = OutputMirrorService(filesystem, mock_processor)
 
         # Act
-        result = service.process_file(source_file, raw_inbox, processed_context)
+        service.process_file(source_file, raw_inbox, processed_context)
 
         # Assert
         expected_output = processed_context / "readme.md"

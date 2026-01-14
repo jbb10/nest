@@ -5,8 +5,6 @@ Tests the pure path manipulation functions used for output mirroring.
 
 from pathlib import Path
 
-import pytest
-
 from nest.core.paths import mirror_path, relative_to_project
 
 
@@ -80,9 +78,9 @@ class TestMirrorPath:
         """Various source extensions all become .md."""
         source_root = Path("/project/raw_inbox")
         target_root = Path("/project/processed_context")
-        
+
         extensions = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
-        
+
         for ext in extensions:
             source = Path(f"/project/raw_inbox/file{ext}")
             result = mirror_path(source, source_root, target_root)

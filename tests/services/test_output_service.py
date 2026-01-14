@@ -7,8 +7,6 @@ document processing.
 from pathlib import Path
 from unittest.mock import Mock
 
-import pytest
-
 from nest.adapters.protocols import DocumentProcessorProtocol, FileSystemProtocol
 from nest.core.models import ProcessingResult
 from nest.services.output_service import OutputMirrorService
@@ -33,7 +31,7 @@ class TestOutputMirrorService:
         service = OutputMirrorService(mock_fs, mock_processor)
 
         # Act
-        result = service.process_file(
+        service.process_file(
             source=Path("/in/sub/file.pdf"),
             raw_dir=Path("/in"),
             output_dir=Path("/out"),

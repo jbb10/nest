@@ -8,3 +8,6 @@ raw_inbox/
 
 # OS metadata
 .DS_Store
+
+# Nest error logs (generated during processing)
+.nest_errors.log
