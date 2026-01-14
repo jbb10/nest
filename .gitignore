@@ -5,3 +5,6 @@ __pycache__/
 
 # Raw documents excluded from version control (processed versions in processed_context/)
 raw_inbox/
+
+# OS metadata
+.DS_Store
