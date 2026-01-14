@@ -299,6 +299,14 @@ All 72 tests passing. Linting clean. Type checking clean.
 - tests/adapters/test_file_discovery.py
 - tests/services/test_discovery_service.py
 
+### Code Review Fixes (2026-01-14)
+- **High**: Fixed `DiscoveryService` crash on first run (missing manifest) by handling `FileNotFoundError`.
+- **Medium**: Fixed `DiscoveryService` crash on file read error (race condition) by handling `OSError`.
+- **Medium**: Fixed `FileDiscoveryAdapter` unsafe file checking by adding `is_file()` check.
+- **Low**: Added input validation to `FileChangeDetector` to enforce relative paths.
+- Added regression tests for all fixes.
+
+
 **Modified Files:**
 - src/nest/core/models.py (added FileStatus, DiscoveredFile, DiscoveryResult)
 - src/nest/adapters/protocols.py (added FileDiscoveryProtocol)
