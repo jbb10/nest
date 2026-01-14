@@ -5,6 +5,8 @@ Handles directory and file operations for the project.
 
 from pathlib import Path
 
+from nest.core.paths import mirror_path
+
 
 class FileSystemAdapter:
     """Adapter for filesystem operations.
@@ -64,3 +66,35 @@ class FileSystemAdapter:
         """
         with path.open("a") as f:
             f.write(content)
+
+    def get_relative_path(self, source: Path, base: Path) -> Path:
+        """Get path of source relative to base directory.
+
+        Args:
+            source: Absolute path to compute relative path for.
+            base: Base directory to compute relative from.
+
+        Returns:
+            Relative Path from base to source.
+        """
+        return source.relative_to(base)
+
+    def compute_output_path(
+        self,
+        source: Path,
+        raw_dir: Path,
+        output_dir: Path,
+    ) -> Path:
+        """Compute mirrored output path for a source file.
+
+        Preserves subdirectory structure and changes extension to .md.
+
+        Args:
+            source: Absolute path to source file.
+            raw_dir: Root of raw_inbox directory.
+            output_dir: Root of processed_context directory.
+
+        Returns:
+            Absolute path where output Markdown should be written.
+        """
+        return mirror_path(source, raw_dir, output_dir, ".md")

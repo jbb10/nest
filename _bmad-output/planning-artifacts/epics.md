@@ -571,6 +571,8 @@ reports/Q3_summary.md
 **I want** clear visual feedback during sync,
 **So that** I know what's happening with my documents.
 
+**Dev Note:** A stub `sync` command already exists in `src/nest/cli/main.py` that returns "Not implemented" with exit code 1. This was added to prevent Typer's single-command promotion. Replace the stub with the real implementation.
+
 **Acceptance Criteria:**
 
 **Given** sync processes multiple files

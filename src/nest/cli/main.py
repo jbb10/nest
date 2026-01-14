@@ -9,15 +9,20 @@ app = typer.Typer()
 app.command(name="init")(init_command)
 
 
-@app.command(name="_placeholder")
-def _placeholder_command() -> None:  # pyright: ignore[reportUnusedFunction]
-    """Temporary placeholder to prevent single-command promotion.
+@app.command(name="sync")
+def sync_command() -> None:
+    """Sync documents from raw_inbox to processed_context.
 
-    TODO: Remove when implementing nest sync (Story 2.x).
-    This exists because Typer promotes single-command apps to root level,
-    which would change `nest init Nike` to `nest Nike`.
+    TODO: Implement in Story 2.8 (Sync Command CLI Integration).
     """
-    raise typer.Exit(code=0)
+    from nest.ui.messages import error
+
+    error(
+        what="Sync not implemented",
+        why="This command is coming in a future release",
+        action="Use `nest init` first, then wait for sync support",
+    )
+    raise typer.Exit(code=1)
 
 
 def main() -> None:

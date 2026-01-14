@@ -153,6 +153,48 @@ class FileSystemProtocol(Protocol):
         """
         ...
 
+    def get_relative_path(self, source: Path, base: Path) -> Path:
+        """Get path of source relative to base directory.
+
+        Used for computing mirrored output paths by extracting the
+        relative subdirectory structure from source files.
+
+        Args:
+            source: Absolute path to compute relative path for.
+            base: Base directory to compute relative from.
+
+        Returns:
+            Relative Path from base to source.
+        """
+        ...
+
+    def compute_output_path(
+        self,
+        source: Path,
+        raw_dir: Path,
+        output_dir: Path,
+    ) -> Path:
+        """Compute mirrored output path for a source file.
+
+        Preserves subdirectory structure from raw_dir and changes
+        extension to .md for the output in output_dir.
+
+        Args:
+            source: Absolute path to source file.
+            raw_dir: Root of raw_inbox directory.
+            output_dir: Root of processed_context directory.
+
+        Returns:
+            Absolute path where output Markdown should be written.
+
+        Example:
+            source = /project/raw_inbox/contracts/2024/alpha.pdf
+            raw_dir = /project/raw_inbox
+            output_dir = /project/processed_context
+            Result: /project/processed_context/contracts/2024/alpha.md
+        """
+        ...
+
 
 @runtime_checkable
 class AgentWriterProtocol(Protocol):
