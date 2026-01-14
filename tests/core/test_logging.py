@@ -12,6 +12,12 @@ class TestSetupErrorLogger:
 
     def test_creates_log_directory(self, tmp_path: Path) -> None:
         """Test that setup creates log directory if needed."""
+        import logging
+
+        # Clear any existing handlers to ensure fresh state
+        logger = logging.getLogger("nest.errors")
+        logger.handlers.clear()
+
         log_file = tmp_path / "nested" / "deep" / ".nest_errors.log"
 
         logger = setup_error_logger(log_file)

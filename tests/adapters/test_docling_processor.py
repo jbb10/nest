@@ -274,3 +274,61 @@ class TestDoclingProcessorBase64Exclusion:
         # Check for common base64 image patterns
         base64_pattern = re.compile(r"data:image/[a-z]+;base64,")
         assert not base64_pattern.search(content)
+
+
+class TestDoclingProcessorErrorLogging:
+    """Tests for error logging integration (AC6, AC7)."""
+
+    def test_failed_processing_logs_to_error_file(self, tmp_path: Path) -> None:
+        """Test that failed processing writes to .nest_errors.log."""
+        import logging
+
+        from nest.adapters.docling_processor import DoclingProcessor
+
+        # Clear any existing handlers
+        logger = logging.getLogger("nest.errors")
+        logger.handlers.clear()
+
+        error_log = tmp_path / ".nest_errors.log"
+        processor = DoclingProcessor(error_log=error_log)
+
+        # Process a nonexistent file to trigger an error
+        source = tmp_path / "does_not_exist.pdf"
+        output = tmp_path / "output.md"
+
+        result = processor.process(source, output)
+
+        # Flush handlers to ensure log is written
+        for handler in logger.handlers:
+            handler.flush()
+
+        assert result.status == "failed"
+        assert error_log.exists()
+        content = error_log.read_text()
+        assert "does_not_exist.pdf" in content
+        assert "[sync]" in content
+
+    def test_error_log_uses_custom_path(self, tmp_path: Path) -> None:
+        """Test that processor uses provided error_log path."""
+        import logging
+
+        from nest.adapters.docling_processor import DoclingProcessor
+
+        # Clear any existing handlers
+        logger = logging.getLogger("nest.errors")
+        logger.handlers.clear()
+
+        custom_log = tmp_path / "custom" / "errors.log"
+        processor = DoclingProcessor(error_log=custom_log)
+
+        source = tmp_path / "bad_file.xyz"
+        source.write_text("not a valid document")
+        output = tmp_path / "output.md"
+
+        processor.process(source, output)
+
+        # Flush handlers
+        for handler in logger.handlers:
+            handler.flush()
+
+        assert custom_log.exists()

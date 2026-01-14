@@ -1,6 +1,6 @@
 # Story 2.2: Docling Document Processing
 
-Status: review
+Status: done
 Branch: feat/2-2-docling-document-processing
 
 ---
@@ -407,6 +407,24 @@ Claude Opus 4.5
 
 N/A - All implementations completed without blockers.
 
+### Code Review Fixes (2026-01-14)
+
+**Issues Found During Code Review:**
+1. **HIGH**: Missing TableStructureOptions configuration with `do_cell_matching=True` (AC1)
+2. **HIGH**: Error logging not integrated into DoclingProcessor.process() (AC6)
+3. **MEDIUM**: PdfPipelineOptions not configured for optimal table extraction
+
+**Fixes Applied:**
+1. Added `TableStructureOptions` with `do_cell_matching=True` and `mode=TableFormerMode.ACCURATE`
+2. Configured `PdfPipelineOptions` with `do_table_structure=True` and table structure options
+3. Integrated `log_processing_error()` call in exception handler
+4. Added `error_log` parameter to DoclingProcessor constructor for dependency injection
+5. Added 2 new tests for error logging integration in test_docling_processor.py
+6. Fixed pre-existing flaky test in test_logging.py (handler state cleanup)
+
+**Test Results After Fix:**
+- 101 tests passing (added 2 new error logging tests)
+
 ### Completion Notes List
 
 1. **Task 1-2 (Protocol & Model)**: Created `DocumentProcessorProtocol` in protocols.py and `ProcessingResult` model in models.py. ProcessingResult uses Literal types for status and ConfigDict for Path support.
@@ -430,4 +448,9 @@ N/A - All implementations completed without blockers.
 **Modified Files:**
 - src/nest/adapters/protocols.py (added DocumentProcessorProtocol)
 - src/nest/core/models.py (added ProcessingResult, ProcessingStatus)
+
+**Modified During Code Review (2026-01-14):**
+- src/nest/adapters/docling_processor.py (added TableStructureOptions, error logging integration)
+- tests/adapters/test_docling_processor.py (added TestDoclingProcessorErrorLogging class)
+- tests/core/test_logging.py (fixed handler cleanup in test_creates_log_directory)
 
