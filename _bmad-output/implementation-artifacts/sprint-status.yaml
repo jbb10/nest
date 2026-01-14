@@ -56,7 +56,7 @@ development_status:
   # FR5-FR14 - nest sync command
   # ============================================================
   epic-2: in-progress
-  2-1-file-discovery-and-checksum-engine: review
+  2-1-file-discovery-and-checksum-engine: done
   2-2-docling-document-processing: backlog
   2-3-output-mirroring-and-file-writing: backlog
   2-4-manifest-tracking-and-updates: backlog

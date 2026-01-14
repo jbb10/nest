@@ -1,6 +1,6 @@
 # Story 2.1: File Discovery & Checksum Engine
 
-Status: review
+Status: done
 Branch: feat/2-1-file-discovery-checksum-engine
 
 ---
