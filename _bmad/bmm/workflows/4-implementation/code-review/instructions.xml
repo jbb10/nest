@@ -251,7 +251,15 @@
     </check>
 
     <action>Run `git log --oneline -3` to confirm commit</action>
-    <output>🌿 Branch `feat/{{story_key}}` ready for merge to main</output>
+    <output>📦 Changes committed to branch: feat/{{story_key}}</output>
+
+    <!-- Merge to main when story is done -->
+    <check if="{{new_status}} == 'done'">
+      <action>Checkout main: `git checkout main`</action>
+      <action>Merge feature branch: `git merge feat/{{story_key}} --no-ff -m "Merge feat/{{story_key}} into main"`</action>
+      <action>Delete feature branch: `git branch -d feat/{{story_key}}`</action>
+      <output>🚀 Merged to main, branch feat/{{story_key}} deleted</output>
+    </check>
   </step>
 
 </workflow>
