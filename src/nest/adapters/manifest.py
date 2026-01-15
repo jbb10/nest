@@ -6,7 +6,10 @@ Handles reading and writing .nest_manifest.json files.
 import json
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from nest import __version__
+from nest.core.exceptions import ManifestError
 from nest.core.models import Manifest
 
 MANIFEST_FILENAME = ".nest_manifest.json"
@@ -60,15 +63,29 @@ class ManifestAdapter:
 
         Raises:
             FileNotFoundError: If manifest file doesn't exist.
-            json.JSONDecodeError: If manifest file is invalid JSON.
+            ManifestError: If manifest file is invalid JSON or has invalid structure.
         """
         manifest_path = project_dir / MANIFEST_FILENAME
         if not manifest_path.exists():
             raise FileNotFoundError(f"Manifest not found: {manifest_path}")
 
         content = manifest_path.read_text()
-        data = json.loads(content)
-        return Manifest.model_validate(data)
+
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as e:
+            raise ManifestError(
+                f"Manifest file is corrupt (invalid JSON). "
+                f"Run `nest doctor` to repair. Details: {e}"
+            ) from e
+
+        try:
+            return Manifest.model_validate(data)
+        except ValidationError as e:
+            raise ManifestError(
+                f"Manifest file is corrupt (invalid structure). "
+                f"Run `nest doctor` to repair. Details: {e}"
+            ) from e
 
     def save(self, project_dir: Path, manifest: Manifest) -> None:
         """Save manifest to file.

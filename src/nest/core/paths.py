@@ -72,3 +72,30 @@ def relative_to_project(path: Path, project_root: Path) -> str:
     relative = path.relative_to(project_root)
     # Use forward slashes for cross-platform manifest portability
     return relative.as_posix()
+
+
+def source_path_to_manifest_key(source: Path, raw_inbox: Path) -> str:
+    """Convert absolute source path to manifest key (portable relative path).
+
+    Takes an absolute path to a source file and the raw_inbox root directory,
+    returning a forward-slash-separated relative path string suitable for
+    use as a manifest file key.
+
+    Args:
+        source: Absolute path to source file.
+        raw_inbox: Absolute path to raw_inbox directory.
+
+    Returns:
+        Forward-slash separated relative path string.
+
+    Raises:
+        ValueError: If source is not under raw_inbox.
+
+    Example:
+        source = Path("/project/raw_inbox/contracts/2024/alpha.pdf")
+        raw_inbox = Path("/project/raw_inbox")
+
+        Result: "contracts/2024/alpha.pdf"
+    """
+    relative = source.relative_to(raw_inbox)
+    return relative.as_posix()
