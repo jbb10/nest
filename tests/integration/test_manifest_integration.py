@@ -29,6 +29,8 @@ class TestManifestIntegration:
         service = ManifestService(
             manifest=adapter,
             project_root=project_root,
+            raw_inbox=raw_inbox,
+            output_dir=processed,
         )
 
         # Simulate processing a file
@@ -63,8 +65,9 @@ class TestManifestIntegration:
         # Arrange
         project_root = tmp_path
         raw_inbox = project_root / "raw_inbox"
+        processed = project_root / "processed_context"
         raw_inbox.mkdir()
-        (project_root / "processed_context").mkdir()
+        processed.mkdir()
 
         adapter = ManifestAdapter()
         adapter.create(project_root, "test-project")
@@ -72,6 +75,8 @@ class TestManifestIntegration:
         service = ManifestService(
             manifest=adapter,
             project_root=project_root,
+            raw_inbox=raw_inbox,
+            output_dir=processed,
         )
 
         source = raw_inbox / "encrypted.pdf"
@@ -109,6 +114,8 @@ class TestManifestIntegration:
         service = ManifestService(
             manifest=adapter,
             project_root=project_root,
+            raw_inbox=raw_inbox,
+            output_dir=processed,
         )
 
         source = raw_inbox / "doc.pdf"
@@ -130,6 +137,8 @@ class TestManifestIntegration:
         service2 = ManifestService(
             manifest=adapter,
             project_root=project_root,
+            raw_inbox=raw_inbox,
+            output_dir=processed,
         )
         service2.record_success(
             source_path=source,
@@ -160,6 +169,8 @@ class TestManifestIntegration:
         service = ManifestService(
             manifest=adapter,
             project_root=project_root,
+            raw_inbox=raw_inbox,
+            output_dir=processed,
         )
 
         before = datetime.now(timezone.utc)
@@ -193,6 +204,8 @@ class TestManifestIntegration:
         service = ManifestService(
             manifest=adapter,
             project_root=project_root,
+            raw_inbox=raw_inbox,
+            output_dir=processed,
         )
 
         # Create multiple files

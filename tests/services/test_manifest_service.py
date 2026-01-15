@@ -30,6 +30,7 @@ class MockManifestAdapter:
         return True
 
     def create(self, project_dir: Path, project_name: str) -> Manifest:
+        self._manifest.project_name = project_name
         return self._manifest
 
     def load(self, project_dir: Path) -> Manifest:
@@ -50,6 +51,8 @@ class TestManifestServiceRecordSuccess:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
 
         # Act
@@ -69,6 +72,8 @@ class TestManifestServiceRecordSuccess:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
 
         # Act
@@ -88,6 +93,8 @@ class TestManifestServiceRecordSuccess:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
         before = datetime.now(timezone.utc)
 
@@ -109,6 +116,8 @@ class TestManifestServiceRecordSuccess:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
 
         # Act
@@ -128,6 +137,8 @@ class TestManifestServiceRecordSuccess:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
 
         # Act
@@ -151,6 +162,8 @@ class TestManifestServiceRecordFailure:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
 
         # Act
@@ -170,6 +183,8 @@ class TestManifestServiceRecordFailure:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
 
         # Act
@@ -189,6 +204,8 @@ class TestManifestServiceRecordFailure:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
 
         # Act
@@ -208,6 +225,8 @@ class TestManifestServiceRecordFailure:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
 
         # Act
@@ -232,6 +251,8 @@ class TestManifestServiceCommit:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
         service.record_success(
             source_path=Path("/project/raw_inbox/doc.pdf"),
@@ -253,6 +274,8 @@ class TestManifestServiceCommit:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
         before = datetime.now(timezone.utc)
 
@@ -272,6 +295,8 @@ class TestManifestServiceCommit:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
 
         # Act
@@ -289,6 +314,8 @@ class TestManifestServiceCommit:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
         service.record_success(
             source_path=Path("/project/raw_inbox/doc.pdf"),
@@ -321,6 +348,8 @@ class TestManifestServiceCommit:
         service = ManifestService(
             manifest=mock_adapter,
             project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
         )
         service.record_success(
             source_path=Path("/project/raw_inbox/new.pdf"),
@@ -335,3 +364,24 @@ class TestManifestServiceCommit:
         saved_files = mock_adapter.saved_manifest.files
         assert "existing.pdf" in saved_files
         assert "new.pdf" in saved_files
+
+    def test_creates_manifest_if_missing(self) -> None:
+        """Creates a new manifest if not found during commit."""
+        # Arrange
+        mock_adapter = MockManifestAdapter()
+        # Mock exists() to return False
+        mock_adapter.exists = lambda _: False
+
+        service = ManifestService(
+            manifest=mock_adapter,
+            project_root=Path("/project"),
+            raw_inbox=Path("/project/raw_inbox"),
+            output_dir=Path("/project/processed_context"),
+        )
+
+        # Act
+        service.commit()
+
+        # Assert
+        assert mock_adapter.save_called
+        assert mock_adapter.saved_manifest.project_name == "project"

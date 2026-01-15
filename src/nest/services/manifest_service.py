@@ -4,6 +4,7 @@ Orchestrates manifest updates during document processing,
 recording success/failure status for each file.
 """
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,6 +12,8 @@ from nest import __version__
 from nest.adapters.protocols import ManifestProtocol
 from nest.core.models import FileEntry
 from nest.core.paths import source_path_to_manifest_key
+
+logger = logging.getLogger(__name__)
 
 
 class ManifestService:
@@ -31,21 +34,21 @@ class ManifestService:
         self,
         manifest: ManifestProtocol,
         project_root: Path,
-        raw_inbox_name: str = "raw_inbox",
-        output_dir_name: str = "processed_context",
+        raw_inbox: Path,
+        output_dir: Path,
     ) -> None:
         """Initialize ManifestService.
 
         Args:
             manifest: Protocol-compliant manifest adapter for file operations.
             project_root: Absolute path to project root directory.
-            raw_inbox_name: Name of raw_inbox directory. Defaults to "raw_inbox".
-            output_dir_name: Name of output directory. Defaults to "processed_context".
+            raw_inbox: Absolute path to raw_inbox directory.
+            output_dir: Absolute path to processed_context directory.
         """
         self._manifest_adapter = manifest
         self._project_root = project_root
-        self._raw_inbox = project_root / raw_inbox_name
-        self._output_dir = project_root / output_dir_name
+        self._raw_inbox = raw_inbox
+        self._output_dir = output_dir
         self._pending_entries: dict[str, FileEntry] = {}
 
     def record_success(
@@ -116,11 +119,24 @@ class ManifestService:
         Merges pending entries into the existing manifest, updates
         metadata (last_sync, nest_version), and saves to disk.
         Clears pending entries after successful commit.
-        """
-        manifest = self._manifest_adapter.load(self._project_root)
 
-        # Merge pending entries into existing files
-        manifest.files.update(self._pending_entries)
+        If manifest does not exist, a new one is created.
+        """
+        if self._manifest_adapter.exists(self._project_root):
+            manifest = self._manifest_adapter.load(self._project_root)
+        else:
+            logger.info("Manifest not found, creating new one.")
+            # Use directory name as default project name
+            manifest = self._manifest_adapter.create(
+                self._project_root,
+                self._project_root.name,
+            )
+
+        # Merge pending entries
+        count = len(self._pending_entries)
+        if count > 0:
+            logger.info("Committing %d entries to manifest.", count)
+            manifest.files.update(self._pending_entries)
 
         # Update metadata
         manifest.last_sync = datetime.now(timezone.utc)
@@ -128,3 +144,4 @@ class ManifestService:
 
         self._manifest_adapter.save(self._project_root, manifest)
         self._pending_entries.clear()
+        logger.debug("Manifest commit complete.")

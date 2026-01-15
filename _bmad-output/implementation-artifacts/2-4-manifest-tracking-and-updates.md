@@ -1,6 +1,6 @@
 # Story 2.4: Manifest Tracking & Updates
 
-Status: review
+Status: done
 Branch: feat/2-4-manifest-tracking-updates
 
 ---
@@ -418,3 +418,10 @@ None — all tests passing on first implementation.
 - `src/nest/adapters/manifest.py` — Enhanced `load()` with ManifestError handling
 - `src/nest/adapters/protocols.py` — Updated `load()` docstring
 - `tests/core/test_paths.py` — Added 5 tests for `source_path_to_manifest_key()`
+
+### Code Review Fixes
+
+- **Robustness**: Updated `ManifestService.commit()` to create a new manifest if not found.
+- **Decoupling**: Updated `ManifestService.__init__` to accept `Path` objects instead of strings, improving testability and dependency injection.
+- **Observability**: Added logging to `ManifestService`.
+- **Tests**: Added regression test `test_creates_manifest_if_missing` and updated all 16 call sites for `ManifestService`.
