@@ -41,10 +41,10 @@ class IndexService:
 
         if sorted_files:
             lines.extend(sorted_files)
-        
+
         # Ensure trailing newline
         lines.append("")
-        
+
         return "\n".join(lines)
 
     def write_index(self, content: str) -> None:

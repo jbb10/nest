@@ -1,6 +1,6 @@
 # Story 2.5: Master Index Generation
 
-Status: review
+Status: done
 Branch: feat/2-5-master-index-generation
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -99,6 +99,11 @@ Gemini 3 Pro (Preview)
 - Created `SyncService` to orchestrate discovery, processing, manifest, and index updates.
 - Updated `ManifestService` to allow loading current manifest state for index generation.
 - Implemented comprehensive integration test for the full sync flow.
+- [Code Review Fix] Fixed lint errors: import ordering, trailing whitespace, line lengths in sync_service.py and index_service.py.
+- [Code Review Fix] Fixed type error: Added explicit `list[str]` annotation to `success_files` to satisfy Pyright strict mode.
+- [Code Review Fix] Removed unused `ProcessingResult` import from sync_service.py.
+- [Code Review Fix] Added comprehensive SyncService unit tests (8 tests covering failure paths, exception handling, empty discovery, output_path None edge case).
+- [Code Review Fix] Added IndexService tests for write_index directory creation and AC3 (index accuracy when files removed).
 
 ### File List
 
