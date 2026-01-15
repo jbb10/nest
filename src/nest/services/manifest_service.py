@@ -10,7 +10,7 @@ from pathlib import Path
 
 from nest import __version__
 from nest.adapters.protocols import ManifestProtocol
-from nest.core.models import FileEntry
+from nest.core.models import FileEntry, Manifest
 from nest.core.paths import source_path_to_manifest_key
 
 logger = logging.getLogger(__name__)
@@ -145,3 +145,11 @@ class ManifestService:
         self._manifest_adapter.save(self._project_root, manifest)
         self._pending_entries.clear()
         logger.debug("Manifest commit complete.")
+
+    def load_current_manifest(self) -> Manifest:
+        """Load the current manifest state from disk.
+
+        Returns:
+            The loaded Manifest object.
+        """
+        return self._manifest_adapter.load(self._project_root)
