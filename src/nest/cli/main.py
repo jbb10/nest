@@ -2,26 +2,13 @@
 import typer
 
 from nest.cli.init_cmd import init_command
+from nest.cli.sync_cmd import sync_command
 
 app = typer.Typer()
 
 # Register commands
 app.command(name="init")(init_command)
-
-
-@app.command(name="sync")
-def sync_command() -> None:
-    """Sync documents from raw_inbox to processed_context.
-
-    TODO: Implement in Story 2.8 (Sync Command CLI Integration).
-    """
-    from nest.ui.messages import error
-
-    error(
-        "Sync not implemented. This command is coming in a future release. "
-        "Use `nest init` first, then wait for sync support."
-    )
-    raise typer.Exit(code=1)
+app.command(name="sync")(sync_command)
 
 
 def main() -> None:

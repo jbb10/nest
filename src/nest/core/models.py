@@ -126,3 +126,21 @@ class OrphanCleanupResult(BaseModel):
     orphans_detected: list[str] = Field(default_factory=lambda: [])
     orphans_removed: list[str] = Field(default_factory=lambda: [])
     skipped: bool = False
+
+
+class DryRunResult(BaseModel):
+    """Result of a dry-run sync operation.
+
+    Shows what WOULD happen if sync were run without --dry-run flag.
+
+    Attributes:
+        new_count: Number of new files that would be processed.
+        modified_count: Number of modified files that would be reprocessed.
+        unchanged_count: Number of unchanged files that would be skipped.
+        orphan_count: Number of orphan files that would be removed.
+    """
+
+    new_count: int = 0
+    modified_count: int = 0
+    unchanged_count: int = 0
+    orphan_count: int = 0

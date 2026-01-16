@@ -34,6 +34,29 @@ class OrphanService:
         self._project_root = project_root
         self._detector = OrphanDetector()
 
+    def detect_orphans(self) -> list[str]:
+        """Detect orphan files without removing them.
+
+        Returns:
+            List of relative paths (posix format) of orphaned files.
+        """
+        output_dir = self._project_root / "processed_context"
+
+        # Load manifest to get successful output paths
+        manifest = self._manifest.load(self._project_root)
+        manifest_outputs = {
+            entry.output for entry in manifest.files.values() if entry.status == "success"
+        }
+
+        # List all files in processed_context
+        output_files = self._filesystem.list_files(output_dir)
+
+        # Detect orphans
+        orphans = self._detector.detect(output_files, manifest_outputs, output_dir)
+
+        # Convert to relative paths
+        return [orphan.relative_to(output_dir).as_posix() for orphan in orphans]
+
     def cleanup(self, no_clean: bool = False) -> OrphanCleanupResult:
         """Detect and optionally remove orphan files.
 
@@ -48,9 +71,7 @@ class OrphanService:
         # Load manifest to get successful output paths
         manifest = self._manifest.load(self._project_root)
         manifest_outputs = {
-            entry.output
-            for entry in manifest.files.values()
-            if entry.status == "success"
+            entry.output for entry in manifest.files.values() if entry.status == "success"
         }
 
         # List all files in processed_context
@@ -60,9 +81,7 @@ class OrphanService:
         orphans = self._detector.detect(output_files, manifest_outputs, output_dir)
 
         # Convert to relative paths for result
-        orphans_detected = [
-            orphan.relative_to(output_dir).as_posix() for orphan in orphans
-        ]
+        orphans_detected = [orphan.relative_to(output_dir).as_posix() for orphan in orphans]
 
         orphans_removed: list[str] = []
 
@@ -75,12 +94,8 @@ class OrphanService:
                     self._filesystem.delete_file(orphan)
 
                 # Build reverse lookup for O(1) manifest entry removal
-                orphan_outputs = {
-                    orphan.relative_to(output_dir).as_posix() for orphan in orphans
-                }
-                output_to_key = {
-                    entry.output: key for key, entry in manifest.files.items()
-                }
+                orphan_outputs = {orphan.relative_to(output_dir).as_posix() for orphan in orphans}
+                output_to_key = {entry.output: key for key, entry in manifest.files.items()}
 
                 # Remove orphan entries from manifest
                 for orphan_output in orphan_outputs:
