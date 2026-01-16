@@ -59,7 +59,7 @@ def init_command(
         console.print("[bold]Next steps:[/bold]")
         console.print("  1. Drop your documents into raw_inbox/")
         console.print("  2. Run [cyan]nest sync[/cyan] to process them")
-        console.print("  3. Open VS Code and use @nest in Copilot Chat")
+        console.print("  3. Open VS Code Copilot Chat and select 'Nest' from the agent dropdown")
         console.print()
         console.print("[dim]Supported formats: PDF, DOCX, PPTX, XLSX, HTML[/dim]")
 

@@ -39,7 +39,7 @@ def test_init_success_output_format(mock_create_service: MagicMock, tmp_path: Pa
     assert "Next steps:" in result.output
     assert "Drop your documents into raw_inbox/" in result.output
     assert "nest sync" in result.output
-    assert "@nest in Copilot Chat" in result.output
+    assert "select 'Nest' from the agent dropdown" in result.output
     assert "Supported formats: PDF, DOCX, PPTX, XLSX, HTML" in result.output
 
 
