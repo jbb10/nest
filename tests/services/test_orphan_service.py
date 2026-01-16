@@ -5,9 +5,7 @@ Tests the OrphanService orchestration layer.
 
 from pathlib import Path
 
-import pytest
-
-from nest.core.models import FileEntry, Manifest, OrphanCleanupResult
+from nest.core.models import FileEntry, Manifest
 from nest.services.orphan_service import OrphanService
 
 
@@ -113,10 +111,10 @@ class TestOrphanService:
         # Arrange
         project_root = tmp_path / "project"
         output_dir = project_root / "processed_context"
-        
+
         # Orphan file exists (perhaps from old failed processing or manually created)
         orphan_file = output_dir / "orphan.md"
-        
+
         # Valid successful file
         valid_file = output_dir / "valid.md"
 
@@ -145,7 +143,7 @@ class TestOrphanService:
                 ),
             },
         )
-        
+
         mock_manifest = MockManifest(manifest)
 
         service = OrphanService(mock_fs, mock_manifest, project_root)

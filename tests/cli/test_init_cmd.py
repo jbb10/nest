@@ -1,4 +1,5 @@
 """Tests for nest init CLI command."""
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -25,9 +26,7 @@ def test_init_command_available_in_main_app(mock_create_service: MagicMock) -> N
 
 
 @patch("nest.cli.init_cmd.create_init_service")
-def test_init_success_output_format(
-    mock_create_service: MagicMock, tmp_path: Path
-) -> None:
+def test_init_success_output_format(mock_create_service: MagicMock, tmp_path: Path) -> None:
     """Verify success message format matches AC1."""
     # Mock service
     mock_service = MagicMock()

@@ -1,5 +1,7 @@
 """Tests for sync command CLI."""
 
+from pathlib import Path
+
 import typer
 from typer.testing import CliRunner
 
@@ -66,3 +68,27 @@ class TestSyncCommandFlags:
         result = runner.invoke(app, ["sync", "--force"])
         # Check that it didn't fail due to flag parsing
         assert "--force" not in result.output or "error" not in result.output.lower()
+
+
+class TestSyncProjectValidation:
+    """Tests for project validation (AC: #3)."""
+
+    def test_sync_fails_when_no_manifest(self, tmp_path: Path) -> None:
+        """Sync should fail with error when .nest_manifest.json doesn't exist."""
+        # Create empty directory (no manifest)
+        result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "No Nest project found" in result.output
+
+    def test_sync_error_message_shows_reason(self, tmp_path: Path) -> None:
+        """Error should explain why (manifest not found)."""
+        result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
+
+        assert ".nest_manifest.json not found" in result.output
+
+    def test_sync_error_message_shows_action(self, tmp_path: Path) -> None:
+        """Error should suggest running nest init."""
+        result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
+
+        assert "nest init" in result.output

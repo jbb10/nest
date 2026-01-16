@@ -1,4 +1,5 @@
 """Unit tests for InitService."""
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -339,4 +340,3 @@ def test_init_service_progress_output_sequence_download(
     assert mock_info.call_count == 1
     info_msg = mock_info.call_args[0][0]
     assert "cached at" in info_msg.lower()
-

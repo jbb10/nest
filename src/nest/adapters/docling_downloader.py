@@ -123,7 +123,7 @@ class DoclingModelDownloader:
                 last_exception = e
                 if attempt < self.MAX_RETRIES - 1:
                     # Exponential backoff: 1s, 2s, 4s
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
 
         # All retries exhausted
         self._cleanup_partial_download()

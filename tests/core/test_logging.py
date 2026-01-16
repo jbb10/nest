@@ -2,8 +2,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from nest.core.logging import log_processing_error, setup_error_logger
 
 

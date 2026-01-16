@@ -33,9 +33,7 @@ def create_init_service() -> InitService:
 
 
 def init_command(
-    project_name: Annotated[
-        str, typer.Argument(help="The project name (e.g., 'Nike')")
-    ],
+    project_name: Annotated[str, typer.Argument(help="The project name (e.g., 'Nike')")],
     target_dir: Annotated[
         Path | None,
         typer.Option("--dir", "-d", help="Target directory for project initialization"),

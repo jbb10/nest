@@ -1,4 +1,5 @@
 """Main CLI entry point for nest command."""
+
 import typer
 
 from nest.cli.init_cmd import init_command

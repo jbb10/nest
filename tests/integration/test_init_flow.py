@@ -1,4 +1,5 @@
 """Integration tests for nest init command."""
+
 from pathlib import Path
 from unittest.mock import MagicMock
 

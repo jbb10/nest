@@ -1,7 +1,6 @@
 """Tests for DoclingProcessor adapter."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
@@ -144,9 +143,7 @@ class TestDoclingProcessorProcessing:
         assert output.parent.exists()
         assert output.exists()
 
-    def test_process_html_to_markdown(
-        self, processor: "DoclingProcessor", tmp_path: Path
-    ) -> None:
+    def test_process_html_to_markdown(self, processor: "DoclingProcessor", tmp_path: Path) -> None:
         """Test HTML file processing produces Markdown output."""
         source = tmp_path / "test.html"
         source.write_text(
