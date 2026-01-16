@@ -1,6 +1,6 @@
 # Story 2.6: Orphan Cleanup
 
-Status: review
+Status: done
 Branch: feat/2-6-orphan-cleanup
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
