@@ -185,11 +185,11 @@ class SyncService:
                 if on_error == "fail":
                     raise
 
-        # 3. Orphan Cleanup (after processing, before manifest commit)
-        orphan_result = self._orphan.cleanup(no_clean=no_clean)
-
-        # 4. Commit Manifest (includes any orphan removals from step 3)
+        # 3. Commit Manifest (before orphan cleanup so orphan detector knows about new files)
         self._manifest.commit()
+
+        # 4. Orphan Cleanup (after manifest commit)
+        orphan_result = self._orphan.cleanup(no_clean=no_clean)
 
         # 5. Update Index
         current_manifest = self._manifest.load_current_manifest()

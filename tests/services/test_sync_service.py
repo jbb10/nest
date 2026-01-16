@@ -326,8 +326,8 @@ class TestSyncOutputPathNone:
 class TestSyncManifestCommit:
     """Tests for manifest commit behavior."""
 
-    def test_sync_commits_manifest_before_index_update(self, mock_deps):
-        """Orphan cleanup, then manifest commit, then index update."""
+    def test_sync_commits_manifest_before_orphan_cleanup(self, mock_deps):
+        """Manifest commit, then orphan cleanup, then index update."""
         service = _create_sync_service(mock_deps)
         call_order = []
 
@@ -345,7 +345,7 @@ class TestSyncManifestCommit:
 
         service.sync()
 
-        assert call_order == ["orphan", "commit", "load", "index"]
+        assert call_order == ["commit", "orphan", "load", "index"]
 
 
 class TestSyncOnErrorMode:
