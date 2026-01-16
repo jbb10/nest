@@ -14,7 +14,7 @@ from pathlib import Path
 def setup_error_logger(
     log_file: Path | None = None,
     service_name: str = "nest",
-) -> logging.Logger:
+) -> logging.LoggerAdapter[logging.Logger]:
     """Setup file logger for error tracking.
 
     Creates or appends to an error log file with ISO timestamp format.
@@ -36,7 +36,8 @@ def setup_error_logger(
     logger.setLevel(logging.ERROR)
 
     # Clear any existing handlers to prevent duplicates
-    logger.handlers.clear()
+    if logger.hasHandlers():
+        logger.handlers.clear()
 
     # Create file handler that appends
     handler = logging.FileHandler(log_file, mode="a", encoding="utf-8")
@@ -51,13 +52,14 @@ def setup_error_logger(
     logger.addHandler(handler)
 
     # Store service name for use in log entries
-    logger = logging.LoggerAdapter(logger, {"service": service_name})
+    # Pyright strict requires typed generic for LoggerAdapter
+    adapter = logging.LoggerAdapter(logger, {"service": service_name})
 
-    return logger  # type: ignore[return-value]
+    return adapter
 
 
 def log_processing_error(
-    logger: logging.Logger | logging.LoggerAdapter,  # type: ignore[type-arg]
+    logger: logging.Logger | logging.LoggerAdapter[logging.Logger],
     file_path: Path,
     error: str,
 ) -> None:

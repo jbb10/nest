@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 
 def create_sync_service(
     project_root: Path,
-    error_logger: "logging.Logger | logging.LoggerAdapter | None" = None,  # type: ignore[type-arg]
+    error_logger: "logging.Logger | logging.LoggerAdapter[logging.Logger] | None" = None,
 ) -> SyncService:
     """Composition root for sync service.
 
@@ -186,6 +186,7 @@ def sync_command(
 
     # Setup error logger
     error_log_path = project_root / ".nest_errors.log"
+    # cast is needed because LoggerAdapter generic handling varies by python version
     error_logger = setup_error_logger(error_log_path, service_name="sync")
 
     try:

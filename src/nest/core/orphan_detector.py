@@ -25,7 +25,7 @@ class OrphanDetector:
         Returns:
             List of orphan file paths (absolute) to remove.
         """
-        orphans = []
+        orphans: list[Path] = []
 
         for file_path in output_files:
             relative = file_path.relative_to(output_dir).as_posix()

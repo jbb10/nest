@@ -120,7 +120,7 @@ class FileSystemAdapter:
             Sorted list of absolute paths to all files (not directories).
             Hidden files (starting with '.') are excluded.
         """
-        files = []
+        files: list[Path] = []
         for item in directory.rglob("*"):
             # Skip directories
             if item.is_dir():

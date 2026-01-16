@@ -32,7 +32,7 @@ class SyncService:
         orphan: OrphanService,
         index: IndexService,
         project_root: Path,
-        error_logger: logging.Logger | logging.LoggerAdapter | None = None,  # type: ignore[type-arg]
+        error_logger: logging.Logger | logging.LoggerAdapter[logging.Logger] | None = None,
     ) -> None:
         """Initialize SyncService.
 
