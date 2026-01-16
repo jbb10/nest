@@ -237,6 +237,18 @@ Claude Opus 4.5 (via GitHub Copilot)
 
 No significant issues encountered during implementation.
 
+### Code Review Fixes (2026-01-16)
+
+**Medium Issues Fixed:**
+- **Double Discovery Performance Hit**: Refactored `SyncService` to expose `discover()` method and accept optional `changes` argument in `sync()`. CLI now calls `discover()` once and passes results to `sync()`.
+- **Duplicate Service Instantiation**: Removed manual instantiation of `DiscoveryService` and adapters in CLI, reusing the service instance from `create_sync_service`.
+
+**Low Issues Fixed:**
+- **Local Imports in CLI**: Removed local imports in `sync_command`, relying on the injected service.
+
+**Tests Added:**
+- `TestSyncDiscovery` in `tests/services/test_sync_service.py` to verify discovery delegation and changes injection.
+
 ### Completion Notes List
 
 - Created `src/nest/ui/progress.py` with `SyncProgress` class wrapping Rich Progress

@@ -191,6 +191,9 @@ def sync_command(
     try:
         service = create_sync_service(project_root, error_logger=error_logger)
 
+        # 1. Discovery phase
+        changes = service.discover(force=force)
+
         # For dry-run, no progress bar needed
         if dry_run:
             result = service.sync(
@@ -198,20 +201,12 @@ def sync_command(
                 on_error=validated_on_error,
                 dry_run=True,
                 force=force,
+                changes=changes,
             )
             _display_dry_run_result(result, console)  # type: ignore[arg-type]
             return
 
-        # Pre-discovery to get file count for progress bar
-        from nest.adapters.file_discovery import FileDiscoveryAdapter
-        from nest.adapters.manifest import ManifestAdapter
-        from nest.services.discovery_service import DiscoveryService
-
-        discovery_service = DiscoveryService(
-            file_discovery=FileDiscoveryAdapter(),
-            manifest=ManifestAdapter(),
-        )
-        changes = discovery_service.discover_changes(project_root, force=force)
+        # Calculate total for progress using discovered changes
         files_to_process_count = len(changes.new_files) + len(changes.modified_files)
 
         # Execute sync with progress bar
@@ -224,6 +219,7 @@ def sync_command(
                 dry_run=False,
                 force=force,
                 progress_callback=progress.advance,
+                changes=changes,
             )
 
         # Normal sync complete - display summary

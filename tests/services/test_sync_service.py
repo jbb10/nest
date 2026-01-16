@@ -66,6 +66,62 @@ def _empty_manifest() -> Manifest:
     return Manifest(nest_version="1.0", project_name="TestProject", files={})
 
 
+class TestSyncDiscovery:
+    """Tests for discovery during sync."""
+
+    def test_discover_delegates_to_discovery_service(self, mock_deps):
+        """discover() method should call discovery service."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        result = service.discover(force=True)
+
+        assert result == _empty_discovery_result()
+        mock_deps["discovery"].discover_changes.assert_called_once_with(
+            mock_deps["project_root"], force=True
+        )
+
+    def test_sync_uses_provided_changes(self, mock_deps):
+        """Sync should use provided changes instead of calling discover."""
+        service = _create_sync_service(mock_deps)
+
+        # Pre-calculated changes
+        changes = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=Path("/app/raw/a.pdf"), checksum="111", status="new")
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/raw/a.pdf"),
+            status="success",
+            output_path=Path("/app/processed_context/a.md"),
+        )
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        # Call sync with changes
+        service.sync(changes=changes)
+
+        # Discovery service should NOT be called
+        mock_deps["discovery"].discover_changes.assert_not_called()
+        # But processing should happen
+        mock_deps["output"].process_file.assert_called_once()
+
+    def test_sync_performs_discovery_if_changes_not_provided(self, mock_deps):
+        """Sync should perform discovery if changes arg is None."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        service.sync(changes=None)
+
+        mock_deps["discovery"].discover_changes.assert_called_once()
+
+
 class TestSyncIndexIntegration:
     """Tests for index generation during sync."""
 

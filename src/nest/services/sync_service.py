@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 
 from nest.core.exceptions import ProcessingError
-from nest.core.models import DryRunResult, SyncResult
+from nest.core.models import DiscoveryResult, DryRunResult, SyncResult
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
@@ -53,6 +53,17 @@ class SyncService:
         self._project_root = project_root
         self._error_logger = error_logger
 
+    def discover(self, force: bool = False) -> DiscoveryResult:
+        """Run file discovery.
+
+        Args:
+            force: If True, reprocess all files regardless of checksum.
+
+        Returns:
+            DiscoveryResult containing new, modified, and unchanged files.
+        """
+        return self._discovery.discover_changes(self._project_root, force=force)
+
     def sync(
         self,
         no_clean: bool = False,
@@ -60,6 +71,7 @@ class SyncService:
         dry_run: bool = False,
         force: bool = False,
         progress_callback: ProgressCallback | None = None,
+        changes: DiscoveryResult | None = None,
     ) -> SyncResult | DryRunResult:
         """Execute the sync process.
 
@@ -71,6 +83,7 @@ class SyncService:
             dry_run: If True, analyze files but don't process/modify anything.
             force: If True, reprocess all files regardless of checksum.
             progress_callback: Optional callback called with filename after each file.
+            changes: Optional pre-calculated discovery result. If None, discovery is performed.
 
         Returns:
             SyncResult for normal sync, DryRunResult for dry run.
@@ -81,7 +94,8 @@ class SyncService:
         logger.info("Starting sync process...")
 
         # 1. Discovery
-        changes = self._discovery.discover_changes(self._project_root, force=force)
+        if changes is None:
+            changes = self.discover(force=force)
 
         # Dry run mode - analyze only, no modifications
         if dry_run:
