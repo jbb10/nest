@@ -1,17 +1,20 @@
 import logging
 from pathlib import Path
 
+from nest.core.models import OrphanCleanupResult
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
+from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
 
 logger = logging.getLogger(__name__)
 
+
 class SyncService:
     """Orchestrator for the document sync process.
 
-    Coordinates discovery, processing, manifest updates, and index generation.
+    Coordinates discovery, processing, manifest updates, orphan cleanup, and index generation.
     """
 
     def __init__(
@@ -19,6 +22,7 @@ class SyncService:
         discovery: DiscoveryService,
         output: OutputMirrorService,
         manifest: ManifestService,
+        orphan: OrphanService,
         index: IndexService,
         project_root: Path,
     ) -> None:
@@ -28,17 +32,26 @@ class SyncService:
             discovery: Service for file discovery.
             output: Service for document processing and output mirroring.
             manifest: Service for manifest tracking.
+            orphan: Service for orphan file cleanup.
             index: Service for master index generation.
             project_root: Root directory of the project.
         """
         self._discovery = discovery
         self._output = output
         self._manifest = manifest
+        self._orphan = orphan
         self._index = index
         self._project_root = project_root
 
-    def sync(self) -> None:
-        """Execute the sync process."""
+    def sync(self, no_clean: bool = False) -> OrphanCleanupResult:
+        """Execute the sync process.
+
+        Args:
+            no_clean: If True, detect but don't remove orphan files.
+
+        Returns:
+            OrphanCleanupResult with orphan cleanup details.
+        """
         logger.info("Starting sync process...")
 
         # 1. Discovery
@@ -89,10 +102,13 @@ class SyncService:
                     file_info.path, file_info.checksum, str(e)
                 )
 
-        # 3. Commit Manifest
+        # 3. Orphan Cleanup (after processing, before manifest commit)
+        orphan_result = self._orphan.cleanup(no_clean=no_clean)
+
+        # 4. Commit Manifest (includes any orphan removals from step 3)
         self._manifest.commit()
 
-        # 4. Update Index
+        # 5. Update Index
         current_manifest = self._manifest.load_current_manifest()
         success_files: list[str] = []
         for entry in current_manifest.files.values():
@@ -104,3 +120,5 @@ class SyncService:
 
         self._index.update_index(success_files, project_name)
         logger.info("Master index updated.")
+
+        return orphan_result

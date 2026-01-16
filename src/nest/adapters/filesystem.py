@@ -98,3 +98,35 @@ class FileSystemAdapter:
             Absolute path where output Markdown should be written.
         """
         return mirror_path(source, raw_dir, output_dir, ".md")
+
+    def delete_file(self, path: Path) -> None:
+        """Delete a file from the filesystem.
+
+        Args:
+            path: Path to the file to delete.
+
+        Note:
+            Uses missing_ok=True to handle already-deleted files gracefully.
+        """
+        path.unlink(missing_ok=True)
+
+    def list_files(self, directory: Path) -> list[Path]:
+        """List all files recursively in a directory.
+
+        Args:
+            directory: Root directory to search.
+
+        Returns:
+            Sorted list of absolute paths to all files (not directories).
+            Hidden files (starting with '.') are excluded.
+        """
+        files = []
+        for item in directory.rglob("*"):
+            # Skip directories
+            if item.is_dir():
+                continue
+            # Skip hidden files
+            if item.name.startswith("."):
+                continue
+            files.append(item)
+        return sorted(files)

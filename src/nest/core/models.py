@@ -112,3 +112,17 @@ class DiscoveryResult(BaseModel):
     def total_count(self) -> int:
         """Total count of all discovered files."""
         return len(self.new_files) + len(self.modified_files) + len(self.unchanged_files)
+
+
+class OrphanCleanupResult(BaseModel):
+    """Result of orphan cleanup operation.
+
+    Attributes:
+        orphans_detected: Relative paths of orphaned files detected.
+        orphans_removed: Relative paths of orphans actually removed (only if cleanup enabled).
+        skipped: True if --no-clean flag was set (orphans detected but not removed).
+    """
+
+    orphans_detected: list[str] = Field(default_factory=lambda: [])
+    orphans_removed: list[str] = Field(default_factory=lambda: [])
+    skipped: bool = False
