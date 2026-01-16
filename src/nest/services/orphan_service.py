@@ -3,11 +3,14 @@
 Orchestrates detection and removal of orphaned output files.
 """
 
+import logging
 from pathlib import Path
 
 from nest.adapters.protocols import FileSystemProtocol, ManifestProtocol
 from nest.core.models import OrphanCleanupResult
 from nest.core.orphan_detector import OrphanDetector
+
+logger = logging.getLogger(__name__)
 
 
 class OrphanService:
@@ -64,26 +67,36 @@ class OrphanService:
         orphans_removed: list[str] = []
 
         if not no_clean:
-            # Remove orphan files
-            for orphan in orphans:
-                self._filesystem.delete_file(orphan)
+            try:
+                # Remove orphan files with logging
+                for orphan in orphans:
+                    relative_path = orphan.relative_to(output_dir).as_posix()
+                    logger.info("Removing orphan file: %s", relative_path)
+                    self._filesystem.delete_file(orphan)
 
-            # Remove orphan entries from manifest
-            orphan_outputs = {
-                orphan.relative_to(output_dir).as_posix() for orphan in orphans
-            }
-            keys_to_remove = [
-                key
-                for key, entry in manifest.files.items()
-                if entry.output in orphan_outputs
-            ]
-            for key in keys_to_remove:
-                del manifest.files[key]
+                # Build reverse lookup for O(1) manifest entry removal
+                orphan_outputs = {
+                    orphan.relative_to(output_dir).as_posix() for orphan in orphans
+                }
+                output_to_key = {
+                    entry.output: key for key, entry in manifest.files.items()
+                }
 
-            # Save updated manifest
-            self._manifest.save(self._project_root, manifest)
+                # Remove orphan entries from manifest
+                for orphan_output in orphan_outputs:
+                    if orphan_output in output_to_key:
+                        key = output_to_key[orphan_output]
+                        logger.debug("Removing manifest entry: %s -> %s", key, orphan_output)
+                        del manifest.files[key]
 
-            orphans_removed = orphans_detected
+                # Save updated manifest
+                self._manifest.save(self._project_root, manifest)
+                logger.info("Orphan cleanup complete: %d files removed", len(orphans))
+
+                orphans_removed = orphans_detected
+            except Exception as e:
+                logger.error("Orphan cleanup failed: %s", e)
+                raise
 
         return OrphanCleanupResult(
             orphans_detected=orphans_detected,
