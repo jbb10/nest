@@ -34,11 +34,12 @@ class DiscoveryService:
         self._file_discovery = file_discovery
         self._manifest = manifest
 
-    def discover_changes(self, project_dir: Path) -> DiscoveryResult:
+    def discover_changes(self, project_dir: Path, force: bool = False) -> DiscoveryResult:
         """Discover files in raw_inbox/ and classify by change status.
 
         Args:
             project_dir: Path to the project root directory.
+            force: If True, treat all files as modified (ignore checksums).
 
         Returns:
             DiscoveryResult containing lists of new, modified, and unchanged files.
@@ -61,9 +62,7 @@ class DiscoveryService:
 
         # Discover files in raw_inbox/
         raw_inbox = project_dir / "raw_inbox"
-        discovered_paths = self._file_discovery.discover(
-            raw_inbox, set(SUPPORTED_EXTENSIONS)
-        )
+        discovered_paths = self._file_discovery.discover(raw_inbox, set(SUPPORTED_EXTENSIONS))
 
         # Classify each discovered file
         result = DiscoveryResult()
@@ -79,13 +78,17 @@ class DiscoveryService:
             # Get relative path for manifest comparison
             relative_path = file_path.relative_to(project_dir)
 
-            # Classify based on manifest
-            status = detector.classify(relative_path, checksum)
+            # Classify based on manifest (or force mode)
+            if force:
+                # Force mode: treat all files as modified
+                status = "modified"
+            else:
+                status = detector.classify(relative_path, checksum)
 
             # Create discovered file entry
             discovered = DiscoveredFile(
                 path=file_path,
-                status=status,
+                status=status,  # type: ignore[arg-type]
                 checksum=checksum,
             )
 

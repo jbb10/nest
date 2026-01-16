@@ -1,6 +1,6 @@
 # Story 2.7: Sync Command Flags & Error Handling
 
-Status: ready-for-dev
+Status: review
 Branch: feat/2-7-sync-command-flags-and-error-handling
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -48,36 +48,36 @@ Branch: feat/2-7-sync-command-flags-and-error-handling
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Add Error Logging Infrastructure** (AC: #5)
-  - [ ] 1.1 Create `src/nest/ui/logger.py` module
-  - [ ] 1.2 Implement `setup_error_logger()` function
+- [x] **Task 1: Add Error Logging Infrastructure** (AC: #5)
+  - [x] 1.1 Create `src/nest/ui/logger.py` module
+  - [x] 1.2 Implement `setup_error_logger()` function
     - Creates Python logger instance for error logging
     - Configures file handler for `.nest_errors.log`
     - Uses format: `{timestamp} {level} [{service}] {message}`
     - Appends to existing log (doesn't overwrite)
-  - [ ] 1.3 Implement `log_processing_error()` helper
+  - [x] 1.3 Implement `log_processing_error()` helper
     - Takes: file path, error message, service name
     - Writes formatted entry to error log
-  - [ ] 1.4 Add error logger to SyncService
+  - [x] 1.4 Add error logger to SyncService
     - Accept logger in constructor (injected from CLI)
     - Log all processing failures
 
-- [ ] **Task 2: Implement OnError Strategy in SyncService** (AC: #1, #2)
-  - [ ] 2.1 Add `on_error: Literal["skip", "fail"]` parameter to `SyncService.sync()`
-  - [ ] 2.2 Update processing loop in SyncService:
+- [x] **Task 2: Implement OnError Strategy in SyncService** (AC: #1, #2)
+  - [x] 2.1 Add `on_error: Literal["skip", "fail"]` parameter to `SyncService.sync()`
+  - [x] 2.2 Update processing loop in SyncService:
     - If processing fails and `on_error="skip"`: log error, continue to next file
     - If processing fails and `on_error="fail"`: raise exception immediately
-  - [ ] 2.3 Update return code logic:
+  - [x] 2.3 Update return code logic:
     - If `on_error="skip"` and any files succeeded: return success (exit 0)
     - If `on_error="fail"` and processing fails: raise NestError (exit 1)
 
-- [ ] **Task 3: Implement Dry-Run Mode** (AC: #3)
-  - [ ] 3.1 Add `dry_run: bool` parameter to `SyncService.sync()`
-  - [ ] 3.2 Update SyncService logic:
+- [x] **Task 3: Implement Dry-Run Mode** (AC: #3)
+  - [x] 3.1 Add `dry_run: bool` parameter to `SyncService.sync()`
+  - [x] 3.2 Update SyncService logic:
     - If `dry_run=True`: perform discovery, checksum comparison, orphan detection
     - Skip: actual processing, file writing, manifest updates
     - Return counts: new/modified/unchanged/orphans
-  - [ ] 3.3 Create `DryRunResult` model in `core/models.py`:
+  - [x] 3.3 Create `DryRunResult` model in `core/models.py`:
     ```python
     class DryRunResult(BaseModel):
         new_count: int
@@ -86,15 +86,15 @@ Branch: feat/2-7-sync-command-flags-and-error-handling
         orphan_count: int
     ```
 
-- [ ] **Task 4: Implement Force Reprocessing** (AC: #4)
-  - [ ] 4.1 Add `force: bool` parameter to `SyncService.sync()`
-  - [ ] 4.2 Update ChangeDetector logic:
+- [x] **Task 4: Implement Force Reprocessing** (AC: #4)
+  - [x] 4.1 Add `force: bool` parameter to `SyncService.sync()`
+  - [x] 4.2 Update ChangeDetector logic:
     - If `force=True`: mark ALL files as "modified" (ignore checksums)
     - Skip checksum comparison when force is enabled
-  - [ ] 4.3 Ensure manifest is still updated after forced processing
+  - [x] 4.3 Ensure manifest is still updated after forced processing
 
-- [ ] **Task 5: Add CLI Flags to sync_cmd.py** (AC: all)
-  - [ ] 5.1 Add Typer options to `sync()` command:
+- [x] **Task 5: Add CLI Flags to sync_cmd.py** (AC: all)
+  - [x] 5.1 Add Typer options to `sync()` command:
     ```python
     @app.command()
     def sync(
@@ -104,15 +104,15 @@ Branch: feat/2-7-sync-command-flags-and-error-handling
         no_clean: bool = typer.Option(False, "--no-clean", help="..."),  # Already exists from 2-6
     ):
     ```
-  - [ ] 5.2 Validate `--on-error` value (must be "skip" or "fail")
-  - [ ] 5.3 Pass all flags to SyncService.sync()
-  - [ ] 5.4 Setup error logger before creating service
-  - [ ] 5.5 Handle exceptions based on `on_error` mode:
+  - [x] 5.2 Validate `--on-error` value (must be "skip" or "fail")
+  - [x] 5.3 Pass all flags to SyncService.sync()
+  - [x] 5.4 Setup error logger before creating service
+  - [x] 5.5 Handle exceptions based on `on_error` mode:
     - Skip mode: catch exceptions, show summary, exit 0 if any succeeded
     - Fail mode: let exceptions propagate, exit 1
 
-- [ ] **Task 6: Update CLI Output for New Flags** (AC: #3)
-  - [ ] 6.1 Add dry-run output format to `ui/messages.py`:
+- [x] **Task 6: Update CLI Output for New Flags** (AC: #3)
+  - [x] 6.1 Add dry-run output format to `ui/messages.py`:
     ```
     🔍 Dry Run Preview
 
@@ -122,7 +122,7 @@ Branch: feat/2-7-sync-command-flags-and-error-handling
 
       Run without --dry-run to execute.
     ```
-  - [ ] 6.2 Update sync summary to show error log location when failures occur:
+  - [x] 6.2 Update sync summary to show error log location when failures occur:
     ```
     ✓ Sync complete
 
@@ -132,23 +132,23 @@ Branch: feat/2-7-sync-command-flags-and-error-handling
       Orphans:   3 removed
     ```
 
-- [ ] **Task 7: Testing** (AC: all)
-  - [ ] 7.1 Unit tests for error logger (`tests/ui/test_logger.py`):
+- [x] **Task 7: Testing** (AC: all)
+  - [x] 7.1 Unit tests for error logger (`tests/ui/test_logger.py`):
     - Test log file creation
     - Test log format correctness
     - Test log appending (not overwriting)
-  - [ ] 7.2 Service tests for `on_error` modes:
+  - [x] 7.2 Service tests for `on_error` modes:
     - Test skip mode continues after failure
     - Test fail mode aborts on first failure
     - Test exit codes for both modes
-  - [ ] 7.3 Service tests for dry-run:
+  - [x] 7.3 Service tests for dry-run:
     - Test no files are actually processed
     - Test counts are accurate
     - Test manifest is not modified
-  - [ ] 7.4 Service tests for force mode:
+  - [x] 7.4 Service tests for force mode:
     - Test all files marked as modified
     - Test checksums are ignored
-  - [ ] 7.5 Integration test `tests/integration/test_sync_flags.py`:
+  - [x] 7.5 Integration test `tests/integration/test_sync_flags.py`:
     - Test full sync with each flag combination
     - Test error logging end-to-end
     - Test CLI output for each mode
@@ -433,7 +433,7 @@ def test_sync_with_dry_run(tmp_path):
 
 ### Agent Model Used
 
-Claude Sonnet 4.5 (via GitHub Copilot)
+Claude Opus 4.5 (via GitHub Copilot)
 
 ### Debug Log References
 
@@ -441,8 +441,38 @@ N/A
 
 ### Completion Notes List
 
-_To be filled by Dev agent during implementation_
+- **Task 1**: Created `src/nest/ui/logger.py` with `setup_error_logger()` and `log_processing_error()` functions. Uses Python logging with ISO timestamp format, appends to `.nest_errors.log`.
+- **Task 2**: Added `on_error: Literal["skip", "fail"]` parameter to `SyncService.sync()`. Skip mode continues after failures, fail mode raises `ProcessingError` immediately.
+- **Task 3**: Added `dry_run: bool` parameter. Returns `DryRunResult` with counts instead of processing files. Created `DryRunResult` model in `core/models.py`.
+- **Task 4**: Added `force: bool` parameter to `SyncService.sync()`. Discovery service marks all files as "modified" when force=True.
+- **Task 5**: Created `src/nest/cli/sync_cmd.py` with all CLI flags (--on-error, --dry-run, --force, --no-clean). Integrated into main.py.
+- **Task 6**: Added dry-run output format and error summary with log file reference in sync_cmd.py.
+- **Task 7**: Comprehensive test coverage: 6 logger tests, 4 on_error tests, 5 dry-run tests, 2 force tests, 7 CLI tests, 6 integration tests.
+- **Bonus**: Fixed pre-existing broken test in `test_sync_index_integration.py` (missing orphan service).
+- **All 240 tests pass**.
 
 ### File List
 
-_To be filled by Dev agent after implementation_
+**New Files:**
+- `src/nest/ui/logger.py` - Error logging infrastructure
+- `src/nest/cli/sync_cmd.py` - Sync command with all flags
+- `tests/ui/test_logger.py` - Logger unit tests
+- `tests/cli/test_sync_cmd.py` - CLI flag tests
+- `tests/integration/test_sync_flags.py` - Integration tests for flags
+
+**Modified Files:**
+- `src/nest/cli/main.py` - Register sync_command
+- `src/nest/services/sync_service.py` - Add on_error, dry_run, force parameters
+- `src/nest/services/discovery_service.py` - Add force parameter to discover_changes
+- `src/nest/services/orphan_service.py` - Add detect_orphans method for dry-run
+- `src/nest/core/models.py` - Add DryRunResult model
+- `tests/services/test_sync_service.py` - Add tests for new modes
+- `tests/integration/test_sync_index_integration.py` - Fix missing orphan service
+
+## Change Log
+
+- 2026-01-16: Story 2-7 implemented - all sync command flags and error handling complete
+
+## Status
+
+review
