@@ -52,9 +52,7 @@ class TestFileChangeDetector:
         detector = FileChangeDetector(manifest_files)
 
         # Act - classify with relative path
-        result = detector.classify(
-            Path("raw_inbox/contracts/alpha.pdf"), "hash123"
-        )
+        result = detector.classify(Path("raw_inbox/contracts/alpha.pdf"), "hash123")
 
         # Assert
         assert result == "unchanged"
@@ -66,9 +64,7 @@ class TestFileChangeDetector:
         detector = FileChangeDetector(manifest_files)
 
         # Act - Same checksum should be unchanged
-        result = detector.classify(
-            Path("raw_inbox/2024/q1/reports/summary.pdf"), "hash_value"
-        )
+        result = detector.classify(Path("raw_inbox/2024/q1/reports/summary.pdf"), "hash_value")
 
         # Assert
         assert result == "unchanged"

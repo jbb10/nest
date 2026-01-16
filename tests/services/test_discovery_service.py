@@ -47,9 +47,7 @@ class TestDiscoveryService:
         assert result.new_files[0].path == pdf_file
         assert result.new_files[0].status == "new"
 
-    def test_discovers_modified_files_with_different_checksum(
-        self, tmp_path: Path
-    ) -> None:
+    def test_discovers_modified_files_with_different_checksum(self, tmp_path: Path) -> None:
         """Verify files with different checksums are classified as 'modified'."""
         # Arrange
         raw_inbox = tmp_path / "raw_inbox"
@@ -89,9 +87,7 @@ class TestDiscoveryService:
         assert len(result.unchanged_files) == 0
         assert result.modified_files[0].status == "modified"
 
-    def test_discovers_unchanged_files_with_matching_checksum(
-        self, tmp_path: Path
-    ) -> None:
+    def test_discovers_unchanged_files_with_matching_checksum(self, tmp_path: Path) -> None:
         """Verify files with matching checksums are classified as 'unchanged'."""
         # Arrange
         import hashlib

@@ -1,4 +1,5 @@
 """VS Code Custom Agent file generator."""
+
 from pathlib import Path
 
 from jinja2 import Environment, PackageLoader, select_autoescape

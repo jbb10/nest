@@ -1,9 +1,10 @@
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
 from nest.core.exceptions import ProcessingError
-from nest.core.models import DryRunResult, OrphanCleanupResult
+from nest.core.models import DryRunResult, SyncResult
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
@@ -12,6 +13,9 @@ from nest.services.output_service import OutputMirrorService
 from nest.ui.logger import log_processing_error
 
 logger = logging.getLogger(__name__)
+
+# Type alias for progress callback function
+ProgressCallback = Callable[[str], None]
 
 
 class SyncService:
@@ -55,7 +59,8 @@ class SyncService:
         on_error: Literal["skip", "fail"] = "skip",
         dry_run: bool = False,
         force: bool = False,
-    ) -> OrphanCleanupResult | DryRunResult:
+        progress_callback: ProgressCallback | None = None,
+    ) -> SyncResult | DryRunResult:
         """Execute the sync process.
 
         Args:
@@ -65,9 +70,10 @@ class SyncService:
                 - "fail": Raise exception immediately on first failure.
             dry_run: If True, analyze files but don't process/modify anything.
             force: If True, reprocess all files regardless of checksum.
+            progress_callback: Optional callback called with filename after each file.
 
         Returns:
-            OrphanCleanupResult for normal sync, DryRunResult for dry run.
+            SyncResult for normal sync, DryRunResult for dry run.
 
         Raises:
             ProcessingError: If on_error="fail" and a file fails processing.
@@ -88,6 +94,9 @@ class SyncService:
             )
 
         files_to_process = changes.new_files + changes.modified_files
+        skipped_count = len(changes.unchanged_files)
+        processed_count = 0
+        failed_count = 0
 
         if files_to_process:
             logger.info("Processing %d files...", len(files_to_process))
@@ -99,6 +108,10 @@ class SyncService:
         for file_info in files_to_process:
             try:
                 result = self._output.process_file(file_info.path, raw_inbox, output_dir)
+
+                # Report progress after processing each file
+                if progress_callback is not None:
+                    progress_callback(file_info.path.name)
 
                 if result.status == "success":
                     if result.output_path is None:
@@ -112,12 +125,14 @@ class SyncService:
                             file_info.checksum,
                             "Internal error: output_path missing",
                         )
+                        failed_count += 1
                     else:
                         self._manifest.record_success(
                             file_info.path,
                             file_info.checksum,
                             result.output_path,
                         )
+                        processed_count += 1
                 elif result.status == "failed":
                     error_msg = result.error or "Unknown error"
                     self._manifest.record_failure(
@@ -125,6 +140,7 @@ class SyncService:
                         file_info.checksum,
                         error_msg,
                     )
+                    failed_count += 1
                     # Log to .nest_errors.log (AC5)
                     if self._error_logger:
                         log_processing_error(self._error_logger, file_info.path, error_msg)
@@ -139,6 +155,7 @@ class SyncService:
                         file_info.checksum,
                         result.error or "Unknown error",
                     )
+                    failed_count += 1
 
             except ProcessingError:
                 # Re-raise ProcessingError (from fail mode) without catching
@@ -147,6 +164,7 @@ class SyncService:
                 logger.exception("Unexpected error processing %s", file_info.path)
                 error_msg = str(e)
                 self._manifest.record_failure(file_info.path, file_info.checksum, error_msg)
+                failed_count += 1
                 # Log to .nest_errors.log (AC5)
                 if self._error_logger:
                     log_processing_error(self._error_logger, file_info.path, error_msg)
@@ -172,4 +190,11 @@ class SyncService:
         self._index.update_index(success_files, project_name)
         logger.info("Master index updated.")
 
-        return orphan_result
+        return SyncResult(
+            processed_count=processed_count,
+            skipped_count=skipped_count,
+            failed_count=failed_count,
+            orphans_removed=len(orphan_result.orphans_removed),
+            orphans_detected=len(orphan_result.orphans_detected),
+            skipped_orphan_cleanup=orphan_result.skipped,
+        )

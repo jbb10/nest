@@ -14,6 +14,7 @@ from nest.core.models import (
     Manifest,
     OrphanCleanupResult,
     ProcessingResult,
+    SyncResult,
 )
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService
@@ -569,3 +570,262 @@ class TestSyncForceMode:
         # Discovery should be called with force=True
         call_kwargs = mock_deps["discovery"].discover_changes.call_args
         assert call_kwargs[1].get("force") is True
+
+
+class TestSyncProgressCallback:
+    """Tests for progress callback integration."""
+
+    def test_sync_calls_progress_callback_for_each_file(self, mock_deps):
+        """Progress callback should be called for each file processed."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=Path("/app/raw/a.pdf"), checksum="111", status="new"),
+                DiscoveredFile(path=Path("/app/raw/b.pdf"), checksum="222", status="new"),
+                DiscoveredFile(path=Path("/app/raw/c.pdf"), checksum="333", status="new"),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/raw/a.pdf"),
+            status="success",
+            output_path=Path("/app/processed_context/a.md"),
+        )
+
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        # Track progress calls
+        progress_calls: list[str] = []
+
+        def mock_progress(filename: str) -> None:
+            progress_calls.append(filename)
+
+        service.sync(progress_callback=mock_progress)
+
+        assert len(progress_calls) == 3
+        assert "a.pdf" in progress_calls
+        assert "b.pdf" in progress_calls
+        assert "c.pdf" in progress_calls
+
+    def test_sync_calls_progress_for_modified_files(self, mock_deps):
+        """Progress callback should be called for modified files too."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
+            new_files=[],
+            modified_files=[
+                DiscoveredFile(path=Path("/app/raw/m.pdf"), checksum="mod", status="modified"),
+            ],
+            unchanged_files=[],
+        )
+
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/raw/m.pdf"),
+            status="success",
+            output_path=Path("/app/processed_context/m.md"),
+        )
+
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        progress_calls: list[str] = []
+        service.sync(progress_callback=lambda f: progress_calls.append(f))
+
+        assert progress_calls == ["m.pdf"]
+
+    def test_sync_does_not_call_progress_when_no_files(self, mock_deps):
+        """No progress callbacks when no files to process."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        progress_calls: list[str] = []
+        service.sync(progress_callback=lambda f: progress_calls.append(f))
+
+        assert progress_calls == []
+
+    def test_sync_works_without_progress_callback(self, mock_deps):
+        """Sync should work fine when progress_callback is None."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=Path("/app/raw/x.pdf"), checksum="xxx", status="new"),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/raw/x.pdf"),
+            status="success",
+            output_path=Path("/app/processed_context/x.md"),
+        )
+
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        # No progress callback - should not crash
+        service.sync(progress_callback=None)
+
+        mock_deps["output"].process_file.assert_called_once()
+
+    def test_sync_calls_progress_even_on_failure(self, mock_deps):
+        """Progress should be reported even for failed files."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=Path("/app/raw/fail.pdf"), checksum="fail", status="new"),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/raw/fail.pdf"),
+            status="failed",
+            output_path=None,
+            error="Password protected",
+        )
+
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        progress_calls: list[str] = []
+        service.sync(progress_callback=lambda f: progress_calls.append(f))
+
+        assert progress_calls == ["fail.pdf"]
+
+
+class TestSyncResultCounts:
+    """Tests for SyncResult count tracking."""
+
+    def test_sync_returns_sync_result_with_counts(self, mock_deps):
+        """Sync should return SyncResult with processed, skipped, failed counts."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=Path("/app/raw/a.pdf"), checksum="111", status="new"),
+                DiscoveredFile(path=Path("/app/raw/b.pdf"), checksum="222", status="new"),
+            ],
+            modified_files=[],
+            unchanged_files=[
+                DiscoveredFile(path=Path("/app/raw/c.pdf"), checksum="333", status="unchanged"),
+            ],
+        )
+
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/raw/a.pdf"),
+            status="success",
+            output_path=Path("/app/processed_context/a.md"),
+        )
+
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        result = service.sync()
+
+        assert isinstance(result, SyncResult)
+        assert result.processed_count == 2
+        assert result.skipped_count == 1
+        assert result.failed_count == 0
+
+    def test_sync_result_counts_failures(self, mock_deps):
+        """SyncResult should count failed files."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=Path("/app/raw/ok.pdf"), checksum="111", status="new"),
+                DiscoveredFile(path=Path("/app/raw/bad.pdf"), checksum="222", status="new"),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        # First succeeds, second fails
+        mock_deps["output"].process_file.side_effect = [
+            ProcessingResult(
+                source_path=Path("/app/raw/ok.pdf"),
+                status="success",
+                output_path=Path("/app/processed_context/ok.md"),
+            ),
+            ProcessingResult(
+                source_path=Path("/app/raw/bad.pdf"),
+                status="failed",
+                output_path=None,
+                error="Encrypted",
+            ),
+        ]
+
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        result = service.sync()
+
+        assert isinstance(result, SyncResult)
+        assert result.processed_count == 1
+        assert result.failed_count == 1
+        assert result.skipped_count == 0
+
+    def test_sync_result_includes_orphan_info(self, mock_deps):
+        """SyncResult should include orphan cleanup information."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        mock_deps["orphan"].cleanup.return_value = OrphanCleanupResult(
+            orphans_detected=["old1.md", "old2.md", "old3.md"],
+            orphans_removed=["old1.md", "old2.md"],
+            skipped=False,
+        )
+
+        result = service.sync()
+
+        assert isinstance(result, SyncResult)
+        assert result.orphans_detected == 3
+        assert result.orphans_removed == 2
+        assert result.skipped_orphan_cleanup is False
+
+    def test_sync_result_reflects_no_clean_flag(self, mock_deps):
+        """SyncResult should reflect when --no-clean was used."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        mock_deps["orphan"].cleanup.return_value = OrphanCleanupResult(
+            orphans_detected=["orphan.md"],
+            orphans_removed=[],
+            skipped=True,
+        )
+
+        result = service.sync(no_clean=True)
+
+        assert isinstance(result, SyncResult)
+        assert result.orphans_detected == 1
+        assert result.orphans_removed == 0
+        assert result.skipped_orphan_cleanup is True
+
+    def test_sync_result_counts_exception_as_failure(self, mock_deps):
+        """Exception during processing should count as failure in SyncResult."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=Path("/app/raw/crash.pdf"), checksum="xxx", status="new"),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_deps["output"].process_file.side_effect = RuntimeError("Crash!")
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        result = service.sync()
+
+        assert isinstance(result, SyncResult)
+        assert result.failed_count == 1
+        assert result.processed_count == 0

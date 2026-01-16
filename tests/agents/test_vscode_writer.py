@@ -1,4 +1,5 @@
 """Unit tests for VS Code agent writer."""
+
 from pathlib import Path
 
 from conftest import MockFileSystem

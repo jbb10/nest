@@ -57,9 +57,7 @@ class TestComputeSha256:
         # Assert
         assert hash1 == hash2
 
-    def test_computes_different_hash_for_different_content(
-        self, tmp_path: Path
-    ) -> None:
+    def test_computes_different_hash_for_different_content(self, tmp_path: Path) -> None:
         """Verify different files produce different hashes."""
         # Arrange
         file1 = tmp_path / "file1.txt"

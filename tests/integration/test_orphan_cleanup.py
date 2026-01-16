@@ -6,8 +6,6 @@ Tests the full orphan cleanup flow from file deletion detection to removal.
 from datetime import datetime
 from pathlib import Path
 
-import pytest
-
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.models import FileEntry, Manifest

@@ -43,9 +43,7 @@ def setup_error_logger(log_file: Path) -> logging.Logger:
     return logger
 
 
-def log_processing_error(
-    log_file: Path, context: str, file_path: Path, error: str
-) -> None:
+def log_processing_error(log_file: Path, context: str, file_path: Path, error: str) -> None:
     """Log a processing error to the error log file.
 
     Args:

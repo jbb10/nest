@@ -63,7 +63,7 @@ development_status:
   2-5-master-index-generation: done
   2-6-orphan-cleanup: done
   2-7-sync-command-flags-and-error-handling: done
-  2-8-sync-command-cli-integration: backlog
+  2-8-sync-command-cli-integration: in-progress
   epic-2-retrospective: optional
 
   # ============================================================

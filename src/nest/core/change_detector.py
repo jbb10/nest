@@ -38,7 +38,7 @@ class FileChangeDetector:
             - "new": Not present in manifest
             - "modified": Present but checksum differs
             - "unchanged": Present with matching checksum
-        
+
         Raises:
             ValueError: If path is absolute (must be relative to project root).
         """

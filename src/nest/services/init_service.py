@@ -16,8 +16,7 @@ from nest.ui.messages import info, status_done, status_start
 
 # Gitignore content
 GITIGNORE_COMMENT = (
-    "# Raw documents excluded from version control "
-    "(processed versions in processed_context/)"
+    "# Raw documents excluded from version control (processed versions in processed_context/)"
 )
 GITIGNORE_ENTRY = "raw_inbox/"
 
@@ -77,9 +76,7 @@ class InitService:
 
         # Check for existing project
         if self._manifest.exists(target_dir):
-            raise NestError(
-                "Nest project already exists. Use `nest sync` to process documents."
-            )
+            raise NestError("Nest project already exists. Use `nest sync` to process documents.")
 
         # Create directories with progress
         status_start("Creating project structure")

@@ -144,3 +144,26 @@ class DryRunResult(BaseModel):
     modified_count: int = 0
     unchanged_count: int = 0
     orphan_count: int = 0
+
+
+class SyncResult(BaseModel):
+    """Result of a sync operation.
+
+    Contains counts of processed, skipped, and failed files along with
+    orphan cleanup information.
+
+    Attributes:
+        processed_count: Number of files successfully processed.
+        skipped_count: Number of unchanged files skipped.
+        failed_count: Number of files that failed processing.
+        orphans_removed: Number of orphan files removed.
+        orphans_detected: Number of orphan files detected.
+        skipped_orphan_cleanup: True if --no-clean was set.
+    """
+
+    processed_count: int = 0
+    skipped_count: int = 0
+    failed_count: int = 0
+    orphans_removed: int = 0
+    orphans_detected: int = 0
+    skipped_orphan_cleanup: bool = False
