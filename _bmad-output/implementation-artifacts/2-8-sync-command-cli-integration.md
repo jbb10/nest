@@ -1,6 +1,6 @@
 # Story 2.8: Sync Command CLI Integration
 
-Status: review
+Status: done
 Branch: feat/2-8-sync-command-cli-integration
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
