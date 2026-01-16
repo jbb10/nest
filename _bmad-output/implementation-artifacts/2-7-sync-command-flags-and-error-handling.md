@@ -447,9 +447,10 @@ N/A
 - **Task 4**: Added `force: bool` parameter to `SyncService.sync()`. Discovery service marks all files as "modified" when force=True.
 - **Task 5**: Created `src/nest/cli/sync_cmd.py` with all CLI flags (--on-error, --dry-run, --force, --no-clean). Integrated into main.py.
 - **Task 6**: Added dry-run output format and error summary with log file reference in sync_cmd.py.
-- **Task 7**: Comprehensive test coverage: 6 logger tests, 4 on_error tests, 5 dry-run tests, 2 force tests, 7 CLI tests, 6 integration tests.
+- **Task 7**: Comprehensive test coverage: 6 logger tests, 4 on_error tests, 5 dry-run tests, 2 force tests, 7 CLI tests, 8 integration tests.
 - **Bonus**: Fixed pre-existing broken test in `test_sync_index_integration.py` (missing orphan service).
-- **All 240 tests pass**.
+- **Code Review Fix (2026-01-16)**: Fixed AC5 error logging - errors now written to `.nest_errors.log` via error_logger injection into SyncService. Added `source_path` attribute to `ProcessingError` for proper error tracking.
+- **All 242 tests pass**.
 
 ### File List
 
@@ -462,17 +463,19 @@ N/A
 
 **Modified Files:**
 - `src/nest/cli/main.py` - Register sync_command
-- `src/nest/services/sync_service.py` - Add on_error, dry_run, force parameters
+- `src/nest/services/sync_service.py` - Add on_error, dry_run, force parameters, error_logger injection
 - `src/nest/services/discovery_service.py` - Add force parameter to discover_changes
 - `src/nest/services/orphan_service.py` - Add detect_orphans method for dry-run
 - `src/nest/core/models.py` - Add DryRunResult model
+- `src/nest/core/exceptions.py` - Add source_path attribute to ProcessingError
 - `tests/services/test_sync_service.py` - Add tests for new modes
 - `tests/integration/test_sync_index_integration.py` - Fix missing orphan service
 
 ## Change Log
 
+- 2026-01-16: Code review fixes - AC5 error logging now functional via error_logger injection
 - 2026-01-16: Story 2-7 implemented - all sync command flags and error handling complete
 
 ## Status
 
-review
+done

@@ -244,6 +244,110 @@ class TestSyncOnErrorIntegration:
         assert mock_output.process_file.call_count == 1
 
 
+class TestErrorLoggingIntegration:
+    """Integration tests for AC5 error logging to .nest_errors.log."""
+
+    def test_errors_written_to_log_file_in_skip_mode(self, tmp_path: Path) -> None:
+        """Errors should be written to .nest_errors.log when on_error=skip."""
+        from nest.ui.logger import setup_error_logger
+
+        mock_discovery = Mock()
+        mock_output = Mock()
+        mock_manifest = Mock()
+        mock_orphan = Mock()
+        mock_index = Mock()
+
+        mock_discovery.discover_changes.return_value = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(
+                    path=tmp_path / "raw_inbox" / "fail.pdf",
+                    checksum="111",
+                    status="new",
+                ),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_output.process_file.return_value = ProcessingResult(
+            source_path=tmp_path / "raw_inbox" / "fail.pdf",
+            status="failed",
+            error="Password protected",
+        )
+        mock_manifest.load_current_manifest.return_value = Mock(files={})
+        mock_orphan.cleanup.return_value = OrphanCleanupResult()
+
+        # Setup error logger
+        log_file = tmp_path / ".nest_errors.log"
+        error_logger = setup_error_logger(log_file, service_name="sync")
+
+        service = SyncService(
+            discovery=mock_discovery,
+            output=mock_output,
+            manifest=mock_manifest,
+            orphan=mock_orphan,
+            index=mock_index,
+            project_root=tmp_path,
+            error_logger=error_logger,
+        )
+
+        service.sync(on_error="skip")
+
+        # Verify error was logged to file
+        assert log_file.exists()
+        content = log_file.read_text()
+        assert "fail.pdf" in content
+        assert "Password protected" in content
+        assert "[sync]" in content
+
+    def test_exception_errors_written_to_log_file(self, tmp_path: Path) -> None:
+        """Unexpected exceptions should also be logged to .nest_errors.log."""
+        from nest.ui.logger import setup_error_logger
+
+        mock_discovery = Mock()
+        mock_output = Mock()
+        mock_manifest = Mock()
+        mock_orphan = Mock()
+        mock_index = Mock()
+
+        mock_discovery.discover_changes.return_value = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(
+                    path=tmp_path / "raw_inbox" / "crash.pdf",
+                    checksum="111",
+                    status="new",
+                ),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_output.process_file.side_effect = RuntimeError("Docling crashed")
+        mock_manifest.load_current_manifest.return_value = Mock(files={})
+        mock_orphan.cleanup.return_value = OrphanCleanupResult()
+
+        log_file = tmp_path / ".nest_errors.log"
+        error_logger = setup_error_logger(log_file, service_name="sync")
+
+        service = SyncService(
+            discovery=mock_discovery,
+            output=mock_output,
+            manifest=mock_manifest,
+            orphan=mock_orphan,
+            index=mock_index,
+            project_root=tmp_path,
+            error_logger=error_logger,
+        )
+
+        service.sync(on_error="skip")
+
+        # Verify exception was logged
+        assert log_file.exists()
+        content = log_file.read_text()
+        assert "crash.pdf" in content
+        assert "Docling crashed" in content
+
+
 class TestSyncFlagCombinations:
     """Tests for combining multiple flags."""
 

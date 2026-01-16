@@ -9,6 +9,7 @@ from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
 from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
+from nest.ui.logger import log_processing_error
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ class SyncService:
         orphan: OrphanService,
         index: IndexService,
         project_root: Path,
+        error_logger: logging.Logger | logging.LoggerAdapter | None = None,  # type: ignore[type-arg]
     ) -> None:
         """Initialize SyncService.
 
@@ -37,6 +39,7 @@ class SyncService:
             orphan: Service for orphan file cleanup.
             index: Service for master index generation.
             project_root: Root directory of the project.
+            error_logger: Logger for writing errors to .nest_errors.log (AC5).
         """
         self._discovery = discovery
         self._output = output
@@ -44,6 +47,7 @@ class SyncService:
         self._orphan = orphan
         self._index = index
         self._project_root = project_root
+        self._error_logger = error_logger
 
     def sync(
         self,
@@ -121,9 +125,13 @@ class SyncService:
                         file_info.checksum,
                         error_msg,
                     )
+                    # Log to .nest_errors.log (AC5)
+                    if self._error_logger:
+                        log_processing_error(self._error_logger, file_info.path, error_msg)
                     if on_error == "fail":
                         raise ProcessingError(
-                            f"Processing failed for {file_info.path.name}: {error_msg}"
+                            f"Processing failed for {file_info.path.name}: {error_msg}",
+                            source_path=file_info.path,
                         )
                 else:
                     self._manifest.record_failure(
@@ -137,9 +145,13 @@ class SyncService:
                 raise
             except Exception as e:
                 logger.exception("Unexpected error processing %s", file_info.path)
+                error_msg = str(e)
+                self._manifest.record_failure(file_info.path, file_info.checksum, error_msg)
+                # Log to .nest_errors.log (AC5)
+                if self._error_logger:
+                    log_processing_error(self._error_logger, file_info.path, error_msg)
                 if on_error == "fail":
                     raise
-                self._manifest.record_failure(file_info.path, file_info.checksum, str(e))
 
         # 3. Orphan Cleanup (after processing, before manifest commit)
         orphan_result = self._orphan.cleanup(no_clean=no_clean)

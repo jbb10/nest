@@ -5,6 +5,7 @@ dry-run, force reprocessing, and orphan cleanup control.
 """
 
 from pathlib import Path
+import logging
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
@@ -28,11 +29,15 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 
-def create_sync_service(project_root: Path) -> SyncService:
+def create_sync_service(
+    project_root: Path,
+    error_logger: "logging.Logger | logging.LoggerAdapter | None" = None,  # type: ignore[type-arg]
+) -> SyncService:
     """Composition root for sync service.
 
     Args:
         project_root: Root directory of the project.
+        error_logger: Logger for writing errors to .nest_errors.log.
 
     Returns:
         Configured SyncService with real adapters.
@@ -69,6 +74,7 @@ def create_sync_service(project_root: Path) -> SyncService:
             project_root=project_root,
         ),
         project_root=project_root,
+        error_logger=error_logger,
     )
 
 
@@ -149,7 +155,7 @@ def sync_command(
     error_logger = setup_error_logger(error_log_path, service_name="sync")
 
     try:
-        service = create_sync_service(project_root)
+        service = create_sync_service(project_root, error_logger=error_logger)
 
         # Execute sync with flags
         result = service.sync(
@@ -168,10 +174,12 @@ def sync_command(
         _display_sync_summary(result, console, error_log_path)
 
     except ProcessingError as e:
-        # Fail mode triggered
-        log_processing_error(error_logger, Path(str(e)), str(e))
+        # Fail mode triggered - error already logged by SyncService
+        # Log to file if source_path available (for fail-fast abort)
+        if e.source_path:
+            log_processing_error(error_logger, e.source_path, e.message)
         error("Sync aborted due to processing failure")
-        console.print(f"  [dim]Reason: {e}[/dim]")
+        console.print(f"  [dim]Reason: {e.message}[/dim]")
         console.print(f"  [dim]See {error_log_path} for details[/dim]")
         raise typer.Exit(1) from None
 
