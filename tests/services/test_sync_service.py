@@ -11,11 +11,13 @@ from nest.core.models import (
     DiscoveryResult,
     FileEntry,
     Manifest,
+    OrphanCleanupResult,
     ProcessingResult,
 )
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
+from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
 from nest.services.sync_service import SyncService
 
@@ -23,10 +25,18 @@ from nest.services.sync_service import SyncService
 @pytest.fixture
 def mock_deps():
     """Create mock dependencies for SyncService."""
+    orphan_mock = Mock(spec=OrphanService)
+    orphan_mock.cleanup.return_value = OrphanCleanupResult(
+        orphans_detected=[],
+        orphans_removed=[],
+        skipped=False,
+    )
+    
     return {
         "discovery": Mock(spec=DiscoveryService),
         "output": Mock(spec=OutputMirrorService),
         "manifest": Mock(spec=ManifestService),
+        "orphan": orphan_mock,
         "index": Mock(spec=IndexService),
         "project_root": Path("/app"),
     }
@@ -38,6 +48,7 @@ def _create_sync_service(deps: dict) -> SyncService:
         discovery=deps["discovery"],
         output=deps["output"],
         manifest=deps["manifest"],
+        orphan=deps["orphan"],
         index=deps["index"],
         project_root=deps["project_root"],
     )
@@ -276,11 +287,15 @@ class TestSyncManifestCommit:
     """Tests for manifest commit behavior."""
 
     def test_sync_commits_manifest_before_index_update(self, mock_deps):
-        """Manifest should be committed before loading for index generation."""
+        """Orphan cleanup, then manifest commit, then index update."""
         service = _create_sync_service(mock_deps)
         call_order = []
 
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["orphan"].cleanup.side_effect = lambda no_clean: (
+            call_order.append("orphan"),
+            OrphanCleanupResult(),
+        )[1]
         mock_deps["manifest"].commit.side_effect = lambda: call_order.append("commit")
         mock_deps["manifest"].load_current_manifest.side_effect = lambda: (
             call_order.append("load"),
@@ -292,4 +307,4 @@ class TestSyncManifestCommit:
 
         service.sync()
 
-        assert call_order == ["commit", "load", "index"]
+        assert call_order == ["orphan", "commit", "load", "index"]

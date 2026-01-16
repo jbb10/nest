@@ -195,6 +195,34 @@ class FileSystemProtocol(Protocol):
         """
         ...
 
+    def delete_file(self, path: Path) -> None:
+        """Delete a file from the filesystem.
+
+        Args:
+            path: Path to the file to delete.
+
+        Note:
+            Should handle missing files gracefully (missing_ok=True).
+            Used for orphan cleanup when source files are removed.
+        """
+        ...
+
+    def list_files(self, directory: Path) -> list[Path]:
+        """List all files recursively in a directory.
+
+        Args:
+            directory: Root directory to search.
+
+        Returns:
+            Sorted list of absolute paths to all files (not directories).
+            Hidden files (starting with '.') are excluded.
+            Results are sorted for deterministic behavior.
+
+        Note:
+            Used for scanning processed_context/ to detect orphan files.
+        """
+        ...
+
 
 @runtime_checkable
 class AgentWriterProtocol(Protocol):

@@ -72,6 +72,87 @@ class TestFileSystemAdapter:
 
         assert file_path.read_text() == "Initial appended"
 
+    def test_delete_file_removes_existing_file(self, tmp_path: Path) -> None:
+        """Verify delete_file removes an existing file."""
+        adapter = FileSystemAdapter()
+        file_path = tmp_path / "delete_me.txt"
+        file_path.write_text("content")
+        assert file_path.exists()
+
+        adapter.delete_file(file_path)
+
+        assert not file_path.exists()
+
+    def test_delete_file_with_missing_file_does_not_error(self, tmp_path: Path) -> None:
+        """Verify delete_file handles missing files gracefully."""
+        adapter = FileSystemAdapter()
+        file_path = tmp_path / "nonexistent.txt"
+        assert not file_path.exists()
+
+        # Should not raise - uses missing_ok=True
+        adapter.delete_file(file_path)
+
+        assert not file_path.exists()
+
+    def test_list_files_returns_all_files(self, tmp_path: Path) -> None:
+        """Verify list_files returns all files in directory tree."""
+        adapter = FileSystemAdapter()
+        (tmp_path / "file1.txt").write_text("a")
+        (tmp_path / "file2.md").write_text("b")
+        (tmp_path / "subdir").mkdir()
+        (tmp_path / "subdir" / "file3.pdf").write_text("c")
+
+        result = adapter.list_files(tmp_path)
+
+        assert len(result) == 3
+        assert tmp_path / "file1.txt" in result
+        assert tmp_path / "file2.md" in result
+        assert tmp_path / "subdir" / "file3.pdf" in result
+
+    def test_list_files_excludes_hidden_files(self, tmp_path: Path) -> None:
+        """Verify list_files excludes hidden files."""
+        adapter = FileSystemAdapter()
+        (tmp_path / "visible.txt").write_text("a")
+        (tmp_path / ".hidden").write_text("b")
+        (tmp_path / "subdir").mkdir()
+        (tmp_path / "subdir" / ".hidden_nested").write_text("c")
+
+        result = adapter.list_files(tmp_path)
+
+        assert len(result) == 1
+        assert tmp_path / "visible.txt" in result
+
+    def test_list_files_excludes_directories(self, tmp_path: Path) -> None:
+        """Verify list_files returns only files, not directories."""
+        adapter = FileSystemAdapter()
+        (tmp_path / "file.txt").write_text("a")
+        (tmp_path / "subdir").mkdir()
+        (tmp_path / "subdir" / "nested").mkdir()
+
+        result = adapter.list_files(tmp_path)
+
+        assert len(result) == 1
+        assert tmp_path / "file.txt" in result
+
+    def test_list_files_returns_sorted_results(self, tmp_path: Path) -> None:
+        """Verify list_files returns sorted list."""
+        adapter = FileSystemAdapter()
+        (tmp_path / "c.txt").write_text("c")
+        (tmp_path / "a.txt").write_text("a")
+        (tmp_path / "b.txt").write_text("b")
+
+        result = adapter.list_files(tmp_path)
+
+        assert result == sorted(result)
+
+    def test_list_files_empty_directory(self, tmp_path: Path) -> None:
+        """Verify list_files returns empty list for empty directory."""
+        adapter = FileSystemAdapter()
+
+        result = adapter.list_files(tmp_path)
+
+        assert result == []
+
 
 class TestGetRelativePath:
     """Tests for get_relative_path method."""
