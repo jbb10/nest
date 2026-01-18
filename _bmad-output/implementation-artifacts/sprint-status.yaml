@@ -64,7 +64,7 @@ development_status:
   2-6-orphan-cleanup: done
   2-7-sync-command-flags-and-error-handling: done
   2-8-sync-command-cli-integration: done
-  2-9-e2e-testing-framework: backlog
+  2-9-e2e-testing-framework: review
   epic-2-retrospective: optional
 
   # ============================================================

@@ -1,0 +1,5 @@
+# E2E test fixtures - binary files (prevent line-ending corruption)
+tests/e2e/fixtures/*.pdf binary
+tests/e2e/fixtures/*.docx binary
+tests/e2e/fixtures/*.pptx binary
+tests/e2e/fixtures/*.xlsx binary
