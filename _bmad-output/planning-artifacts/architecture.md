@@ -211,6 +211,61 @@ BREAKING CHANGE: Agent files now use .agent.md extension
 4. Breaking changes require `!` after type OR `BREAKING CHANGE` footer
 5. Run `./scripts/ci-lint.sh` before committing
 
+### Testing Strategy
+
+**Test Layers:**
+
+| Layer | Purpose | Location | Execution |
+|-------|---------|----------|-----------|
+| Unit | Pure functions, isolated logic | `tests/core/`, `tests/adapters/` | `pytest -m "not e2e"` |
+| Integration | Service orchestration with mocks | `tests/services/`, `tests/integration/` | `pytest -m "not e2e"` |
+| **E2E** | Full CLI, real file I/O, real Docling | `tests/e2e/` | `pytest -m "e2e" --timeout=60` |
+
+**E2E Test Infrastructure:**
+
+```
+tests/e2e/
+├── conftest.py                # CLI runner, temp_project fixtures
+├── test_init_e2e.py           # Full init command flow
+├── test_sync_e2e.py           # Full sync command flow
+├── test_negative_e2e.py       # Error handling tests
+└── fixtures/                  # Real test documents (binary)
+    ├── quarterly.pdf
+    ├── summary.docx
+    ├── deck.pptx
+    └── data.xlsx
+```
+
+**E2E Skip Condition:**
+```python
+def docling_available() -> bool:
+    """Check if Docling models are downloaded."""
+    cache_dir = Path.home() / ".cache" / "docling"
+    return cache_dir.exists() and any(cache_dir.iterdir())
+
+skip_without_docling = pytest.mark.skipif(
+    not docling_available(),
+    reason="Docling models not downloaded"
+)
+```
+
+**Binary Fixture Handling (`.gitattributes`):**
+```gitattributes
+tests/e2e/fixtures/*.pdf binary
+tests/e2e/fixtures/*.docx binary
+tests/e2e/fixtures/*.pptx binary
+tests/e2e/fixtures/*.xlsx binary
+```
+
+**E2E Fixture Scope:**
+- `temp_project` fixture uses `scope="class"` to share init overhead within test classes
+- `cli_runner` fixture uses `scope="function"` (stateless, fast)
+
+**Story Completion Requirement:**
+A story is NOT complete until all applicable E2E tests pass. When creating stories, the Scrum Master MUST evaluate if new E2E tests are needed and add them to acceptance criteria.
+
+---
+
 ### CI Strategy
 
 **Script-Based Architecture:**
@@ -221,7 +276,8 @@ scripts/
 ├── ci-lint.sh          # Ruff check + format verification
 ├── ci-typecheck.sh     # Pyright strict mode
 ├── ci-test.sh          # pytest with coverage (matrix: per Python version)
-└── ci-integration.sh   # Docling processing tests (matrix: per Python version)
+├── ci-integration.sh   # Docling processing tests (matrix: per Python version)
+└── ci-e2e.sh           # E2E tests (requires Docling models)
 ```
 
 **GitHub Actions (`.github/workflows/ci.yml`):**

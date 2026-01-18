@@ -53,7 +53,7 @@ development_status:
 
   # ============================================================
   # Epic 2: Document Processing & Sync
-  # FR5-FR14 - nest sync command
+  # FR5-FR14, NFR11 - nest sync command + E2E testing
   # ============================================================
   epic-2: in-progress
   2-1-file-discovery-and-checksum-engine: done
@@ -64,6 +64,7 @@ development_status:
   2-6-orphan-cleanup: done
   2-7-sync-command-flags-and-error-handling: done
   2-8-sync-command-cli-integration: done
+  2-9-e2e-testing-framework: backlog
   epic-2-retrospective: optional
 
   # ============================================================

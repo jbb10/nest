@@ -132,7 +132,7 @@ As a user starting a new project, I can run a single command to create a smart, 
 ### Epic 2: Document Processing & Sync
 As a user with project documents, I can drop them into a folder and have them automatically converted into AI-readable Markdown, so my Copilot agent can understand them.
 
-**FRs covered:** FR5, FR6, FR7, FR8, FR9, FR10, FR11, FR12, FR13, FR14
+**FRs covered:** FR5, FR6, FR7, FR8, FR9, FR10, FR11, FR12, FR13, FR14, NFR11
 
 **Scope:**
 - Scans for supported files (.pdf, .docx, .pptx, .xlsx, .html)
@@ -143,6 +143,7 @@ As a user with project documents, I can drop them into a folder and have them au
 - Index regeneration (00_MASTER_INDEX.md)
 - Manifest updates
 - All sync flags (--on-error, --dry-run, --force, --no-clean)
+- **E2E testing framework for CLI commands (Story 2.9)**
 
 ---
 
@@ -604,6 +605,119 @@ reports/Q3_summary.md
 **When** it creates SyncService
 **Then** it injects: FileSystemAdapter, DoclingProcessor, ManifestAdapter
 **And** passes flag values (on_error, dry_run, force, no_clean)
+
+---
+
+### Story 2.9: E2E Testing Framework for CLI Commands
+
+**As a** developer working on Nest,
+**I want** an end-to-end testing framework that validates full CLI command flows with real file I/O and actual Docling processing,
+**So that** I can catch integration bugs that unit and mocked tests miss, and have confidence that releases work correctly.
+
+**Background:**
+This story was added after v0.1.0 release revealed a bug that would have been caught with proper E2E tests. E2E tests are now a required gate for story completion.
+
+**Acceptance Criteria:**
+
+**Infrastructure Setup:**
+
+**Given** a developer wants to run E2E tests
+**When** they execute `pytest -m "e2e" --timeout=60`
+**Then** only E2E tests run with 60-second timeout
+**And** tests skip automatically if Docling models are not downloaded
+
+**Given** E2E test fixtures include binary documents (PDF, DOCX, PPTX, XLSX)
+**When** the repository is cloned on any platform
+**Then** binary files are not corrupted by line-ending normalization
+**And** `.gitattributes` marks fixture files as binary
+
+**Given** an E2E test class with multiple tests
+**When** `temp_project` fixture is used
+**Then** it uses `scope="class"` to share init overhead within the test class
+
+**Init Command E2E:**
+
+**Given** `nest init "TestProject"` is run via subprocess in an empty temp directory
+**When** the command completes
+**Then** exit code is 0
+**And** `raw_inbox/` directory exists and is empty
+**And** `processed_context/` directory exists and is empty
+**And** `.nest_manifest.json` exists with valid JSON containing project name
+
+**Sync Command E2E:**
+
+**Given** a Nest project is initialized
+**And** 4 test documents are placed in nested structure under `raw_inbox/`:
+  - `reports/quarterly.pdf`
+  - `reports/summary.docx`
+  - `presentations/deck.pptx`
+  - `presentations/data.xlsx`
+**When** `nest sync` is run via subprocess
+**Then** exit code is 0
+**And** output structure mirrors input in `processed_context/`:
+  - `reports/quarterly.md`
+  - `reports/summary.md`
+  - `presentations/deck.md`
+  - `presentations/data.md`
+**And** all output files have `.md` extension
+**And** all output files are non-empty
+**And** manifest contains entries for all 4 files
+**And** stdout indicates 4 files processed
+
+**Negative Path Tests:**
+
+**Given** `nest sync` is run in a directory without `.nest_manifest.json`
+**When** the command executes
+**Then** exit code is 1
+**And** error message contains "No Nest project found" or "nest init"
+
+**Given** `nest init "Project2"` is run in a directory with existing manifest
+**When** the command executes
+**Then** exit code is 1
+**And** error message indicates project already exists
+
+**Given** `nest init` is run without a project name argument
+**When** the command executes
+**Then** exit code is 1
+**And** error message indicates project name is required
+
+**Given** a corrupt/truncated PDF is placed in `raw_inbox/`
+**And** `nest sync` is run with default flags
+**When** processing encounters the corrupt file
+**Then** the corrupt file is skipped
+**And** error is logged to `.nest_errors.log`
+**And** other valid files are still processed
+**And** exit code is 0 (skip mode)
+
+**Given** a corrupt PDF is placed in `raw_inbox/`
+**And** `nest sync --on-error=fail` is run
+**When** processing encounters the corrupt file
+**Then** exit code is 1
+**And** sync aborts immediately
+
+**Given** an unsupported file type (e.g., `.txt`) is placed in `raw_inbox/`
+**When** `nest sync` is run
+**Then** the unsupported file is ignored (not in output)
+**And** no error is logged for it
+
+**Given** `raw_inbox/` contains no supported files
+**When** `nest sync` is run
+**Then** exit code is 0
+**And** output indicates no files to process
+
+**Test Documents:**
+
+**Given** test fixtures are needed in `tests/e2e/fixtures/`
+**When** documents are created
+**Then** each document is under 100KB for fast processing
+**And** content is simple (no complex formatting)
+**And** one file exists for each supported type (PDF, DOCX, PPTX, XLSX)
+
+**pytest Configuration:**
+
+**Given** `pyproject.toml` pytest configuration
+**When** markers are defined
+**Then** `e2e` marker is registered with description: "End-to-end tests (require real Docling, may be slow)"
 
 ---
 

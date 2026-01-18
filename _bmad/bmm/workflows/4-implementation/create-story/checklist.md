@@ -159,7 +159,20 @@ You will systematically re-do the entire story creation process, but with a crit
 - **UX violations:** Missing user experience requirements that could ruin the product
 - **Learning failures:** Missing previous story context that could repeat same mistakes
 
-#### **3.5 Implementation DISASTERS**
+#### **3.5 E2E Testing DISASTERS**
+
+- **Missing E2E coverage:** Story modifies CLI behavior without E2E test consideration
+- **E2E gaps not identified:** New functionality not validated by existing E2E tests
+- **Missing E2E requirements:** Story ACs don't include required E2E test updates
+- **E2E test skip:** Story is marked complete without E2E tests passing
+
+**E2E Testing Checklist (MANDATORY for CLI-affecting stories):**
+- [ ] Does this story modify CLI command behavior? → E2E tests REQUIRED
+- [ ] Are existing E2E tests sufficient for this story's changes?
+- [ ] If new E2E tests needed, are they specified in ACs?
+- [ ] Is "All E2E tests pass" included as completion criteria?
+
+#### **3.6 Implementation DISASTERS**
 
 - **Vague implementations:** Missing details that could lead to incorrect or incomplete work
 - **Completion lies:** Missing acceptance criteria that could allow fake implementations

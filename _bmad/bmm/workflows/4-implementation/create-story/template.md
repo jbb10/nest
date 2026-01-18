@@ -15,6 +15,13 @@ so that {{benefit}}.
 
 1. [Add acceptance criteria from epics/PRD]
 
+## E2E Testing Requirements
+
+<!-- MANDATORY: Evaluate E2E test coverage for this story -->
+- [ ] Existing E2E tests cover this story's functionality: [Yes/No - list tests if Yes]
+- [ ] New E2E tests required: [Yes/No - describe if Yes]
+- [ ] E2E test execution required for story completion: [Yes/No]
+
 ## Tasks / Subtasks
 
 - [ ] Task 1 (AC: #)

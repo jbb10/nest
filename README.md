@@ -1,4 +1,4 @@
-# Nest 🪺
+# Nest
 
 **Turn your project documents into an AI-powered knowledge base for VS Code Copilot.**
 

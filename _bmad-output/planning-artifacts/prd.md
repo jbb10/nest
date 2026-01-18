@@ -328,7 +328,29 @@ nest init "Nike"
 * All errors are logged to `.nest_errors.log` in the project root.
 * Summary shown at end of sync: `Processed 45/47 files. 2 errors (see .nest_errors.log)`
 
-### 6.5 Team Usage Guidance
+### 6.5 E2E Testing Requirements
+
+**NFR11: End-to-End Testing**
+
+Nest requires E2E tests that validate full CLI command flows with real file I/O and actual Docling processing.
+
+| Test Layer | Purpose | Required |
+|------------|---------|----------|
+| Unit | Pure functions, business logic | ✅ |
+| Integration | Service orchestration with mocked I/O | ✅ |
+| **E2E** | Full CLI invocation, real Docling | ✅ |
+
+**E2E Test Commands:**
+- `pytest -m "not e2e"` — Fast tests for dev loop
+- `pytest -m "e2e" --timeout=60` — Full E2E validation
+
+**Story Completion Gate:** A story is NOT complete until all E2E tests pass. When adding new CLI logic, developers MUST evaluate if new E2E tests are needed.
+
+**Skip Condition:** E2E tests automatically skip if Docling models are not downloaded, preventing CI failures in environments without models.
+
+---
+
+### 6.6 Team Usage Guidance
 
 **Recommended Workflow:**
 1. **Commit `processed_context/`** — This is the shared "brain" for the team.
