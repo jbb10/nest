@@ -4,6 +4,7 @@ Provides fixtures for running CLI commands via subprocess and managing
 temporary project directories.
 """
 
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -22,6 +23,24 @@ skip_without_docling = pytest.mark.skipif(
     not docling_available(),
     reason="Docling models not downloaded. Run 'nest init' first.",
 )
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Print temp directory path at the end of E2E test runs."""
+    # Only print if we actually ran E2E tests (check if any were collected)
+    if not any(item.get_closest_marker("e2e") for item in session.items):
+        return
+
+    # Get the pytest temp directory from environment
+    tmpdir = os.environ.get("TMPDIR", "/tmp")
+    user = os.environ.get("USER", "unknown")
+    pytest_tmp = Path(tmpdir) / f"pytest-of-{user}" / "pytest-current"
+
+    if pytest_tmp.exists():
+        # Resolve symlink to actual path
+        actual_path = pytest_tmp.resolve()
+        print(f"\n\n📁 E2E test artifacts: {actual_path}")
+        print(f"   Quick access: open $TMPDIR/pytest-of-{user}/pytest-current\n")
 
 
 @dataclass
