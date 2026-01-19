@@ -407,7 +407,7 @@ Claude Opus 4.5
 
 1. **Task 1**: Created `tests/e2e/` directory structure with `__init__.py`, `conftest.py`, and `fixtures/` directory. Added `e2e` marker to `pyproject.toml`. Created `.gitattributes` with binary patterns for test fixtures.
 
-2. **Task 2**: Implemented `CLIResult` dataclass, `run_cli()` helper function, `temp_project` class-scoped fixture, `fresh_temp_dir` function-scoped fixture, and `sample_documents` fixture in `conftest.py`. Added `skip_without_docling` marker.
+2. **Task 2**: Implemented `CLIResult` dataclass, `run_cli()` helper function, `fresh_temp_dir` fixture, `initialized_project` fixture (runs `nest init`), and `sample_documents` fixture in `conftest.py`. Added `skip_without_docling` marker. All fixtures are function-scoped for test isolation.
 
 3. **Task 3**: Created `generate_fixtures.py` script that generates minimal test documents using `reportlab`, `python-docx`, `python-pptx`, and `openpyxl`. All fixtures under 100KB. Created corrupt.pdf (100 bytes) for negative testing.
 
@@ -419,11 +419,22 @@ Claude Opus 4.5
 
 7. **Task 7**: Verified full E2E suite passes with `pytest -m "e2e"`. All 281 tests pass.
 
+### Code Review Fixes (2026-01-19)
+
+**Issue**: Original implementation created fixtures in conftest.py but duplicated them inline in test_sync_e2e.py, violating DRY and leaving conftest.py fixtures unused.
+
+**Fix**: Refactored to use proper fixture chain in conftest.py:
+- `fresh_temp_dir` → plain temp directory (for init tests)
+- `initialized_project` → runs `nest init` (each test gets fresh project)
+- `sample_documents` → copies fixtures to raw_inbox/, depends on `initialized_project`
+
+Removed inline duplicate fixtures from test_sync_e2e.py. Tests now use conftest.py fixtures as designed.
+
 ### File List
 
 **Created:**
 - `tests/e2e/__init__.py` — E2E test module init
-- `tests/e2e/conftest.py` — E2E fixtures (CLIResult, run_cli, temp_project, etc.)
+- `tests/e2e/conftest.py` — E2E fixtures (CLIResult, run_cli, initialized_project, sample_documents)
 - `tests/e2e/test_init_e2e.py` — Init command E2E tests (2 tests)
 - `tests/e2e/test_sync_e2e.py` — Sync command E2E tests (2 tests)
 - `tests/e2e/test_negative_e2e.py` — Negative path E2E tests (7 tests)

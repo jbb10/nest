@@ -5,7 +5,6 @@ and real Docling processing.
 """
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
@@ -20,44 +19,13 @@ class TestSyncE2E:
 
     These tests require Docling models to be downloaded.
     They will be skipped if models are not available.
+
+    Uses fixtures from conftest.py:
+    - initialized_project: Runs nest init (each test gets fresh project)
+    - sample_documents: Copies test fixtures to raw_inbox/
     """
 
-    @pytest.fixture(scope="class")
-    def initialized_project(self, tmp_path_factory: pytest.TempPathFactory) -> Path:
-        """Create an initialized Nest project for sync tests."""
-        project_dir = tmp_path_factory.mktemp("nest_sync_e2e")
-        result = run_cli(["init", "SyncTestProject"], cwd=project_dir)
-        assert result.exit_code == 0, f"Init failed: {result.stderr}"
-        return project_dir
-
-    @pytest.fixture
-    def project_with_documents(self, initialized_project: Path) -> Path:
-        """Copy test fixtures to raw_inbox in nested structure.
-
-        Creates:
-            raw_inbox/reports/quarterly.pdf
-            raw_inbox/reports/summary.docx
-            raw_inbox/presentations/deck.pptx
-            raw_inbox/presentations/data.xlsx
-        """
-        fixtures_dir = Path(__file__).parent / "fixtures"
-        raw_inbox = initialized_project / "raw_inbox"
-
-        # Create nested structure
-        reports_dir = raw_inbox / "reports"
-        presentations_dir = raw_inbox / "presentations"
-        reports_dir.mkdir(parents=True, exist_ok=True)
-        presentations_dir.mkdir(parents=True, exist_ok=True)
-
-        # Copy fixtures to nested structure
-        shutil.copy(fixtures_dir / "quarterly.pdf", reports_dir / "quarterly.pdf")
-        shutil.copy(fixtures_dir / "summary.docx", reports_dir / "summary.docx")
-        shutil.copy(fixtures_dir / "deck.pptx", presentations_dir / "deck.pptx")
-        shutil.copy(fixtures_dir / "data.xlsx", presentations_dir / "data.xlsx")
-
-        return initialized_project
-
-    def test_sync_processes_nested_documents(self, project_with_documents: Path):
+    def test_sync_processes_nested_documents(self, sample_documents: Path):
         """Test that sync processes nested documents correctly.
 
         AC5: Given a Nest project is initialized
@@ -70,7 +38,7 @@ class TestSyncE2E:
         And manifest contains entries for all 4 files
         And stdout indicates files were processed
         """
-        project_dir = project_with_documents
+        project_dir = sample_documents
 
         # Act
         result = run_cli(["sync"], cwd=project_dir)
@@ -113,9 +81,9 @@ class TestSyncE2E:
         # Assert stdout indicates files were processed
         assert "4" in result.stdout or "processed" in result.stdout.lower()
 
-    def test_sync_idempotent_no_changes(self, project_with_documents: Path):
+    def test_sync_idempotent_no_changes(self, sample_documents: Path):
         """Test that running sync twice skips unchanged files."""
-        project_dir = project_with_documents
+        project_dir = sample_documents
 
         # First sync
         result1 = run_cli(["sync"], cwd=project_dir)

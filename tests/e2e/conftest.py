@@ -59,33 +59,36 @@ def run_cli(args: list[str], cwd: Path, timeout: int = 300) -> CLIResult:
 
 
 @pytest.fixture
-def cli_runner() -> type[CLIResult]:
-    """Provide the CLIResult class for type hints in tests."""
-    return CLIResult
-
-
-@pytest.fixture(scope="class")
-def temp_project(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Create a temp directory shared across test class.
-
-    Uses class scope to share init overhead within the test class.
-    Automatically cleaned up by pytest after all tests in class complete.
-    """
-    return tmp_path_factory.mktemp("nest_e2e")
-
-
-@pytest.fixture
 def fresh_temp_dir(tmp_path: Path) -> Path:
     """Create a fresh temp directory for a single test.
 
     Use this when tests need isolated directories that don't share state.
+    Tests that don't need nest init (like init tests themselves) use this.
     """
     return tmp_path
 
 
 @pytest.fixture
-def sample_documents(temp_project: Path) -> Path:
+def initialized_project(fresh_temp_dir: Path) -> Path:
+    """Create an initialized Nest project.
+
+    Runs `nest init` in a fresh temp directory. Each test gets its own
+    initialized project for isolation. Init is fast (~5s) so this is
+    acceptable overhead for test reliability.
+
+    Returns:
+        Path to the project directory (containing raw_inbox/, processed_context/, etc.).
+    """
+    result = run_cli(["init", "E2ETestProject"], cwd=fresh_temp_dir)
+    assert result.exit_code == 0, f"Init failed: {result.stderr}"
+    return fresh_temp_dir
+
+
+@pytest.fixture
+def sample_documents(initialized_project: Path) -> Path:
     """Copy fixture files to raw_inbox in nested structure.
+
+    Depends on initialized_project to ensure raw_inbox/ exists.
 
     Creates:
         raw_inbox/reports/quarterly.pdf
@@ -94,10 +97,10 @@ def sample_documents(temp_project: Path) -> Path:
         raw_inbox/presentations/data.xlsx
 
     Returns:
-        Path to the raw_inbox directory.
+        Path to the project directory (for use in sync tests).
     """
     fixtures_dir = Path(__file__).parent / "fixtures"
-    raw_inbox = temp_project / "raw_inbox"
+    raw_inbox = initialized_project / "raw_inbox"
 
     # Create nested structure
     reports_dir = raw_inbox / "reports"
@@ -111,4 +114,4 @@ def sample_documents(temp_project: Path) -> Path:
     shutil.copy(fixtures_dir / "deck.pptx", presentations_dir / "deck.pptx")
     shutil.copy(fixtures_dir / "data.xlsx", presentations_dir / "data.xlsx")
 
-    return raw_inbox
+    return initialized_project
