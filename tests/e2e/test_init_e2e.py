@@ -60,5 +60,6 @@ class TestInitE2E:
 
         # Assert
         assert result.exit_code == 0
-        # Output should indicate success (Rich console output)
-        assert "MyProject" in result.stdout or "success" in result.stdout.lower()
+        # Output should show project name and "initialized" (actual: '✓ Project "X" initialized!')
+        assert "MyProject" in result.stdout
+        assert "initialized" in result.stdout.lower()
