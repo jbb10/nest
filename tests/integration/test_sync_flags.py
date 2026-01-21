@@ -108,7 +108,7 @@ class TestSyncForceIntegration:
         mock_output.process_file.return_value = ProcessingResult(
             source_path=tmp_path / "raw_inbox" / "file.pdf",
             status="success",
-            output_path=tmp_path / "processed_context" / "file.md",
+            output_path=tmp_path  "_nest_context" / "file.md",
         )
         mock_manifest.load_current_manifest.return_value = Mock(files={})
         mock_orphan.cleanup.return_value = OrphanCleanupResult()
@@ -171,7 +171,7 @@ class TestSyncOnErrorIntegration:
             ProcessingResult(
                 source_path=tmp_path / "raw_inbox" / "ok.pdf",
                 status="success",
-                output_path=tmp_path / "processed_context" / "ok.md",
+                output_path=tmp_path  "_nest_context" / "ok.md",
             ),
         ]
         mock_manifest.load_current_manifest.return_value = Mock(files={})

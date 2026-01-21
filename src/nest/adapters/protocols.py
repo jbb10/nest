@@ -181,17 +181,17 @@ class FileSystemProtocol(Protocol):
 
         Args:
             source: Absolute path to source file.
-            raw_dir: Root of raw_inbox directory.
-            output_dir: Root of processed_context directory.
+            raw_dir: Root of sources directory.
+            output_dir: Root of context directory.
 
         Returns:
             Absolute path where output Markdown should be written.
 
         Example:
-            source = /project/raw_inbox/contracts/2024/alpha.pdf
-            raw_dir = /project/raw_inbox
-            output_dir = /project/processed_context
-            Result: /project/processed_context/contracts/2024/alpha.md
+            source = /project/_nest_sources/contracts/2024/alpha.pdf
+            raw_dir = /project/_nest_sources
+            output_dir = /project/_nest_context
+            Result: /project/_nest_context/contracts/2024/alpha.md
         """
         ...
 

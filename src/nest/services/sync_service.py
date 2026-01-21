@@ -191,18 +191,14 @@ class SyncService:
         # 4. Orphan Cleanup (after manifest commit)
         orphan_result = self._orphan.cleanup(no_clean=no_clean)
 
-        # 5. Update Index
-        current_manifest = self._manifest.load_current_manifest()
-        success_files: list[str] = []
-        for entry in current_manifest.files.values():
-            if entry.status == "success":
-                success_files.append(entry.output)
-
+        # 5. Update Index (scans entire context directory for all .md files)
         # Use project directory name as project name
         project_name = self._project_root.name
-
-        self._index.update_index(success_files, project_name)
+        self._index.update_index(project_name)
         logger.info("Master index updated.")
+
+        # Count user-curated files
+        user_curated_count = self._orphan.count_user_curated_files()
 
         return SyncResult(
             processed_count=processed_count,
@@ -211,4 +207,5 @@ class SyncService:
             orphans_removed=len(orphan_result.orphans_removed),
             orphans_detected=len(orphan_result.orphans_detected),
             skipped_orphan_cleanup=orphan_result.skipped,
+            user_curated_count=user_curated_count,
         )

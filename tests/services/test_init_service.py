@@ -132,7 +132,7 @@ def test_init_service_creates_all_directories(
 
     created_dirs = [str(d) for d in mock_filesystem.created_dirs]
     assert str(target_dir / "raw_inbox") in created_dirs
-    assert str(target_dir / "processed_context") in created_dirs
+    assert str(target_dir  "_nest_context") in created_dirs
     assert str(target_dir / ".github/agents") in created_dirs
 
 

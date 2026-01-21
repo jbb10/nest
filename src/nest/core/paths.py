@@ -6,6 +6,12 @@ structure in output directories. No I/O operations - fully testable.
 
 from pathlib import Path
 
+# Folder name constants
+SOURCES_DIR = "_nest_sources"
+CONTEXT_DIR = "_nest_context"
+MASTER_INDEX_FILE = "00_MASTER_INDEX.md"
+SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
+
 
 def mirror_path(
     source: Path,

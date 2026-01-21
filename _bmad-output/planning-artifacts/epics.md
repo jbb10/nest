@@ -16,16 +16,16 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 
 ### Functional Requirements
 
-**FR1:** `nest init "Project Name"` creates project structure with `raw_inbox/`, `processed_context/` directories
+**FR1:** `nest init "Project Name"` creates project structure with `_nest_sources/`, `_nest_context/` directories
 **FR2:** `nest init` creates `.github/agents/nest.agent.md` in VS Code Custom Agent format (frontmatter + instructions)
 **FR3:** `nest init` creates empty `.nest_manifest.json` manifest file
 **FR4:** `nest init` downloads Docling ML models (~1.5-2GB) if not already cached, with progress display
-**FR5:** `nest sync` recursively scans `raw_inbox/` for supported files (.pdf, .docx, .pptx, .xlsx, .html)
+**FR5:** `nest sync` recursively scans `_nest_sources/` for supported files (.pdf, .docx, .pptx, .xlsx, .html)
 **FR6:** `nest sync` computes SHA-256 checksums and compares against manifest to detect new/modified/unchanged files
 **FR7:** `nest sync` processes documents via Docling to convert to Markdown
-**FR8:** `nest sync` mirrors source folder hierarchy in `processed_context/` output
-**FR9:** `nest sync` removes orphaned files from `processed_context/` when source is deleted (default behavior, disable with `--no-clean`)
-**FR10:** `nest sync` regenerates `00_MASTER_INDEX.md` with file listing
+**FR8:** `nest sync` mirrors source folder hierarchy in `_nest_context/` output
+**FR9:** `nest sync` removes orphaned files from `_nest_context/` **that are tracked in the manifest** when source is deleted (default behavior, disable with `--no-clean`)
+**FR10:** `nest sync` regenerates `00_MASTER_INDEX.md` with file listing from entire `_nest_context/` directory
 **FR11:** `nest sync` updates `.nest_manifest.json` with processed file metadata
 **FR12:** `nest sync` supports `--on-error` flag (skip | fail) for error handling behavior
 **FR13:** `nest sync` supports `--dry-run` flag to preview changes without executing
@@ -122,10 +122,11 @@ As a user starting a new project, I can run a single command to create a smart, 
 **FRs covered:** FR1, FR2, FR3, FR4
 
 **Scope:**
-- Creates `raw_inbox/`, `processed_context/` directories
+- Creates `_nest_sources/`, `_nest_context/` directories
 - Creates VS Code agent file (`.github/agents/nest.agent.md`)
 - Creates empty manifest (`.nest_manifest.json`)
 - Downloads ML models on first run with progress display
+- Supports both auto-generated and user-curated context files
 
 ---
 
@@ -188,8 +189,8 @@ As a user starting a new project, I can run a single command to create a smart, 
 **Given** I am in an empty directory
 **When** I run `nest init "Nike"`
 **Then** the following directories are created:
-- `raw_inbox/`
-- `processed_context/`
+- `_nest_sources/`
+- `_nest_context/`
 - `.github/agents/`
 **And** a `.nest_manifest.json` file is created with:
 ```json
@@ -204,12 +205,12 @@ As a user starting a new project, I can run a single command to create a smart, 
 
 **Given** a `.gitignore` file exists in the directory
 **When** I run `nest init "Nike"`
-**Then** `raw_inbox/` is appended to `.gitignore` if not already present
+**Then** `_nest_sources/` is appended to `.gitignore` if not already present
 **And** a comment explaining why is included
 
 **Given** a `.gitignore` file does NOT exist
 **When** I run `nest init "Nike"`
-**Then** a new `.gitignore` is created with `raw_inbox/` entry
+**Then** a new `.gitignore` is created with `_nest_sources/` entry
 
 **Given** I run `nest init` without a project name
 **When** the command executes
@@ -241,9 +242,9 @@ icon: book
 ---
 ```
 **And** the file includes instructions for:
-- Reading `processed_context/00_MASTER_INDEX.md` first
+- Reading `_nest_context/00_MASTER_INDEX.md` first
 - Citing sources with filenames
-- Never reading `raw_inbox/` or system files
+- Never reading `_nest_sources/` or system files
 - Honest "I cannot find that" responses
 
 **Given** the AgentWriter protocol is implemented
@@ -480,9 +481,9 @@ As a user with project documents, I can drop them into a folder and have them au
 
 **Given** sync completes processing
 **When** index generation runs
-**Then** `processed_context/00_MASTER_INDEX.md` is created/updated
+**Then** `_nest_context/00_MASTER_INDEX.md` is created/updated
 
-**Given** 47 files are processed
+**Given** 47 files are processed (both generated and user-curated)
 **When** index is generated
 **Then** format is:
 ```markdown
@@ -492,13 +493,15 @@ Generated: 2026-01-12T14:30:00Z | Files: 47
 ## File Listing
 contracts/2024/alpha.md
 contracts/2024/beta.md
+developer-guide.md
 reports/Q3_summary.md
 ...
 ```
 **And** one file per line (token-efficient)
-**And** paths are relative to `processed_context/`
+**And** paths are relative to `_nest_context/`
+**And** includes both manifest-tracked and user-curated files
 
-**Given** files are removed from `processed_context/`
+**Given** files are removed from `_nest_context/`
 **When** index regenerates
 **Then** removed files no longer appear in index
 
@@ -512,15 +515,20 @@ reports/Q3_summary.md
 
 **Acceptance Criteria:**
 
-**Given** `processed_context/old_report.md` exists
-**When** `raw_inbox/old_report.pdf` is deleted and sync runs
-**Then** `processed_context/old_report.md` is automatically removed
+**Given** `_nest_context/old_report.md` exists and is tracked in manifest
+**When** `_nest_sources/old_report.pdf` is deleted and sync runs
+**Then** `_nest_context/old_report.md` is automatically removed
 **And** the file is removed from manifest
+
+**Given** I have manually added `developer-guide.md` to `_nest_context/` (not in manifest)
+**When** I run `nest sync --clean`
+**Then** `developer-guide.md` is NOT removed (not tracked, therefore not an orphan)
+**And** console confirms: "User-curated files: 1 (preserved)"
 
 **Given** sync runs with `--no-clean` flag
 **When** orphan files are detected
 **Then** orphan files are NOT removed
-**And** they remain in `processed_context/`
+**And** they remain in `_nest_context/`
 
 **Given** orphan cleanup removes files
 **When** sync summary is displayed
@@ -640,21 +648,21 @@ This story was added after v0.1.0 release revealed a bug that would have been ca
 **Given** `nest init "TestProject"` is run via subprocess in an empty temp directory
 **When** the command completes
 **Then** exit code is 0
-**And** `raw_inbox/` directory exists and is empty
-**And** `processed_context/` directory exists and is empty
+**And** `_nest_sources/` directory exists and is empty
+**And** `_nest_context/` directory exists and is empty
 **And** `.nest_manifest.json` exists with valid JSON containing project name
 
 **Sync Command E2E:**
 
 **Given** a Nest project is initialized
-**And** 4 test documents are placed in nested structure under `raw_inbox/`:
+**And** 4 test documents are placed in nested structure under `_nest_sources/`:
   - `reports/quarterly.pdf`
   - `reports/summary.docx`
   - `presentations/deck.pptx`
   - `presentations/data.xlsx`
 **When** `nest sync` is run via subprocess
 **Then** exit code is 0
-**And** output structure mirrors input in `processed_context/`:
+**And** output structure mirrors input in `_nest_context/`:
   - `reports/quarterly.md`
   - `reports/summary.md`
   - `presentations/deck.md`
@@ -718,6 +726,82 @@ This story was added after v0.1.0 release revealed a bug that would have been ca
 **Given** `pyproject.toml` pytest configuration
 **When** markers are defined
 **Then** `e2e` marker is registered with description: "End-to-end tests (require real Docling, may be slow)"
+
+---
+
+### Story 2.10: Folder Naming Refactor & User-Curated Context Support
+
+**As a** user,
+**I want** unambiguous folder names that won't conflict with my project files and the ability to add my own context files directly,
+**So that** I can incorporate pre-existing documentation into my knowledge base without processing, and Nest folders are clearly identifiable.
+
+**Scope:** This is a refactoring story that implements the approved Sprint Change Proposal (2026-01-21). It renames folders from `raw_inbox/processed_context` to `_nest_sources/_nest_context`, enhances orphan cleanup to be manifest-aware, and updates index generation to include user-curated files.
+
+**Reference Document:** `_bmad-output/planning-artifacts/sprint-change-proposal-2026-01-21.md`
+
+**Acceptance Criteria:**
+
+**Folder Naming:**
+
+**Given** I run `nest init "ProjectName"`
+**When** the command completes
+**Then** `_nest_sources/` directory is created (not `raw_inbox/`)
+**And** `_nest_context/` directory is created (not `processed_context/`)
+**And** `.nest_manifest.json` is created with correct paths
+**And** `_nest_sources/` is added to `.gitignore`
+
+**Given** I run `nest sync`
+**When** files are discovered
+**Then** sync scans `_nest_sources/` for input files
+**And** processed files are written to `_nest_context/`
+
+**User-Curated Context Files:**
+
+**Given** I manually add `developer-guide.md` directly to `_nest_context/` (not via processing)
+**When** I run `nest sync`
+**Then** `developer-guide.md` is NOT removed by orphan cleanup
+**And** `developer-guide.md` IS included in `00_MASTER_INDEX.md`
+**And** console displays: "User-curated files: X (preserved)"
+
+**Manifest-Aware Orphan Cleanup:**
+
+**Given** `_nest_context/report.md` exists and IS tracked in manifest
+**And** I delete `_nest_sources/report.pdf`
+**When** I run `nest sync`
+**Then** `_nest_context/report.md` IS removed (manifest-tracked orphan)
+**And** manifest entry is removed
+
+**Given** `_nest_context/custom.md` exists and is NOT in manifest
+**When** I run `nest sync`
+**Then** `_nest_context/custom.md` is NOT removed (user-curated, not an orphan)
+
+**Index Generation:**
+
+**Given** `_nest_context/` contains both processed and user-curated files
+**When** index generation runs
+**Then** `00_MASTER_INDEX.md` includes ALL files from `_nest_context/`
+**And** no distinction is made between generated and user-curated files in the index
+
+**Agent Template:**
+
+**Given** the VS Code agent template
+**When** `nest init` creates the agent file
+**Then** agent instructions reference `_nest_context/` as the knowledge base
+**And** agent instructions reference `_nest_sources/` as forbidden folder
+
+**Backward Compatibility:**
+
+**Given** an existing project with old folder names (`raw_inbox/`, `processed_context/`)
+**When** user runs `nest sync` after updating Nest
+**Then** a clear error or migration message is displayed
+**And** user is guided to rename folders or re-run init
+
+**All Existing Tests Pass:**
+
+**Given** all unit, integration, and E2E tests
+**When** the refactoring is complete
+**Then** all tests pass with updated folder names
+**And** no regressions are introduced
 
 ---
 

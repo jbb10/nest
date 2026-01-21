@@ -13,6 +13,7 @@ from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.agents.vscode_writer import VSCodeAgentWriter
 from nest.core.exceptions import ModelError, NestError
+from nest.core.paths import SOURCES_DIR
 from nest.services.init_service import InitService
 from nest.ui.messages import error, get_console, success
 
@@ -57,7 +58,7 @@ def init_command(
         success(f'Project "{project_name}" initialized!')
         console.print()
         console.print("[bold]Next steps:[/bold]")
-        console.print("  1. Drop your documents into raw_inbox/")
+        console.print(f"  1. Drop your documents into {SOURCES_DIR}/")
         console.print("  2. Run [cyan]nest sync[/cyan] to process them")
         console.print("  3. Open VS Code Copilot Chat and select 'Nest' from the agent dropdown")
         console.print()

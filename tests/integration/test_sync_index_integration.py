@@ -19,7 +19,7 @@ def test_sync_generates_index_end_to_end(tmp_path: Path):
     project_root = tmp_path
     raw = project_root / "raw_inbox"
     raw.mkdir()
-    processed_context = project_root / "processed_context"
+    processed_context = project_root  "_nest_context"
     # processed_context not created yet
 
     # Create a file

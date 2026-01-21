@@ -45,8 +45,8 @@ class OutputMirrorService:
 
         Args:
             source: Path to source document.
-            raw_dir: Root of raw_inbox directory.
-            output_dir: Root of processed_context directory.
+            raw_dir: Root of sources directory.
+            output_dir: Root of context directory.
 
         Returns:
             ProcessingResult from the document processor.

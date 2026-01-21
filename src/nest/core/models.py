@@ -159,6 +159,7 @@ class SyncResult(BaseModel):
         orphans_removed: Number of orphan files removed.
         orphans_detected: Number of orphan files detected.
         skipped_orphan_cleanup: True if --no-clean was set.
+        user_curated_count: Number of user-curated files preserved (not in manifest).
     """
 
     processed_count: int = 0
@@ -167,3 +168,4 @@ class SyncResult(BaseModel):
     orphans_removed: int = 0
     orphans_detected: int = 0
     skipped_orphan_cleanup: bool = False
+    user_curated_count: int = 0

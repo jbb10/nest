@@ -91,8 +91,8 @@ class FileSystemAdapter:
 
         Args:
             source: Absolute path to source file.
-            raw_dir: Root of raw_inbox directory.
-            output_dir: Root of processed_context directory.
+            raw_dir: Root of sources directory.
+            output_dir: Root of context directory.
 
         Returns:
             Absolute path where output Markdown should be written.

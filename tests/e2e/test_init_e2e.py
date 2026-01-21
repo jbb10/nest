@@ -37,7 +37,7 @@ class TestInitE2E:
         assert list(raw_inbox.iterdir()) == [], "raw_inbox should be empty"
 
         # Assert processed_context exists and is empty
-        processed_context = fresh_temp_dir / "processed_context"
+        processed_context = fresh_temp_dir  "_nest_context"
         assert processed_context.exists(), "processed_context directory should exist"
         assert processed_context.is_dir(), "processed_context should be a directory"
         assert list(processed_context.iterdir()) == [], "processed_context should be empty"

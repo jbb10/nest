@@ -16,6 +16,7 @@ from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.exceptions import NestError, ProcessingError
 from nest.core.models import DryRunResult, SyncResult
+from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
@@ -71,8 +72,8 @@ def create_sync_service(
     processor = DoclingProcessor()
 
     # Project paths
-    raw_inbox = project_root / "raw_inbox"
-    output_dir = project_root / "processed_context"
+    raw_inbox = project_root / SOURCES_DIR
+    output_dir = project_root / CONTEXT_DIR
 
     # Wire up services with their dependencies
     return SyncService(
@@ -159,10 +160,10 @@ def sync_command(
         ),
     ] = None,
 ) -> None:
-    """Sync documents from raw_inbox to processed_context.
+    """Sync documents from sources to context directory.
 
-    Processes PDF, DOCX, PPTX, XLSX, and HTML files from raw_inbox/
-    and converts them to Markdown in processed_context/.
+    Processes PDF, DOCX, PPTX, XLSX, and HTML files from _nest_sources/
+    and converts them to Markdown in _nest_context/.
 
     Examples:
         nest sync
@@ -297,6 +298,10 @@ def _display_sync_summary(result: SyncResult, console: "Console", error_log_path
         console.print(f"  Orphans:   {result.orphans_detected} detected (not removed)")
     else:
         console.print(f"  Orphans:   {result.orphans_detected} detected")
+    
+    # Show user-curated file count
+    if result.user_curated_count > 0:
+        console.print(f"  User-curated: {result.user_curated_count} preserved")
 
     console.print()
     console.print("  Index updated: 00_MASTER_INDEX.md")

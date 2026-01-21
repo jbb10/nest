@@ -9,6 +9,7 @@ from pathlib import Path
 from nest.adapters.protocols import FileSystemProtocol, ManifestProtocol
 from nest.core.models import OrphanCleanupResult
 from nest.core.orphan_detector import OrphanDetector
+from nest.core.paths import CONTEXT_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -40,19 +41,23 @@ class OrphanService:
         Returns:
             List of relative paths (posix format) of orphaned files.
         """
-        output_dir = self._project_root / "processed_context"
+        output_dir = self._project_root / CONTEXT_DIR
 
-        # Load manifest to get successful output paths
+        # Load manifest to build source->output mapping
         manifest = self._manifest.load(self._project_root)
-        manifest_outputs = {
-            entry.output for entry in manifest.files.values() if entry.status == "success"
-        }
+        
+        # Build mapping: source_path -> output_path (for successful entries only)
+        manifest_sources: dict[Path, str] = {}
+        for key, entry in manifest.files.items():
+            if entry.status == "success":
+                source_path = self._project_root / key
+                manifest_sources[source_path] = entry.output
 
-        # List all files in processed_context
+        # List all files in context directory
         output_files = self._filesystem.list_files(output_dir)
 
-        # Detect orphans
-        orphans = self._detector.detect(output_files, manifest_outputs, output_dir)
+        # Detect orphans (manifest files with missing sources)
+        orphans = self._detector.detect(output_files, manifest_sources, output_dir)
 
         # Convert to relative paths
         return [orphan.relative_to(output_dir).as_posix() for orphan in orphans]
@@ -66,19 +71,23 @@ class OrphanService:
         Returns:
             OrphanCleanupResult with detection/removal details.
         """
-        output_dir = self._project_root / "processed_context"
+        output_dir = self._project_root / CONTEXT_DIR
 
-        # Load manifest to get successful output paths
+        # Load manifest to build source->output mapping
         manifest = self._manifest.load(self._project_root)
-        manifest_outputs = {
-            entry.output for entry in manifest.files.values() if entry.status == "success"
-        }
+        
+        # Build mapping: source_path -> output_path (for successful entries only)
+        manifest_sources: dict[Path, str] = {}
+        for key, entry in manifest.files.items():
+            if entry.status == "success":
+                source_path = self._project_root / key
+                manifest_sources[source_path] = entry.output
 
-        # List all files in processed_context
+        # List all files in context directory
         output_files = self._filesystem.list_files(output_dir)
 
-        # Detect orphans
-        orphans = self._detector.detect(output_files, manifest_outputs, output_dir)
+        # Detect orphans (manifest files with missing sources)
+        orphans = self._detector.detect(output_files, manifest_sources, output_dir)
 
         # Convert to relative paths for result
         orphans_detected = [orphan.relative_to(output_dir).as_posix() for orphan in orphans]
@@ -118,3 +127,31 @@ class OrphanService:
             orphans_removed=orphans_removed,
             skipped=no_clean,
         )
+
+    def count_user_curated_files(self) -> int:
+        """Count files in context directory that are NOT in manifest (user-curated).
+
+        Returns:
+            Number of user-curated files.
+        """
+        output_dir = self._project_root / CONTEXT_DIR
+
+        # Load manifest to get tracked outputs
+        manifest = self._manifest.load(self._project_root)
+        manifest_outputs = {entry.output for entry in manifest.files.values()}
+
+        # List all files in context directory
+        output_files = self._filesystem.list_files(output_dir)
+
+        # Count files NOT in manifest (excluding system files)
+        user_curated = 0
+        for file_path in output_files:
+            relative = file_path.relative_to(output_dir).as_posix()
+            # Skip system files
+            if relative == "00_MASTER_INDEX.md":
+                continue
+            # Count if NOT in manifest
+            if relative not in manifest_outputs:
+                user_curated += 1
+
+        return user_curated

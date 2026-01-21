@@ -1050,16 +1050,16 @@ Format: `{timestamp} {level} [{context}] {file}: {technical_detail}`
 # ✓ Correct
 from pathlib import Path
 
-def get_output_path(source: Path, raw_dir: Path, processed_dir: Path) -> Path:
-    relative = source.relative_to(raw_dir)
-    return processed_dir / relative.with_suffix(".md")
+def get_output_path(source: Path, sources_dir: Path, context_dir: Path) -> Path:
+    relative = source.relative_to(sources_dir)
+    return context_dir / relative.with_suffix(".md")
 
 # ✗ Wrong
 import os
 
-def get_output_path(source: str, raw_dir: str, processed_dir: str) -> str:
-    relative = source.replace(raw_dir, "")
-    return os.path.join(processed_dir, relative.replace(".pdf", ".md"))
+def get_output_path(source: str, sources_dir: str, context_dir: str) -> str:
+    relative = source.replace(sources_dir, "")
+    return os.path.join(context_dir, relative.replace(".pdf", ".md"))
 ```
 
 **Path rules:**

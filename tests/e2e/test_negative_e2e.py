@@ -120,7 +120,7 @@ class TestNegativePathsWithDocling:
         )
 
         # Valid doc should be processed
-        processed = fresh_temp_dir / "processed_context"
+        processed = fresh_temp_dir  "_nest_context"
         assert (processed / "valid.md").exists(), "Valid doc should be processed"
 
         # Error log should exist
@@ -169,6 +169,6 @@ class TestNegativePathsWithDocling:
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.stderr}"
 
         # .txt should NOT be in output
-        processed = fresh_temp_dir / "processed_context"
+        processed = fresh_temp_dir  "_nest_context"
         assert not (processed / "readme.md").exists(), ".txt file should be ignored"
         assert not (processed / "readme.txt").exists(), ".txt file should be ignored"

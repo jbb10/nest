@@ -47,7 +47,7 @@ class TestSyncE2E:
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
         # Assert output structure mirrors input
-        processed = project_dir / "processed_context"
+        processed = project_dir  "_nest_context"
         assert (processed / "reports" / "quarterly.md").exists()
         assert (processed / "reports" / "summary.md").exists()
         assert (processed / "presentations" / "deck.md").exists()

@@ -40,11 +40,12 @@ my-project/
 ├── .github/
 │   └── agents/
 │       └── nest.agent.md       <-- The "Persona" (VS Code picks this up automatically)
-├── raw_inbox/                  <-- User Input (PDFs, XLSX)
-└── processed_context/          <-- System Output (AI Knowledge Base)
+├── _nest_sources/              <-- User Input (PDFs, XLSX, etc. for processing)
+└── _nest_context/              <-- AI Knowledge Base (Generated + User-Curated)
     ├── 00_MASTER_INDEX.md      <-- The Map
-    ├── policy_v1.md
-    └── financial_data.md
+    ├── policy_v1.md            <-- Generated from sources
+    ├── developer-guide.md      <-- User-added (no processing needed)
+    └── financial_data.md       <-- Generated from sources
 ```
 
 ### 3.2 The Technology Stack
@@ -79,7 +80,7 @@ my-project/
 ### 4.1 Command: `nest init`
 **Trigger:** `nest init "Project Name"`
 **Behavior:**
-1.  Creates directories: `raw_inbox/`, `processed_context/`.
+1.  Creates directories: `_nest_sources/`, `_nest_context/`.
 2.  Creates `.github/agents/nest.agent.md`.
 3.  Creates `.nest_manifest.json` (empty manifest).
 4.  Downloads Docling ML models if not already cached (first-time only, ~1.5-2GB).
@@ -108,8 +109,8 @@ You are the dedicated AI analyst for [Project Name].
 Your goal is to assist the user by navigating and synthesizing the project documentation located in `processed_context/`.
 
 # KNOWLEDGE BASE
-- Your entire world of knowledge is located in the `processed_context/` directory.
-- **STEP 1:** Always read `processed_context/00_MASTER_INDEX.md` first to understand what files are available.
+- Your entire world of knowledge is located in the `_nest_context/` directory.
+- **STEP 1:** Always read `_nest_context/00_MASTER_INDEX.md` first to understand what files are available.
 - **STEP 2:** Retrieve the specific files you need to answer the user's question.
 
 # BEHAVIOR
@@ -125,9 +126,9 @@ Your context window is precious. These files contain no useful content for answe
 - `.nest_errors.log` — Internal error log
 
 **Raw Source Files:**
-- `raw_inbox/**` — Never read files from this folder. Always use the processed Markdown versions in `processed_context/` instead. The raw files are PDFs/Excel/etc. that you cannot parse properly.
+- `_nest_sources/**` — Never read files from this folder. Always use the processed Markdown versions in `_nest_context/` instead. The raw files are PDFs/Excel/etc. that you cannot parse properly.
 
-**If you find yourself wanting to read any of these, STOP and reconsider. The answer to the user's question is in `processed_context/`.**
+**If you find yourself wanting to read any of these, STOP and reconsider. The answer to the user's question is in `_nest_context/`.**
 ```
 
 ### 4.2 Command: `nest sync`
@@ -142,29 +143,31 @@ Your context window is precious. These files contain no useful content for answe
 | `--force` | `false` | Re-process all files regardless of checksum (ignore manifest) |
 
 **Behavior:**
-1.  **Scan:** Recursively scans `raw_inbox/` for supported files (`.pdf`, `.docx`, `.pptx`, `.xlsx`, `.html`).
+1.  **Scan:** Recursively scans `_nest_sources/` for supported files (`.pdf`, `.docx`, `.pptx`, `.xlsx`, `.html`).
 2.  **Checksum Comparison:** For each file, compute SHA-256 hash and compare against `.nest_manifest.json`:
     * **New file** (not in manifest) → Process and save.
     * **Modified file** (hash differs) → Re-process and overwrite.
     * **Unchanged file** (hash matches) → Skip (saves time).
 3.  **Processing Loop:**
     * Runs `Docling` to convert file → Markdown.
-    * Saves plain Markdown to `processed_context/` **mirroring the source folder hierarchy**.
+    * Saves plain Markdown to `_nest_context/` **mirroring the source folder hierarchy**.
     * (No YAML header in output — metadata lives only in manifest.)
-4.  **Orphan Cleanup:** By default, removes files from `processed_context/` whose source no longer exists in `raw_inbox/`. Disable with `--no-clean`.
-5.  **Index Generation:** Regenerates `00_MASTER_INDEX.md` with file listing.
+4.  **Orphan Cleanup:** By default, removes files from `_nest_context/` **that are tracked in the manifest** whose source no longer exists in `_nest_sources/`. Files not in the manifest (user-curated) are never touched. Disable with `--no-clean`.
+5.  **Index Generation:** Regenerates `00_MASTER_INDEX.md` with file listing from entire `_nest_context/` directory (both generated and user-curated files).
 6.  **Manifest Update:** Updates `.nest_manifest.json` with processed file metadata.
 
 **Directory Mirroring Example:**
 ```
-raw_inbox/                      processed_context/
+_nest_sources/                  _nest_context/
 ├── contracts/                  ├── contracts/
 │   ├── 2024/                   │   ├── 2024/
 │   │   └── alpha.pdf     →     │   │   └── alpha.md
 │   └── 2025/                   │   └── 2025/
 │       └── beta.pdf      →     │       └── beta.md
-└── reports/                    └── reports/
-    └── Q3_summary.xlsx   →         └── Q3_summary.md
+├── reports/                    ├── reports/
+│   └── Q3_summary.xlsx   →     │   └── Q3_summary.md
+└── (manual files go           └── developer-guide.md  <-- User-curated
+    directly in _nest_context/)    onboarding.md       <-- User-curated
 ```
 
 **Manifest Schema (`.nest_manifest.json`):**
@@ -177,13 +180,13 @@ raw_inbox/                      processed_context/
     "contracts/2024/alpha.pdf": {
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "processed_at": "2026-01-11T14:30:00Z",
-      "output": "processed_context/contracts/2024/alpha.md",
+      "output": "_nest_context/contracts/2024/alpha.md",
       "status": "success"
     },
     "reports/Q3_summary.xlsx": {
       "sha256": "d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592",
       "processed_at": "2026-01-11T14:30:00Z",
-      "output": "processed_context/reports/Q3_summary.md",
+      "output": "_nest_context/reports/Q3_summary.md",
       "status": "success"
     }
   }
@@ -280,7 +283,7 @@ nest init "Nike"
 *Result:* Folders created. Agent installed.
 
 **Step 3: Adding Data**
-* User drags 10 PDF contracts into `raw_inbox`.
+* User drags 10 PDF contracts into `_nest_sources`.
 * User runs: `nest sync`
 * *Terminal:* `[Green Check] Processed 10 files. Master Index updated.`
 
@@ -307,9 +310,9 @@ nest init "Nike"
 * **Local Only:** Ensure `Docling` is running with `artifacts_path` set to a local cache, so it doesn't try to download models every run.
 * **Gitignore:** The `init` command should check if a `.gitignore` exists. If so, it should append:
     ```text
-    raw_inbox/
-    # We commit processed_context so the team shares the brain
-    # We DO NOT commit raw_inbox (often too large/sensitive)
+    _nest_sources/
+    # We commit _nest_context/ so the team shares the brain
+    # We DO NOT commit _nest_sources/ (often too large/sensitive)
     ```
 
 ### 6.4 Error Handling

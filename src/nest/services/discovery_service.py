@@ -9,14 +9,14 @@ from pathlib import Path
 from nest.adapters.protocols import FileDiscoveryProtocol, ManifestProtocol
 from nest.core.change_detector import FileChangeDetector
 from nest.core.checksum import compute_sha256
-from nest.core.constants import SUPPORTED_EXTENSIONS
+from nest.core.paths import SOURCES_DIR, SUPPORTED_EXTENSIONS
 from nest.core.models import DiscoveredFile, DiscoveryResult
 
 
 class DiscoveryService:
     """Service for discovering and classifying file changes.
 
-    Orchestrates file discovery in raw_inbox/ and classifies files
+    Orchestrates file discovery in sources directory and classifies files
     as new, modified, or unchanged based on manifest checksums.
     """
 
@@ -35,11 +35,11 @@ class DiscoveryService:
         self._manifest = manifest
 
     def discover_changes(self, project_dir: Path, force: bool = False) -> DiscoveryResult:
-        """Discover files in raw_inbox/ and classify by change status.
+        """Discover files in sources directory and classify by change status.
 
         Args:
             project_dir: Path to the project root directory.
-            force: If True, treat all files as modified (ignore checksums).
+            force: If True, mark all files as 'modified' regardless of checksum.
 
         Returns:
             DiscoveryResult containing lists of new, modified, and unchanged files.
@@ -60,9 +60,11 @@ class DiscoveryService:
         # Create change detector with manifest data
         detector = FileChangeDetector(manifest_checksums)
 
-        # Discover files in raw_inbox/
-        raw_inbox = project_dir / "raw_inbox"
-        discovered_paths = self._file_discovery.discover(raw_inbox, set(SUPPORTED_EXTENSIONS))
+        # Discover files in sources directory
+        sources_dir = project_dir / SOURCES_DIR
+        discovered_paths = self._file_discovery.discover(
+            sources_dir, set(SUPPORTED_EXTENSIONS)
+        )
 
         # Classify each discovered file
         result = DiscoveryResult()
@@ -80,15 +82,21 @@ class DiscoveryService:
 
             # Classify based on manifest (or force mode)
             if force:
-                # Force mode: treat all files as modified
-                status = "modified"
+                # Force mode: treat all files as needing reprocessing
+                # New files stay "new", existing files become "modified"
+                path_key = relative_path.as_posix()
+                if path_key in manifest_checksums:
+                    status = "modified"
+                else:
+                    status = "new"
             else:
+                # Normal mode: classify based on checksum comparison
                 status = detector.classify(relative_path, checksum)
 
             # Create discovered file entry
             discovered = DiscoveredFile(
                 path=file_path,
-                status=status,  # type: ignore[arg-type]
+                status=status,
                 checksum=checksum,
             )
 

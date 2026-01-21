@@ -12,18 +12,19 @@ from nest.adapters.protocols import (
     ModelDownloaderProtocol,
 )
 from nest.core.exceptions import NestError
+from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
 from nest.ui.messages import info, status_done, status_start
 
 # Gitignore content
 GITIGNORE_COMMENT = (
-    "# Raw documents excluded from version control (processed versions in processed_context/)"
+    f"# Raw documents excluded from version control (processed versions in {CONTEXT_DIR}/)"
 )
-GITIGNORE_ENTRY = "raw_inbox/"
+GITIGNORE_ENTRY = f"{SOURCES_DIR}/"
 
 # Directories to create during init
 INIT_DIRECTORIES = [
-    "raw_inbox",
-    "processed_context",
+    SOURCES_DIR,
+    CONTEXT_DIR,
     ".github/agents",
 ]
 
@@ -108,7 +109,7 @@ class InitService:
             info(f"Models cached at {cache_path}")
 
     def _update_gitignore(self, target_dir: Path) -> None:
-        """Update or create .gitignore with raw_inbox entry.
+        """Update or create .gitignore with sources directory entry.
 
         Args:
             target_dir: Path to the project root directory.
