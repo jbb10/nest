@@ -144,7 +144,7 @@ def test_sync_preserves_user_curated_files():
 
 ### Task 6: Update All Test Files (AC: 7)
 - [ ] 6.1: Update `tests/services/test_init_service.py` (~30 references)
-- [ ] 6.2: Update `tests/services/test_sync_service.py` (~80 references)
+- [x] 6.2: Update `tests/services/test_sync_service.py` (~80 references)
 - [ ] 6.3: Update `tests/services/test_discovery_service.py` (~50 references)
 - [ ] 6.4: Update `tests/services/test_index_service.py` (~20 references)
 - [ ] 6.5: Update `tests/core/test_paths.py` (~50 references)
@@ -311,3 +311,8 @@ Claude Sonnet 4.5 (via GitHub Copilot)
 - tests/services/test_orphan_service.py (API signature change)
 - tests/integration/test_orphan_cleanup.py (API signature change)
 - Other integration/e2e tests (path references)
+
+### Code Review Fixes (2026-01-21)
+- **Fixed:** Critical issue in `src/nest/services/sync_service.py` where `raw_inbox`/`processed_context` were still hardcoded. Replaced with `SOURCES_DIR`/`CONTEXT_DIR`.
+- **Fixed:** Updated `tests/services/test_sync_service.py` to match new `IndexService.update_index` signature and mocked `OrphanService.count_user_curated_files` to fix test failures.
+- **Verified:** All tests in `tests/services/test_sync_service.py` pass.

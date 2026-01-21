@@ -5,6 +5,7 @@ from typing import Literal
 
 from nest.core.exceptions import ProcessingError
 from nest.core.models import DiscoveryResult, DryRunResult, SyncResult
+from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
@@ -116,8 +117,8 @@ class SyncService:
             logger.info("Processing %d files...", len(files_to_process))
 
         # 2. Processing Loop
-        raw_inbox = self._project_root / "raw_inbox"
-        output_dir = self._project_root / "processed_context"
+        raw_inbox = self._project_root / SOURCES_DIR
+        output_dir = self._project_root / CONTEXT_DIR
 
         for file_info in files_to_process:
             try:

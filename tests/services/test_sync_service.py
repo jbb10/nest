@@ -33,6 +33,7 @@ def mock_deps():
         orphans_removed=[],
         skipped=False,
     )
+    orphan_mock.count_user_curated_files.return_value = 0
 
     return {
         "discovery": Mock(spec=DiscoveryService),
@@ -169,12 +170,10 @@ class TestSyncIndexIntegration:
         service.sync()
 
         mock_deps["index"].update_index.assert_called_once()
-        files_arg = mock_deps["index"].update_index.call_args[0][0]
-        project_name = mock_deps["index"].update_index.call_args[0][1]
+        # update_index now only takes project_name
+        assert len(mock_deps["index"].update_index.call_args[0]) == 1
+        project_name = mock_deps["index"].update_index.call_args[0][0]
 
-        assert "idx/a.md" in files_arg
-        assert "" not in files_arg  # Failed entries have empty output
-        assert len(files_arg) == 1
         assert project_name == mock_deps["project_root"].name
 
 
@@ -192,10 +191,10 @@ class TestSyncEmptyDiscovery:
 
         # Commit should still be called
         mock_deps["manifest"].commit.assert_called_once()
-        # Index should still be updated (empty list)
+        # Index should still be updated
         mock_deps["index"].update_index.assert_called_once()
-        files_arg = mock_deps["index"].update_index.call_args[0][0]
-        assert files_arg == []
+        args = mock_deps["index"].update_index.call_args[0]
+        assert args[0] == mock_deps["project_root"].name
 
 
 class TestSyncFailureHandling:
@@ -345,7 +344,7 @@ class TestSyncManifestCommit:
 
         service.sync()
 
-        assert call_order == ["commit", "orphan", "load", "index"]
+        assert call_order == ["commit", "orphan", "index"]
 
 
 class TestSyncOnErrorMode:
