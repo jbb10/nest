@@ -22,7 +22,7 @@ class TestOutputMirrorIntegration:
         # Arrange - create source directory structure
         raw_inbox = tmp_path / "raw_inbox"
         raw_inbox.mkdir()
-        processed_context = tmp_path  "_nest_context"
+        processed_context = tmp_path / "_nest_context"
         # Note: processed_context is NOT pre-created
 
         # Create nested source structure
@@ -61,7 +61,7 @@ class TestOutputMirrorIntegration:
         # Arrange
         raw_inbox = tmp_path / "raw_inbox"
         raw_inbox.mkdir()
-        processed_context = tmp_path  "_nest_context"
+        processed_context = tmp_path / "_nest_context"
         # Intentionally NOT creating processed_context or subdirs
 
         # Create deeply nested source
@@ -99,7 +99,7 @@ class TestOutputMirrorIntegration:
         # Arrange
         raw_inbox = tmp_path / "raw_inbox"
         raw_inbox.mkdir()
-        processed_context = tmp_path  "_nest_context"
+        processed_context = tmp_path / "_nest_context"
         processed_context.mkdir()
 
         source_file = raw_inbox / "document.pdf"
@@ -135,7 +135,7 @@ class TestOutputMirrorIntegration:
         # Arrange
         raw_inbox = tmp_path / "raw_inbox"
         raw_inbox.mkdir()
-        processed_context = tmp_path  "_nest_context"
+        processed_context = tmp_path / "_nest_context"
 
         source_file = raw_inbox / "readme.pdf"
         source_file.write_bytes(b"root file")
@@ -166,7 +166,7 @@ class TestOutputMirrorIntegration:
         """AC #4: Path helpers work correctly with real filesystem paths."""
         # Arrange
         raw_inbox = tmp_path / "raw_inbox"
-        processed_context = tmp_path  "_nest_context"
+        processed_context = tmp_path / "_nest_context"
         source = raw_inbox / "reports" / "2024" / "q1.xlsx"
 
         # Act
@@ -182,7 +182,7 @@ class TestOutputMirrorIntegration:
         """Multiple files across different subdirectories."""
         # Arrange
         raw_inbox = tmp_path / "raw_inbox"
-        processed_context = tmp_path  "_nest_context"
+        processed_context = tmp_path / "_nest_context"
 
         files = [
             raw_inbox / "contracts" / "a.pdf",

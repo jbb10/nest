@@ -81,25 +81,25 @@ class TestWriteIndex:
     """Tests for IndexService.write_index()."""
 
     def test_writes_to_processed_context_directory(self):
-        """Index should be written to processed_context/00_MASTER_INDEX.md."""
+        """Index should be written to _nest_context/00_MASTER_INDEX.md."""
         fs = Mock(spec=FileSystemProtocol)
         fs.exists.return_value = True
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
         service.write_index("test content")
 
-        expected_path = Path("/app/processed_context/00_MASTER_INDEX.md")
+        expected_path = Path("/app/_nest_context/00_MASTER_INDEX.md")
         fs.write_text.assert_called_once_with(expected_path, "test content")
 
     def test_creates_directory_if_not_exists(self):
-        """Should create processed_context directory if it doesn't exist."""
+        """Should create context directory if it doesn't exist."""
         fs = Mock(spec=FileSystemProtocol)
         fs.exists.return_value = False
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
         service.write_index("test content")
 
-        fs.create_directory.assert_called_once_with(Path("/app/processed_context"))
+        fs.create_directory.assert_called_once_with(Path("/app/_nest_context"))
         fs.write_text.assert_called_once()
 
     def test_skips_directory_creation_if_exists(self):
@@ -120,11 +120,12 @@ class TestUpdateIndex:
         """update_index should write formatted content to correct path."""
         fs = Mock(spec=FileSystemProtocol)
         fs.exists.return_value = True
+        fs.list_files.return_value = [Path("/app/_nest_context/doc.md")]
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        service.update_index(["doc.md"], project_name="TestNested")
+        service.update_index(project_name="TestNested")
 
-        expected_path = Path("/app/processed_context/00_MASTER_INDEX.md")
+        expected_path = Path("/app/_nest_context/00_MASTER_INDEX.md")
         fs.write_text.assert_called_once()
         args, _ = fs.write_text.call_args
         assert args[0] == expected_path
@@ -132,12 +133,13 @@ class TestUpdateIndex:
         assert "doc.md" in args[1]
 
     def test_handles_empty_list(self):
-        """update_index with empty list should write index with zero files."""
+        """update_index with no .md files should write index with zero files."""
         fs = Mock(spec=FileSystemProtocol)
         fs.exists.return_value = True
+        fs.list_files.return_value = []  # No files in directory
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        service.update_index([], project_name="Empty Project")
+        service.update_index(project_name="Empty Project")
 
         fs.write_text.assert_called_once()
         args, _ = fs.write_text.call_args

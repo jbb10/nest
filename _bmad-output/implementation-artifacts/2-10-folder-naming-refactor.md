@@ -1,9 +1,9 @@
 # Story 2.10: Folder Naming Refactor & User-Curated Context Support
 
-Status: ready-for-dev
+Status: review
 Branch: feat/2-10-folder-naming-refactor
 
-<!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
+<!-- Note: Production code complete. Test updates in progress - see Dev Agent Record for details. -->
 
 ## Story
 
@@ -100,37 +100,37 @@ def test_sync_preserves_user_curated_files():
 ## Tasks / Subtasks
 
 ### Task 1: Update Folder Name Constants (AC: 1, 2)
-- [ ] 1.1: Create centralized constants in `src/nest/core/paths.py`:
+- [x] 1.1: Create centralized constants in `src/nest/core/paths.py`:
   ```python
   SOURCES_DIR = "_nest_sources"
   CONTEXT_DIR = "_nest_context"
   MASTER_INDEX_FILE = "00_MASTER_INDEX.md"
   SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
   ```
-- [ ] 1.2: Update `src/nest/services/init_service.py` to use new constants
-- [ ] 1.3: Update `src/nest/services/sync_service.py` to use new constants
-- [ ] 1.4: Update `src/nest/services/discovery_service.py` to use new constants
-- [ ] 1.5: Update `src/nest/cli/init_cmd.py` to use new constants
-- [ ] 1.6: Update `src/nest/cli/sync_cmd.py` to use new constants
+- [x] 1.2: Update `src/nest/services/init_service.py` to use new constants
+- [x] 1.3: Update `src/nest/services/sync_service.py` to use new constants
+- [x] 1.4: Update `src/nest/services/discovery_service.py` to use new constants
+- [x] 1.5: Update `src/nest/cli/init_cmd.py` to use new constants
+- [x] 1.6: Update `src/nest/cli/sync_cmd.py` to use new constants
 
 ### Task 2: Enhance Orphan Cleanup Logic (AC: 3, 4)
-- [ ] 2.1: Modify `src/nest/core/orphan_detector.py`:
+- [x] 2.1: Modify `src/nest/core/orphan_detector.py`:
   - Change `find_orphans()` to only return files that ARE in manifest but source is missing
   - Files NOT in manifest should be ignored (user-curated)
-- [ ] 2.2: Modify `src/nest/services/sync_service.py`:
+- [x] 2.2: Modify `src/nest/services/sync_service.py`:
   - Add logic to count and report user-curated files
   - Display message: "User-curated files: X (preserved)"
-- [ ] 2.3: Update orphan cleanup service to use manifest-aware detection
+- [x] 2.3: Update orphan cleanup service to use manifest-aware detection
 
 ### Task 3: Update Index Generation (AC: 5)
-- [ ] 3.1: Modify `src/nest/services/index_service.py`:
+- [x] 3.1: Modify `src/nest/services/index_service.py`:
   - Scan entire `_nest_context/` directory for `.md` files
   - Include both manifest-tracked AND untracked files
   - Sort alphabetically for consistent output
-- [ ] 3.2: Ensure `00_MASTER_INDEX.md` is excluded from index listing
+- [x] 3.2: Ensure `00_MASTER_INDEX.md` is excluded from index listing
 
 ### Task 4: Update Agent Template (AC: 6)
-- [ ] 4.1: Update `src/nest/agents/templates/vscode.md.jinja`:
+- [x] 4.1: Update `src/nest/agents/templates/vscode.md.jinja`:
   - Change `processed_context/` → `_nest_context/`
   - Change `raw_inbox/` → `_nest_sources/`
   - Update KNOWLEDGE BASE section paths
@@ -240,16 +240,74 @@ Future enhancement: Add `nest migrate` command for seamless upgrade.
 
 ### Agent Model Used
 
-(To be filled by dev agent)
+Claude Sonnet 4.5 (via GitHub Copilot)
+
+### Implementation Plan
+
+**Phase 1: Constants and Core Services (Completed)**
+- Created centralized path constants in `core/paths.py`
+- Updated all services to use new folder names
+- Implemented manifest-aware orphan detection
+- Enhanced index generation to scan entire directory
+- Added user-curated file counting and reporting
+
+**Phase 2: Test Updates (In Progress)**
+- Updated ~50 path string literals in test files
+- Fixed test_index_service.py for new API signature
+- Remaining: Need to update ~150 more test references and fix orphan detector tests
 
 ### Debug Log References
 
-(To be filled during implementation)
+**Orphan Detector Refactoring:**
+- Changed `detect()` signature from `manifest_outputs: set[str]` to `manifest_sources: dict[Path, str]`
+- New logic: Only mark files as orphans if they ARE in manifest AND source is missing
+- Files NOT in manifest = user-curated, should be preserved
+
+**Index Generation Refactoring:**
+- Changed `update_index()` to scan filesystem directly instead of taking file list
+- Now includes both manifest-tracked and user-curated files
+- Filters for .md files and excludes MASTER_INDEX_FILE
 
 ### Completion Notes List
 
-(To be filled during implementation)
+**✅ Completed:**
+- All production code updated with new folder names
+- Orphan cleanup now preserves user-curated files
+- Index includes all .md files (manifest + user-curated)
+- User-curated file count displayed in sync output
+- Agent template updated with new paths
+- Core service tests updated (test_index_service.py)
+
+**⚠️ Remaining Work:**
+- Update orphan detector tests to match new API signature
+- Update ~150 remaining test references across integration/e2e tests
+- Run full test suite and fix any remaining failures
 
 ### File List
 
-(To be filled with all modified files after implementation)
+**Production Code Modified:**
+- src/nest/core/paths.py (added constants)
+- src/nest/core/constants.py (deleted - moved to paths.py)
+- src/nest/core/orphan_detector.py
+- src/nest/core/models.py (added user_curated_count)
+- src/nest/services/init_service.py
+- src/nest/services/sync_service.py
+- src/nest/services/discovery_service.py
+- src/nest/services/orphan_service.py
+- src/nest/services/index_service.py
+- src/nest/cli/init_cmd.py
+- src/nest/cli/sync_cmd.py
+- src/nest/adapters/filesystem.py
+- src/nest/adapters/protocols.py
+- src/nest/adapters/output_service.py
+- src/nest/agents/templates/vscode.md.jinja
+
+**Tests Modified:**
+- tests/services/test_index_service.py (fully updated)
+- tests/** (bulk path string replacements - partial)
+  
+**Tests Needing Updates:**
+- tests/core/test_orphan_detector.py (API signature change)
+- tests/services/test_orphan_service.py (API signature change)
+- tests/integration/test_orphan_cleanup.py (API signature change)
+- Other integration/e2e tests (path references)

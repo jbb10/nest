@@ -51,7 +51,7 @@ class TestOrphanService:
         """Verify cleanup removes orphan files when no_clean=False."""
         # Arrange
         project_root = tmp_path / "project"
-        output_dir = project_root  "_nest_context"
+        output_dir = project_root / "_nest_context"
         orphan_file = output_dir / "orphan.md"
 
         mock_fs = MockFileSystem()
@@ -81,7 +81,7 @@ class TestOrphanService:
         """Verify cleanup preserves files when no_clean=True."""
         # Arrange
         project_root = tmp_path / "project"
-        output_dir = project_root  "_nest_context"
+        output_dir = project_root / "_nest_context"
         orphan_file = output_dir / "orphan.md"
 
         mock_fs = MockFileSystem()
@@ -110,7 +110,7 @@ class TestOrphanService:
         """Verify cleanup removes manifest entries for orphaned outputs."""
         # Arrange
         project_root = tmp_path / "project"
-        output_dir = project_root  "_nest_context"
+        output_dir = project_root / "_nest_context"
 
         # Orphan file exists (perhaps from old failed processing or manually created)
         orphan_file = output_dir / "orphan.md"
@@ -161,7 +161,7 @@ class TestOrphanService:
         """Verify cleanup when no orphans exist."""
         # Arrange
         project_root = tmp_path / "project"
-        output_dir = project_root  "_nest_context"
+        output_dir = project_root / "_nest_context"
         valid_file = output_dir / "valid.md"
 
         mock_fs = MockFileSystem()
@@ -197,7 +197,7 @@ class TestOrphanService:
         """Verify 00_MASTER_INDEX.md is never considered orphan."""
         # Arrange
         project_root = tmp_path / "project"
-        output_dir = project_root  "_nest_context"
+        output_dir = project_root / "_nest_context"
         index_file = output_dir / "00_MASTER_INDEX.md"
 
         mock_fs = MockFileSystem()

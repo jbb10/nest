@@ -18,7 +18,7 @@ class TestManifestIntegration:
         # Arrange - create project structure
         project_root = tmp_path
         raw_inbox = project_root / "raw_inbox"
-        processed = project_root  "_nest_context"
+        processed = project_root / "_nest_context"
         raw_inbox.mkdir()
         processed.mkdir()
 
@@ -65,7 +65,7 @@ class TestManifestIntegration:
         # Arrange
         project_root = tmp_path
         raw_inbox = project_root / "raw_inbox"
-        processed = project_root  "_nest_context"
+        processed = project_root / "_nest_context"
         raw_inbox.mkdir()
         processed.mkdir()
 
@@ -104,7 +104,7 @@ class TestManifestIntegration:
         # Arrange
         project_root = tmp_path
         raw_inbox = project_root / "raw_inbox"
-        processed = project_root  "_nest_context"
+        processed = project_root / "_nest_context"
         raw_inbox.mkdir()
         processed.mkdir()
 
@@ -158,7 +158,7 @@ class TestManifestIntegration:
         # Arrange
         project_root = tmp_path
         raw_inbox = project_root / "raw_inbox"
-        processed = project_root  "_nest_context"
+        processed = project_root / "_nest_context"
         raw_inbox.mkdir()
         processed.mkdir()
 
@@ -194,7 +194,7 @@ class TestManifestIntegration:
         # Arrange
         project_root = tmp_path
         raw_inbox = project_root / "raw_inbox"
-        processed = project_root  "_nest_context"
+        processed = project_root / "_nest_context"
         raw_inbox.mkdir()
         processed.mkdir()
 

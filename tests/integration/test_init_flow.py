@@ -66,7 +66,7 @@ def test_init_creates_all_directories(tmp_path: Path) -> None:
     service.execute("TestProject", tmp_path)
 
     assert (tmp_path / "raw_inbox").exists()
-    assert (tmp_path  "_nest_context").exists()
+    assert (tmp_path / "_nest_context").exists()
     assert (tmp_path / ".github" / "agents").exists()
 
 

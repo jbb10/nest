@@ -20,7 +20,7 @@ class TestOrphanCleanupIntegration:
         # Setup project structure
         project_root = tmp_path / "project"
         raw_inbox = project_root / "raw_inbox"
-        output_dir = project_root  "_nest_context"
+        output_dir = project_root / "_nest_context"
         raw_inbox.mkdir(parents=True)
         output_dir.mkdir(parents=True)
 
@@ -68,7 +68,7 @@ class TestOrphanCleanupIntegration:
         """Verify --no-clean preserves orphan files."""
         # Setup
         project_root = tmp_path / "project"
-        output_dir = project_root  "_nest_context"
+        output_dir = project_root / "_nest_context"
         output_dir.mkdir(parents=True)
 
         manifest = Manifest(
@@ -99,7 +99,7 @@ class TestOrphanCleanupIntegration:
         """Verify 00_MASTER_INDEX.md is never removed."""
         # Setup
         project_root = tmp_path / "project"
-        output_dir = project_root  "_nest_context"
+        output_dir = project_root / "_nest_context"
         output_dir.mkdir(parents=True)
 
         manifest = Manifest(
@@ -129,7 +129,7 @@ class TestOrphanCleanupIntegration:
         """Verify orphan detection works in subdirectories."""
         # Setup
         project_root = tmp_path / "project"
-        output_dir = project_root  "_nest_context"
+        output_dir = project_root / "_nest_context"
         contracts_dir = output_dir / "contracts" / "2024"
         contracts_dir.mkdir(parents=True)
 

@@ -30,7 +30,7 @@ class TestSyncCLIIntegration:
 
         # Create raw_inbox and processed_context
         (tmp_path / "raw_inbox").mkdir()
-        (tmp_path  "_nest_context").mkdir()
+        (tmp_path / "_nest_context").mkdir()
 
         result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
 
@@ -54,7 +54,7 @@ class TestSyncCLIIntegration:
         manifest_path.write_text(json.dumps(manifest))
 
         (tmp_path / "raw_inbox").mkdir()
-        (tmp_path  "_nest_context").mkdir()
+        (tmp_path / "_nest_context").mkdir()
 
         result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
 
@@ -77,7 +77,7 @@ class TestSyncCLIIntegration:
         manifest_path.write_text(json.dumps(manifest))
 
         (tmp_path / "raw_inbox").mkdir()
-        (tmp_path  "_nest_context").mkdir()
+        (tmp_path / "_nest_context").mkdir()
 
         result = runner.invoke(app, ["sync", "--dry-run", "--dir", str(tmp_path)])
 
@@ -111,7 +111,7 @@ class TestSyncProgressIntegration:
         manifest_path.write_text(json.dumps(manifest))
 
         (tmp_path / "raw_inbox").mkdir()
-        (tmp_path  "_nest_context").mkdir()
+        (tmp_path / "_nest_context").mkdir()
 
         result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
 
