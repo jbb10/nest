@@ -212,7 +212,7 @@ class TestDiscoveryService:
         # Assert
         mock_discovery.discover.assert_called_once()
         call_args = mock_discovery.discover.call_args
-        assert call_args[0][0] == raw_inbox  # First positional arg is directory
+        assert call_args[0][0] == tmp_path / "_nest_sources"  # First positional arg is directory
         # Second arg should be set of supported extensions
         extensions = call_args[0][1]
         assert ".pdf" in extensions
@@ -224,7 +224,7 @@ class TestDiscoveryService:
     def test_handles_empty_raw_inbox(self, tmp_path: Path) -> None:
         """Verify empty raw_inbox returns empty discovery result."""
         # Arrange
-        raw_inbox = tmp_path / "raw_inbox"
+        raw_inbox = tmp_path / "_nest_sources"
         raw_inbox.mkdir()
 
         mock_discovery = Mock(spec=FileDiscoveryProtocol)

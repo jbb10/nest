@@ -17,7 +17,7 @@ from nest.services.sync_service import SyncService
 def test_sync_generates_index_end_to_end(tmp_path: Path):
     # Setup directories (Use tmp_path directly as root to avoid nesting issues or path confusion)
     project_root = tmp_path
-    raw = project_root / "raw_inbox"
+    raw = project_root / "_nest_sources"
     raw.mkdir()
     processed_context = project_root / "_nest_context"
     # processed_context not created yet

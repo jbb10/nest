@@ -107,7 +107,7 @@ class TestNegativePathsWithDocling:
         assert result.exit_code == 0
 
         # Add corrupt.pdf and a valid file
-        raw_inbox = fresh_temp_dir / "raw_inbox"
+        raw_inbox = fresh_temp_dir / "_nest_sources"
         shutil.copy(fixtures_dir / "corrupt.pdf", raw_inbox / "corrupt.pdf")
         shutil.copy(fixtures_dir / "summary.docx", raw_inbox / "valid.docx")
 
@@ -120,7 +120,7 @@ class TestNegativePathsWithDocling:
         )
 
         # Valid doc should be processed
-        processed = fresh_temp_dir  "_nest_context"
+        processed = fresh_temp_dir / "_nest_context"
         assert (processed / "valid.md").exists(), "Valid doc should be processed"
 
         # Error log should exist
@@ -139,7 +139,7 @@ class TestNegativePathsWithDocling:
         assert result.exit_code == 0
 
         # Add corrupt.pdf
-        raw_inbox = fresh_temp_dir / "raw_inbox"
+        raw_inbox = fresh_temp_dir / "_nest_sources"
         shutil.copy(fixtures_dir / "corrupt.pdf", raw_inbox / "corrupt.pdf")
 
         # Act - sync with fail mode
@@ -158,7 +158,7 @@ class TestNegativePathsWithDocling:
         assert result.exit_code == 0
 
         # Add a .txt file (unsupported)
-        raw_inbox = fresh_temp_dir / "raw_inbox"
+        raw_inbox = fresh_temp_dir / "_nest_sources"
         txt_file = raw_inbox / "readme.txt"
         txt_file.write_text("This is a text file that should be ignored.")
 
@@ -169,6 +169,6 @@ class TestNegativePathsWithDocling:
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.stderr}"
 
         # .txt should NOT be in output
-        processed = fresh_temp_dir  "_nest_context"
+        processed = fresh_temp_dir / "_nest_context"
         assert not (processed / "readme.md").exists(), ".txt file should be ignored"
         assert not (processed / "readme.txt").exists(), ".txt file should be ignored"

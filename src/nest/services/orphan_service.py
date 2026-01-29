@@ -9,7 +9,7 @@ from pathlib import Path
 from nest.adapters.protocols import FileSystemProtocol, ManifestProtocol
 from nest.core.models import OrphanCleanupResult
 from nest.core.orphan_detector import OrphanDetector
-from nest.core.paths import CONTEXT_DIR
+from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +47,12 @@ class OrphanService:
         manifest = self._manifest.load(self._project_root)
         
         # Build mapping: source_path -> output_path (for successful entries only)
+        # NOTE: Manifest keys are relative to SOURCES_DIR, so construct full path
+        sources_dir = self._project_root / SOURCES_DIR
         manifest_sources: dict[Path, str] = {}
         for key, entry in manifest.files.items():
             if entry.status == "success":
-                source_path = self._project_root / key
+                source_path = sources_dir / key
                 manifest_sources[source_path] = entry.output
 
         # List all files in context directory
@@ -77,10 +79,12 @@ class OrphanService:
         manifest = self._manifest.load(self._project_root)
         
         # Build mapping: source_path -> output_path (for successful entries only)
+        # NOTE: Manifest keys are relative to SOURCES_DIR, so construct full path
+        sources_dir = self._project_root / SOURCES_DIR
         manifest_sources: dict[Path, str] = {}
         for key, entry in manifest.files.items():
             if entry.status == "success":
-                source_path = self._project_root / key
+                source_path = sources_dir / key
                 manifest_sources[source_path] = entry.output
 
         # List all files in context directory

@@ -39,8 +39,8 @@ def test_init_creates_agent_file(tmp_path: Path) -> None:
     content = agent_path.read_text()
     assert content.startswith("---\nname: nest\n")
     assert "Nike" in content
-    assert "processed_context/00_MASTER_INDEX.md" in content
-    assert "raw_inbox/" in content
+    assert "_nest_context/00_MASTER_INDEX.md" in content
+    assert "_nest_sources/" in content
 
     # Verify downloader methods were called appropriately
     mock_downloader.are_models_cached.assert_called_once()
@@ -65,7 +65,7 @@ def test_init_creates_all_directories(tmp_path: Path) -> None:
 
     service.execute("TestProject", tmp_path)
 
-    assert (tmp_path / "raw_inbox").exists()
+    assert (tmp_path / "_nest_sources").exists()
     assert (tmp_path / "_nest_context").exists()
     assert (tmp_path / ".github" / "agents").exists()
 

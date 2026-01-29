@@ -64,16 +64,16 @@ development_status:
   2-6-orphan-cleanup: done
   2-7-sync-command-flags-and-error-handling: done
   2-8-sync-command-cli-integration: done
-  2-9-e2e-testing-framework: review
-  2-10-folder-naming-refactor: review
+  2-9-e2e-testing-framework: done
+  2-10-folder-naming-refactor: done
   epic-2-retrospective: optional
 
   # ============================================================
   # Epic 3: Project Visibility & Health
   # FR18-FR22 - nest status & nest doctor commands
   # ============================================================
-  epic-3: backlog
-  3-1-project-status-display: backlog
+  epic-3: in-progress
+  3-1-project-status-display: ready-for-dev
   3-2-environment-validation: backlog
   3-3-ml-model-validation: backlog
   3-4-project-state-validation: backlog

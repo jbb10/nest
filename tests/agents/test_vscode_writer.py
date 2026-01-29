@@ -63,8 +63,8 @@ def test_generate_includes_required_instructions(mock_filesystem: MockFileSystem
     content = mock_filesystem.written_files[output_path]
     # Check for key instruction elements
     assert "00_MASTER_INDEX.md" in content
-    assert "processed_context/" in content
-    assert "raw_inbox/" in content
+    assert "_nest_context/" in content
+    assert "_nest_sources/" in content
     assert "cite" in content.lower() or "citation" in content.lower()
 
 

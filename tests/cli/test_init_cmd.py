@@ -37,7 +37,7 @@ def test_init_success_output_format(mock_create_service: MagicMock, tmp_path: Pa
     # Should show success (AC1)
     assert 'Project "Nike" initialized!' in result.output
     assert "Next steps:" in result.output
-    assert "Drop your documents into raw_inbox/" in result.output
+    assert "Drop your documents into _nest_sources/" in result.output
     assert "nest sync" in result.output
     assert "select 'Nest' from the agent dropdown" in result.output
     assert "Supported formats: PDF, DOCX, PPTX, XLSX, HTML" in result.output

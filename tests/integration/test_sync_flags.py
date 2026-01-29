@@ -98,7 +98,7 @@ class TestSyncForceIntegration:
             new_files=[],
             modified_files=[
                 DiscoveredFile(
-                    path=tmp_path / "raw_inbox" / "file.pdf",
+                    path=tmp_path / "_nest_sources" / "file.pdf",
                     checksum="111",
                     status="modified",
                 )
@@ -106,12 +106,13 @@ class TestSyncForceIntegration:
             unchanged_files=[],
         )
         mock_output.process_file.return_value = ProcessingResult(
-            source_path=tmp_path / "raw_inbox" / "file.pdf",
+            source_path=tmp_path / "_nest_sources" / "file.pdf",
             status="success",
             output_path=tmp_path / "_nest_context" / "file.md",
         )
         mock_manifest.load_current_manifest.return_value = Mock(files={})
         mock_orphan.cleanup.return_value = OrphanCleanupResult()
+        mock_orphan.count_user_curated_files.return_value = 0
 
         service = SyncService(
             discovery=mock_discovery,
@@ -176,6 +177,7 @@ class TestSyncOnErrorIntegration:
         ]
         mock_manifest.load_current_manifest.return_value = Mock(files={})
         mock_orphan.cleanup.return_value = OrphanCleanupResult()
+        mock_orphan.count_user_curated_files.return_value = 0
 
         service = SyncService(
             discovery=mock_discovery,
@@ -276,6 +278,7 @@ class TestErrorLoggingIntegration:
         )
         mock_manifest.load_current_manifest.return_value = Mock(files={})
         mock_orphan.cleanup.return_value = OrphanCleanupResult()
+        mock_orphan.count_user_curated_files.return_value = 0
 
         # Setup error logger
         log_file = tmp_path / ".nest_errors.log"
@@ -325,6 +328,7 @@ class TestErrorLoggingIntegration:
         mock_output.process_file.side_effect = RuntimeError("Docling crashed")
         mock_manifest.load_current_manifest.return_value = Mock(files={})
         mock_orphan.cleanup.return_value = OrphanCleanupResult()
+        mock_orphan.count_user_curated_files.return_value = 0
 
         log_file = tmp_path / ".nest_errors.log"
         error_logger = setup_error_logger(log_file, service_name="sync")

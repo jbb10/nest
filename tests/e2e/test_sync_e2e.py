@@ -22,17 +22,17 @@ class TestSyncE2E:
 
     Uses fixtures from conftest.py:
     - initialized_project: Runs nest init (each test gets fresh project)
-    - sample_documents: Copies test fixtures to raw_inbox/
+    - sample_documents: Copies test fixtures to _nest_sources/
     """
 
     def test_sync_processes_nested_documents(self, sample_documents: Path):
         """Test that sync processes nested documents correctly.
 
         AC5: Given a Nest project is initialized
-        And 4 test documents are placed in nested structure under raw_inbox/
+        And 4 test documents are placed in nested structure under _nest_sources/
         When nest sync is run via subprocess
         Then exit code is 0
-        And output structure mirrors input in processed_context/
+        And output structure mirrors input in _nest_context/
         And all output files have .md extension
         And all output files are non-empty
         And manifest contains entries for all 4 files
@@ -47,7 +47,7 @@ class TestSyncE2E:
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
         # Assert output structure mirrors input
-        processed = project_dir  "_nest_context"
+        processed = project_dir / "_nest_context"
         assert (processed / "reports" / "quarterly.md").exists()
         assert (processed / "reports" / "summary.md").exists()
         assert (processed / "presentations" / "deck.md").exists()

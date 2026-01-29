@@ -131,8 +131,8 @@ def test_init_service_creates_all_directories(
     service.execute("Nike", target_dir)
 
     created_dirs = [str(d) for d in mock_filesystem.created_dirs]
-    assert str(target_dir / "raw_inbox") in created_dirs
-    assert str(target_dir  "_nest_context") in created_dirs
+    assert str(target_dir / "_nest_sources") in created_dirs
+    assert str(target_dir / "_nest_context") in created_dirs
     assert str(target_dir / ".github/agents") in created_dirs
 
 
@@ -177,7 +177,7 @@ def test_init_service_creates_gitignore(
     gitignore_path = target_dir / ".gitignore"
     assert gitignore_path in mock_filesystem.written_files
     content = mock_filesystem.written_files[gitignore_path]
-    assert "raw_inbox/" in content
+    assert "_nest_sources/" in content
 
 
 def test_init_service_appends_to_existing_gitignore(
@@ -205,7 +205,7 @@ def test_init_service_appends_to_existing_gitignore(
 
     content = mock_filesystem.written_files[gitignore_path]
     assert "node_modules/" in content
-    assert "raw_inbox/" in content
+    assert "_nest_sources/" in content
 
 
 def test_init_service_skips_gitignore_if_entry_exists(
@@ -220,7 +220,7 @@ def test_init_service_skips_gitignore_if_entry_exists(
 
     # Simulate existing gitignore with entry already present
     mock_filesystem.existing_paths.add(gitignore_path)
-    mock_filesystem.file_contents[gitignore_path] = "raw_inbox/\n"
+    mock_filesystem.file_contents[gitignore_path] = "_nest_sources/\n"
 
     service = InitService(
         filesystem=mock_filesystem,

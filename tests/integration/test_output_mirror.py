@@ -165,7 +165,7 @@ class TestOutputMirrorIntegration:
     def test_path_helpers_with_real_paths(self, tmp_path: Path) -> None:
         """AC #4: Path helpers work correctly with real filesystem paths."""
         # Arrange
-        raw_inbox = tmp_path / "raw_inbox"
+        raw_inbox = tmp_path / "_nest_sources"
         processed_context = tmp_path / "_nest_context"
         source = raw_inbox / "reports" / "2024" / "q1.xlsx"
 
@@ -175,7 +175,7 @@ class TestOutputMirrorIntegration:
 
         # Assert
         assert output == processed_context / "reports" / "2024" / "q1.md"
-        assert relative == "processed_context/reports/2024/q1.md"
+        assert relative == "_nest_context/reports/2024/q1.md"
         assert "/" in relative  # Forward slashes for portability
 
     def test_multiple_files_in_different_directories(self, tmp_path: Path) -> None:

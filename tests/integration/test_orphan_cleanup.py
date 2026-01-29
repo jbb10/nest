@@ -1,6 +1,8 @@
 """Integration tests for orphan cleanup functionality.
 
-Tests the full orphan cleanup flow from file deletion detection to removal.
+Tests the full orphan cleanup flow with MANIFEST-AWARE orphan detection.
+Orphans are files that ARE in manifest but whose source file no longer exists.
+User-curated files (not in manifest) are NEVER orphans and are preserved.
 """
 
 from datetime import datetime
@@ -9,23 +11,26 @@ from pathlib import Path
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.models import FileEntry, Manifest
+from nest.core.paths import SOURCES_DIR, CONTEXT_DIR
 from nest.services.orphan_service import OrphanService
 
 
 class TestOrphanCleanupIntegration:
-    """Integration tests for orphan cleanup."""
+    """Integration tests for manifest-aware orphan cleanup."""
 
     def test_orphan_cleanup_removes_stale_files(self, tmp_path: Path) -> None:
-        """Verify orphans are detected and removed when source deleted."""
+        """Verify orphans are detected and removed when source is deleted.
+        
+        Orphan = file IN manifest whose source no longer exists.
+        """
         # Setup project structure
         project_root = tmp_path / "project"
-        raw_inbox = project_root / "raw_inbox"
-        output_dir = project_root / "_nest_context"
-        raw_inbox.mkdir(parents=True)
+        sources_dir = project_root / SOURCES_DIR
+        output_dir = project_root / CONTEXT_DIR
+        sources_dir.mkdir(parents=True)
         output_dir.mkdir(parents=True)
 
-        # Create manifest with processed file
-        manifest_path = project_root / ".nest_manifest.json"
+        # Create manifest with processed file (source was deleted)
         manifest = Manifest(
             nest_version="1.0.0",
             project_name="test",
@@ -39,15 +44,13 @@ class TestOrphanCleanupIntegration:
             },
         )
 
-        # Write orphan file (source was deleted)
+        # Write output file (source was deleted - making this an orphan)
         orphan_file = output_dir / "report.md"
         orphan_file.write_text("# Old Report\n\nThis file is now an orphan.")
 
-        # Simulate source deletion: remove the source from manifest
-        # (in real scenario, discovery would detect this)
-        manifest.files = {}  # Source deleted, manifest updated
+        # NOTE: Source file (report.pdf) does NOT exist - this makes it an orphan
 
-        # Save empty manifest
+        # Save manifest
         adapter = ManifestAdapter()
         adapter.save(project_root, manifest)
 
@@ -68,17 +71,28 @@ class TestOrphanCleanupIntegration:
         """Verify --no-clean preserves orphan files."""
         # Setup
         project_root = tmp_path / "project"
-        output_dir = project_root / "_nest_context"
+        sources_dir = project_root / SOURCES_DIR
+        output_dir = project_root / CONTEXT_DIR
+        sources_dir.mkdir(parents=True)
         output_dir.mkdir(parents=True)
 
+        # File in manifest but source deleted = orphan
         manifest = Manifest(
             nest_version="1.0.0",
             project_name="test",
-            files={},  # Empty - all files are orphans
+            files={
+                "orphan.pdf": FileEntry(
+                    sha256="abc123",
+                    processed_at=datetime.now(),
+                    output="orphan.md",
+                    status="success",
+                )
+            },
         )
 
         orphan_file = output_dir / "orphan.md"
         orphan_file.write_text("# Orphan")
+        # NOTE: orphan.pdf source does NOT exist
 
         adapter = ManifestAdapter()
         adapter.save(project_root, manifest)
@@ -99,7 +113,9 @@ class TestOrphanCleanupIntegration:
         """Verify 00_MASTER_INDEX.md is never removed."""
         # Setup
         project_root = tmp_path / "project"
-        output_dir = project_root / "_nest_context"
+        sources_dir = project_root / SOURCES_DIR
+        output_dir = project_root / CONTEXT_DIR
+        sources_dir.mkdir(parents=True)
         output_dir.mkdir(parents=True)
 
         manifest = Manifest(
@@ -108,7 +124,7 @@ class TestOrphanCleanupIntegration:
             files={},  # Empty manifest
         )
 
-        # Create index file
+        # Create index file (user-curated, not in manifest)
         index_file = output_dir / "00_MASTER_INDEX.md"
         index_file.write_text("# Master Index\n\nThis should never be removed.")
 
@@ -121,7 +137,7 @@ class TestOrphanCleanupIntegration:
 
         result = orphan_service.cleanup(no_clean=False)
 
-        # Verify index was not detected as orphan
+        # Verify index was not detected as orphan (not in manifest)
         assert len(result.orphans_detected) == 0
         assert index_file.exists()
 
@@ -129,17 +145,27 @@ class TestOrphanCleanupIntegration:
         """Verify orphan detection works in subdirectories."""
         # Setup
         project_root = tmp_path / "project"
-        output_dir = project_root / "_nest_context"
+        sources_dir = project_root / SOURCES_DIR
+        output_dir = project_root / CONTEXT_DIR
         contracts_dir = output_dir / "contracts" / "2024"
+        sources_dir.mkdir(parents=True)
         contracts_dir.mkdir(parents=True)
 
+        # File in manifest with nested output, source deleted = orphan
         manifest = Manifest(
             nest_version="1.0.0",
             project_name="test",
-            files={},
+            files={
+                "contracts/2024/agreement.pdf": FileEntry(
+                    sha256="abc123",
+                    processed_at=datetime.now(),
+                    output="contracts/2024/agreement.md",
+                    status="success",
+                )
+            },
         )
 
-        # Create nested orphan
+        # Create nested orphan (source doesn't exist)
         orphan = contracts_dir / "agreement.md"
         orphan.write_text("# Agreement")
 
@@ -156,3 +182,80 @@ class TestOrphanCleanupIntegration:
         assert len(result.orphans_detected) == 1
         assert "contracts/2024/agreement.md" in result.orphans_detected
         assert not orphan.exists()
+
+    def test_orphan_cleanup_preserves_user_curated_files(self, tmp_path: Path) -> None:
+        """Verify user-curated files (not in manifest) are never orphans."""
+        # Setup
+        project_root = tmp_path / "project"
+        sources_dir = project_root / SOURCES_DIR
+        output_dir = project_root / CONTEXT_DIR
+        sources_dir.mkdir(parents=True)
+        output_dir.mkdir(parents=True)
+
+        # Empty manifest - no tracked files
+        manifest = Manifest(
+            nest_version="1.0.0",
+            project_name="test",
+            files={},
+        )
+
+        # Create user-curated file (NOT in manifest)
+        user_file = output_dir / "my_notes.md"
+        user_file.write_text("# My Custom Notes\n\nUser-created content.")
+
+        adapter = ManifestAdapter()
+        adapter.save(project_root, manifest)
+
+        # Run cleanup
+        fs = FileSystemAdapter()
+        orphan_service = OrphanService(fs, adapter, project_root)
+
+        result = orphan_service.cleanup(no_clean=False)
+
+        # Verify user file was NOT detected as orphan
+        assert len(result.orphans_detected) == 0
+        assert user_file.exists()
+
+    def test_orphan_cleanup_with_existing_source_not_orphan(self, tmp_path: Path) -> None:
+        """Verify files with existing sources are NOT orphans."""
+        # Setup
+        project_root = tmp_path / "project"
+        sources_dir = project_root / SOURCES_DIR
+        output_dir = project_root / CONTEXT_DIR
+        sources_dir.mkdir(parents=True)
+        output_dir.mkdir(parents=True)
+
+        # Create source file (exists)
+        source_file = sources_dir / "report.pdf"
+        source_file.write_bytes(b"PDF content")
+
+        # File in manifest with existing source = NOT orphan
+        manifest = Manifest(
+            nest_version="1.0.0",
+            project_name="test",
+            files={
+                "report.pdf": FileEntry(
+                    sha256="abc123",
+                    processed_at=datetime.now(),
+                    output="report.md",
+                    status="success",
+                )
+            },
+        )
+
+        # Create output file
+        output_file = output_dir / "report.md"
+        output_file.write_text("# Report")
+
+        adapter = ManifestAdapter()
+        adapter.save(project_root, manifest)
+
+        # Run cleanup
+        fs = FileSystemAdapter()
+        orphan_service = OrphanService(fs, adapter, project_root)
+
+        result = orphan_service.cleanup(no_clean=False)
+
+        # Verify no orphans detected (source exists)
+        assert len(result.orphans_detected) == 0
+        assert output_file.exists()

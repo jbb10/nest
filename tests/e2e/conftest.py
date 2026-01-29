@@ -96,7 +96,7 @@ def initialized_project(fresh_temp_dir: Path) -> Path:
     acceptable overhead for test reliability.
 
     Returns:
-        Path to the project directory (containing raw_inbox/, processed_context/, etc.).
+        Path to the project directory (containing _nest_sources/, _nest_context/, etc.).
     """
     result = run_cli(["init", "E2ETestProject"], cwd=fresh_temp_dir)
     assert result.exit_code == 0, f"Init failed: {result.stderr}"
@@ -105,21 +105,21 @@ def initialized_project(fresh_temp_dir: Path) -> Path:
 
 @pytest.fixture
 def sample_documents(initialized_project: Path) -> Path:
-    """Copy fixture files to raw_inbox in nested structure.
+    """Copy fixture files to _nest_sources in nested structure.
 
-    Depends on initialized_project to ensure raw_inbox/ exists.
+    Depends on initialized_project to ensure _nest_sources/ exists.
 
     Creates:
-        raw_inbox/reports/quarterly.pdf
-        raw_inbox/reports/summary.docx
-        raw_inbox/presentations/deck.pptx
-        raw_inbox/presentations/data.xlsx
+        _nest_sources/reports/quarterly.pdf
+        _nest_sources/reports/summary.docx
+        _nest_sources/presentations/deck.pptx
+        _nest_sources/presentations/data.xlsx
 
     Returns:
         Path to the project directory (for use in sync tests).
     """
     fixtures_dir = Path(__file__).parent / "fixtures"
-    raw_inbox = initialized_project / "raw_inbox"
+    raw_inbox = initialized_project / "_nest_sources"
 
     # Create nested structure
     reports_dir = raw_inbox / "reports"

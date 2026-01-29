@@ -20,7 +20,7 @@ class TestInitE2E:
         AC4: Given nest init "TestProject" is run via subprocess
         When the command completes
         Then exit code is 0
-        And raw_inbox/ exists and is empty
+        And _nest_sources/ exists and is empty
         And processed_context/ exists and is empty
         And .nest_manifest.json exists with valid JSON containing project name
         """
@@ -31,16 +31,16 @@ class TestInitE2E:
         assert result.exit_code == 0, f"Init failed: {result.stderr}"
 
         # Assert raw_inbox exists and is empty
-        raw_inbox = fresh_temp_dir / "raw_inbox"
-        assert raw_inbox.exists(), "raw_inbox directory should exist"
-        assert raw_inbox.is_dir(), "raw_inbox should be a directory"
-        assert list(raw_inbox.iterdir()) == [], "raw_inbox should be empty"
+        raw_inbox = fresh_temp_dir / "_nest_sources"
+        assert raw_inbox.exists(), "_nest_sources directory should exist"
+        assert raw_inbox.is_dir(), "_nest_sources should be a directory"
+        assert list(raw_inbox.iterdir()) == [], "_nest_sources should be empty"
 
         # Assert processed_context exists and is empty
-        processed_context = fresh_temp_dir  "_nest_context"
-        assert processed_context.exists(), "processed_context directory should exist"
-        assert processed_context.is_dir(), "processed_context should be a directory"
-        assert list(processed_context.iterdir()) == [], "processed_context should be empty"
+        processed_context = fresh_temp_dir / "_nest_context"
+        assert processed_context.exists(), "_nest_context directory should exist"
+        assert processed_context.is_dir(), "_nest_context should be a directory"
+        assert list(processed_context.iterdir()) == [], "_nest_context should be empty"
 
         # Assert manifest exists with valid JSON
         manifest_path = fresh_temp_dir / ".nest_manifest.json"
