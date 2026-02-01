@@ -73,7 +73,7 @@ development_status:
   # FR18-FR22 - nest status & nest doctor commands
   # ============================================================
   epic-3: in-progress
-  3-1-project-status-display: ready-for-dev
+  3-1-project-status-display: done
   3-2-environment-validation: backlog
   3-3-ml-model-validation: backlog
   3-4-project-state-validation: backlog

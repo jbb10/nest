@@ -3,8 +3,13 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Raw documents excluded from version control (processed versions in processed_context/)
+# Raw documents excluded from version control (processed versions in _nest_context/)
 raw_inbox/
+_nest_sources/
+
+# Nest project artifacts (if repo is accidentally initialized as Nest project)
+.nest_manifest.json
+_nest_context/
 
 # OS metadata
 .DS_Store

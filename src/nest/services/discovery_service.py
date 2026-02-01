@@ -9,8 +9,8 @@ from pathlib import Path
 from nest.adapters.protocols import FileDiscoveryProtocol, ManifestProtocol
 from nest.core.change_detector import FileChangeDetector
 from nest.core.checksum import compute_sha256
-from nest.core.paths import SOURCES_DIR, SUPPORTED_EXTENSIONS
 from nest.core.models import DiscoveredFile, DiscoveryResult
+from nest.core.paths import SOURCES_DIR, SUPPORTED_EXTENSIONS
 
 
 class DiscoveryService:

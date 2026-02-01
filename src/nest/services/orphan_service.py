@@ -45,7 +45,7 @@ class OrphanService:
 
         # Load manifest to build source->output mapping
         manifest = self._manifest.load(self._project_root)
-        
+
         # Build mapping: source_path -> output_path (for successful entries only)
         # NOTE: Manifest keys are relative to SOURCES_DIR, so construct full path
         sources_dir = self._project_root / SOURCES_DIR
@@ -77,7 +77,7 @@ class OrphanService:
 
         # Load manifest to build source->output mapping
         manifest = self._manifest.load(self._project_root)
-        
+
         # Build mapping: source_path -> output_path (for successful entries only)
         # NOTE: Manifest keys are relative to SOURCES_DIR, so construct full path
         sources_dir = self._project_root / SOURCES_DIR

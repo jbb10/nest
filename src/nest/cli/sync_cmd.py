@@ -271,7 +271,7 @@ def _display_sync_summary(result: SyncResult, console: "Console", error_log_path
       Failed:    2 (see .nest_errors.log)
       Orphans:   3 removed
 
-      Index updated: 00_MASTER_INDEX.md
+
 
     Args:
         result: SyncResult from sync with all counts.
@@ -298,7 +298,7 @@ def _display_sync_summary(result: SyncResult, console: "Console", error_log_path
         console.print(f"  Orphans:   {result.orphans_detected} detected (not removed)")
     else:
         console.print(f"  Orphans:   {result.orphans_detected} detected")
-    
+
     # Show user-curated file count
     if result.user_curated_count > 0:
         console.print(f"  User-curated: {result.user_curated_count} preserved")
