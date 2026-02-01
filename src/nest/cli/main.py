@@ -3,6 +3,7 @@
 import typer
 
 from nest.cli.init_cmd import init_command
+from nest.cli.status_cmd import status_command
 from nest.cli.sync_cmd import sync_command
 
 app = typer.Typer()
@@ -10,6 +11,7 @@ app = typer.Typer()
 # Register commands
 app.command(name="init")(init_command)
 app.command(name="sync")(sync_command)
+app.command(name="status")(status_command)
 
 
 def main() -> None:

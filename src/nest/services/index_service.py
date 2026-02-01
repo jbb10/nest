@@ -72,7 +72,7 @@ class IndexService:
         """
         # Scan entire context directory for all .md files
         all_files = self._fs.list_files(self._context_dir)
-        
+
         # Filter to .md files and exclude the index itself
         md_files: list[str] = []
         for file_path in all_files:
@@ -81,6 +81,6 @@ class IndexService:
                 # Exclude the master index itself
                 if relative != MASTER_INDEX_FILE:
                     md_files.append(relative)
-        
+
         content = self.generate_content(md_files, project_name)
         self.write_index(content)

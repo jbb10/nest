@@ -11,7 +11,7 @@ from pathlib import Path
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.models import FileEntry, Manifest
-from nest.core.paths import SOURCES_DIR, CONTEXT_DIR
+from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
 from nest.services.orphan_service import OrphanService
 
 
@@ -20,7 +20,7 @@ class TestOrphanCleanupIntegration:
 
     def test_orphan_cleanup_removes_stale_files(self, tmp_path: Path) -> None:
         """Verify orphans are detected and removed when source is deleted.
-        
+
         Orphan = file IN manifest whose source no longer exists.
         """
         # Setup project structure

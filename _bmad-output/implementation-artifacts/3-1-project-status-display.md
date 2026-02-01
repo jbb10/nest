@@ -1,6 +1,6 @@
 # Story 3.1: Project Status Display
 
-Status: ready-for-dev
+Status: done
 Branch: feat/3-1-project-status-display
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -67,9 +67,9 @@ This reduces friction by eliminating the need to run `nest sync --dry-run` just 
 
 ## E2E Testing Requirements
 
-- [ ] Existing E2E tests cover this story's functionality: No - status command is new
-- [ ] New E2E tests required: Yes - add E2E tests for status command
-- [ ] E2E test execution required for story completion: Yes
+- [x] Existing E2E tests cover this story's functionality: No - status command is new
+- [x] New E2E tests required: Yes - add E2E tests for status command
+- [x] E2E test execution required for story completion: Yes
 
 **New E2E Tests Needed:**
 1. `test_status_shows_pending_files()` - Status shows correct counts after adding files
@@ -79,11 +79,11 @@ This reduces friction by eliminating the need to run `nest sync --dry-run` just 
 ## Tasks / Subtasks
 
 ### Task 1: Create StatusService (AC: 1, 5)
-- [ ] 1.1: Create `src/nest/services/status_service.py`
+- [x] 1.1: Create `src/nest/services/status_service.py`
   - Inject `FileSystemProtocol` and `ManifestProtocol`
   - Reuse `core/checksum.py` for file state comparison
-- [ ] 1.2: Implement `get_status()` method returning `StatusReport` dataclass
-- [ ] 1.3: Create `StatusReport` dataclass with all required fields:
+- [x] 1.2: Implement `get_status()` method returning `StatusReport` dataclass
+- [x] 1.3: Create `StatusReport` dataclass with all required fields:
   ```python
   @dataclass
   class StatusReport:
@@ -100,54 +100,54 @@ This reduces friction by eliminating the need to run `nest sync --dry-run` just 
   ```
 
 ### Task 2: Implement File State Analysis (AC: 1, 5)
-- [ ] 2.1: Create `analyze_source_files()` method in StatusService
+- [x] 2.1: Create `analyze_source_files()` method in StatusService
   - Scan `_nest_sources/` for supported files
   - Compare checksums against manifest
   - Categorize as new/modified/unchanged
-- [ ] 2.2: Create `analyze_context_files()` method
+- [x] 2.2: Create `analyze_context_files()` method
   - Count files in `_nest_context/`
   - Identify orphaned files (in manifest but source missing)
-- [ ] 2.3: Ensure consistent use of `SUPPORTED_EXTENSIONS` from `core/paths.py`
+- [x] 2.3: Ensure consistent use of `SUPPORTED_EXTENSIONS` from `core/paths.py`
 
 ### Task 3: Create Status CLI Command (AC: 1, 4)
-- [ ] 3.1: Create `src/nest/cli/status_cmd.py`
+- [x] 3.1: Create `src/nest/cli/status_cmd.py`
   - Register `status` command with Typer app
   - Implement composition root (inject dependencies)
   - Handle "no project" error case
-- [ ] 3.2: Add `status` command to `cli/main.py` app registration
+- [x] 3.2: Add `status` command to `cli/main.py` app registration
 
 ### Task 4: Implement Rich Output Formatting (AC: 1, 2, 3)
-- [ ] 4.1: Create `src/nest/ui/status_display.py` for Rich formatting
+- [x] 4.1: Create `src/nest/ui/status_display.py` for Rich formatting
   - Tree-structured output with Rich Tree or nested formatting
   - Color-coded counts (green=✓, yellow=pending, red=errors)
-- [ ] 4.2: Implement relative time formatting helper
+- [x] 4.2: Implement relative time formatting helper
   - "just now", "X minutes ago", "X hours ago", "X days ago", "never"
-- [ ] 4.3: Implement "All up to date" message when nothing pending
-- [ ] 4.4: Implement actionable prompt: "Run `nest sync` to process N pending files"
+- [x] 4.3: Implement "All up to date" message when nothing pending
+- [x] 4.4: Implement actionable prompt: "Run `nest sync` to process N pending files"
 
 ### Task 5: Add Unit Tests (AC: all)
-- [ ] 5.1: Create `tests/services/test_status_service.py`
+- [x] 5.1: Create `tests/services/test_status_service.py`
   - Test file state categorization (new/modified/unchanged)
   - Test orphan detection
   - Test with empty project
   - Test with fully synced project
-- [ ] 5.2: Create `tests/cli/test_status_cmd.py`
+- [x] 5.2: Create `tests/cli/test_status_cmd.py`
   - Test successful status display
   - Test "no project" error handling
-- [ ] 5.3: Create `tests/ui/test_status_display.py`
+- [x] 5.3: Create `tests/ui/test_status_display.py`
   - Test relative time formatting
   - Test output formatting
 
 ### Task 6: Add E2E Tests (AC: all)
-- [ ] 6.1: Add `test_status_shows_pending_files()` to `tests/e2e/test_status_e2e.py`
-- [ ] 6.2: Add `test_status_after_sync_shows_up_to_date()`
-- [ ] 6.3: Add `test_status_outside_project_fails()`
+- [x] 6.1: Add `test_status_shows_pending_files()` to `tests/e2e/test_status_e2e.py`
+- [x] 6.2: Add `test_status_after_sync_shows_up_to_date()`
+- [x] 6.3: Add `test_status_outside_project_fails()`
 
 ### Task 7: Run Full Test Suite
-- [ ] 7.1: Run `pytest -m "not e2e"` - all unit/integration tests pass
-- [ ] 7.2: Run `pytest -m "e2e"` - all E2E tests pass
-- [ ] 7.3: Run `ruff check` - no linting errors
-- [ ] 7.4: Run `pyright` - no type errors
+- [x] 7.1: Run `pytest -m "not e2e"` - all unit/integration tests pass
+- [x] 7.2: Run `pytest -m "e2e"` - all E2E tests pass
+- [x] 7.3: Run `ruff check` - no linting errors
+- [x] 7.4: Run `pyright` - no type errors
 
 ## Dev Notes
 
@@ -280,10 +280,60 @@ Alignment with unified project structure:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+GPT-5.2
 
 ### Debug Log References
 
+- `uv run pytest -m "not e2e"`
+- `uv run pytest -m e2e`
+- `uv run ruff check .`
+- `uv run pyright`
+
 ### Completion Notes List
 
+- Added `nest status` command with Rich tree output and actionable next steps
+- Implemented StatusService file classification via `compute_sha256()` reuse and `SUPPORTED_EXTENSIONS`
+- Added unit tests for service, CLI, and UI; added E2E coverage for status scenarios
+- Ensured all repo quality gates pass (pytest, ruff, pyright)
+
+**Incidental Code Quality Improvements:**
+- Added `TYPE_CHECKING` guards to test files for proper type annotation hygiene
+- Cleaned up trailing whitespace in sync_cmd.py, orphan_detector.py, index_service.py, orphan_service.py
+- Fixed import ordering in discovery_service.py and test files per PEP 8
+- Removed unused variable in test_orphan_service.py
+
+**Process Issue Discovered & Fixed:**
+- Found test artifacts (.nest_manifest.json, _nest_context/) in repo from running `nest init` in project root
+- Root cause: .gitignore still had old folder names (raw_inbox/processed_context) instead of new names (_nest_sources/_nest_context)
+- Fixed: Updated .gitignore to exclude new folder names and prevent future test artifact commits
+- Reverted test artifacts before final commit
+
 ### File List
+
+**Story Implementation:**
+- src/nest/cli/main.py
+- src/nest/cli/status_cmd.py
+- src/nest/services/status_service.py
+- src/nest/ui/status_display.py
+- tests/cli/test_status_cmd.py
+- tests/e2e/test_status_e2e.py
+- tests/services/test_status_service.py
+- tests/ui/test_status_display.py
+
+**Incidental Code Quality Improvements:**
+- src/nest/cli/sync_cmd.py (trailing whitespace)
+- src/nest/core/orphan_detector.py (trailing whitespace)
+- src/nest/services/discovery_service.py (import order)
+- src/nest/services/index_service.py (trailing whitespace)
+- src/nest/services/orphan_service.py (trailing whitespace)
+- tests/adapters/test_docling_processor.py (TYPE_CHECKING guards)
+- tests/integration/test_orphan_cleanup.py (import order, whitespace)
+- tests/services/test_orphan_service.py (unused variable removal)
+
+**Process Fix:**
+- .gitignore (exclude new folder names and test artifacts)
+
+### Change Log
+
+- 2026-02-01: Added `nest status` command (StatusService + Rich output) with unit + E2E tests; repo lint/typecheck gates green
+- 2026-02-01: Code review - cleaned up incidental whitespace/import issues, fixed .gitignore to prevent test artifact commits

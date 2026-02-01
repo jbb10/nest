@@ -1,11 +1,17 @@
 """Tests for DoclingProcessor adapter."""
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from nest.adapters.protocols import DocumentProcessorProtocol
 from nest.core.models import ProcessingResult
+
+if TYPE_CHECKING:
+    from nest.adapters.docling_processor import DoclingProcessor
 
 
 class TestDocumentProcessorProtocolExists:
@@ -120,14 +126,14 @@ class TestDoclingProcessorProcessing:
     """Tests for DoclingProcessor document processing functionality."""
 
     @pytest.fixture
-    def processor(self) -> "DoclingProcessor":
+    def processor(self) -> DoclingProcessor:
         """Create a DoclingProcessor instance."""
         from nest.adapters.docling_processor import DoclingProcessor
 
         return DoclingProcessor()
 
     def test_process_creates_output_directory(
-        self, processor: "DoclingProcessor", tmp_path: Path
+        self, processor: DoclingProcessor, tmp_path: Path
     ) -> None:
         """Test that process creates parent directories for output."""
         # Create a simple HTML file (minimal test case)
@@ -143,7 +149,7 @@ class TestDoclingProcessorProcessing:
         assert output.parent.exists()
         assert output.exists()
 
-    def test_process_html_to_markdown(self, processor: "DoclingProcessor", tmp_path: Path) -> None:
+    def test_process_html_to_markdown(self, processor: DoclingProcessor, tmp_path: Path) -> None:
         """Test HTML file processing produces Markdown output."""
         source = tmp_path / "test.html"
         source.write_text(
@@ -174,7 +180,7 @@ class TestDoclingProcessorProcessing:
         assert len(content) > 0
 
     def test_process_nonexistent_file_returns_failed(
-        self, processor: "DoclingProcessor", tmp_path: Path
+        self, processor: DoclingProcessor, tmp_path: Path
     ) -> None:
         """Test that processing a nonexistent file returns failed result."""
         source = tmp_path / "does_not_exist.pdf"
@@ -188,7 +194,7 @@ class TestDoclingProcessorProcessing:
         assert result.output_path is None
 
     def test_process_invalid_format_returns_failed(
-        self, processor: "DoclingProcessor", tmp_path: Path
+        self, processor: DoclingProcessor, tmp_path: Path
     ) -> None:
         """Test that processing an unsupported format returns failed result."""
         source = tmp_path / "test.xyz"
@@ -201,7 +207,7 @@ class TestDoclingProcessorProcessing:
         assert result.error is not None
 
     def test_process_result_contains_source_path(
-        self, processor: "DoclingProcessor", tmp_path: Path
+        self, processor: DoclingProcessor, tmp_path: Path
     ) -> None:
         """Test that ProcessingResult always includes source_path."""
         source = tmp_path / "test.html"
@@ -217,20 +223,22 @@ class TestDoclingProcessorBase64Exclusion:
     """Tests for base64 image exclusion (AC8)."""
 
     @pytest.fixture
-    def processor(self) -> "DoclingProcessor":
+    def processor(self) -> DoclingProcessor:
         """Create a DoclingProcessor instance."""
         from nest.adapters.docling_processor import DoclingProcessor
 
         return DoclingProcessor()
 
     def test_html_with_embedded_image_excludes_base64(
-        self, processor: "DoclingProcessor", tmp_path: Path
+        self, processor: DoclingProcessor, tmp_path: Path
     ) -> None:
         """Test that HTML with embedded images produces clean Markdown without base64."""
         # Create HTML with a base64 embedded image
         source = tmp_path / "with_image.html"
         # Small 1x1 red pixel PNG encoded as base64
-        base64_img = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+        base64_img = (
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+        )
         source.write_text(
             f"""<!DOCTYPE html>
 <html>
@@ -254,7 +262,7 @@ class TestDoclingProcessorBase64Exclusion:
         assert base64_img not in content
 
     def test_output_does_not_contain_base64_patterns(
-        self, processor: "DoclingProcessor", tmp_path: Path
+        self, processor: DoclingProcessor, tmp_path: Path
     ) -> None:
         """Test that output Markdown never contains base64 data patterns."""
         import re

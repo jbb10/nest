@@ -57,7 +57,6 @@ class TestOrphanService:
         """Verify cleanup removes orphan files when source is missing and no_clean=False."""
         # Arrange
         project_root = tmp_path / "project"
-        sources_dir = project_root / "_nest_sources"
         output_dir = project_root / "_nest_context"
         orphan_file = output_dir / "orphan.md"
 
@@ -173,7 +172,7 @@ class TestOrphanService:
             return "valid.pdf" in str(self)
 
         with patch.object(Path, "exists", exists_check):
-            result = service.cleanup(no_clean=False)
+            service.cleanup(no_clean=False)
 
         # Assert - orphan entry removed, valid entry remains
         assert "_nest_sources/orphan.pdf" not in mock_manifest.manifest.files
