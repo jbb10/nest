@@ -271,6 +271,27 @@ def test_sync_skips_unchanged_files():
 
 **Integration Tests:** Use real Docling, run via `./scripts/ci-integration.sh`
 
+**🚨 DEV AGENT TESTING PROTOCOL (CRITICAL):**
+```
+NEVER run nest init|sync|status commands directly in the repository
+✗ FORBIDDEN: nest init "TestProject"  (pollutes repo with .nest_manifest.json)
+✗ FORBIDDEN: nest sync                (creates _nest_context/ artifacts in repo)
+
+✓ CORRECT: pytest tests/e2e/test_init_e2e.py   (runs in isolated temp workspace)
+✓ CORRECT: pytest -m e2e                        (E2E tests auto-cleanup)
+```
+
+**Rationale:**
+- E2E tests use isolated temp directories (auto-created/auto-cleaned)
+- Running nest commands in repo root creates test artifacts that pollute git
+- All CLI functionality MUST be verified via E2E tests
+- If debugging requires manual inspection, use `/tmp/nest-debug-{timestamp}` and DELETE after
+
+**E2E Test Fixtures (conftest.py):**
+- `e2e_workspace`: Creates isolated temp directory for each test
+- Automatically cleans up after test completion
+- Zero risk of repo pollution
+
 ---
 
 ### Git Workflow
