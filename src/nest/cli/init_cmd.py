@@ -7,8 +7,6 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-
-from nest.adapters.docling_downloader import DoclingModelDownloader
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.agents.vscode_writer import VSCodeAgentWriter
@@ -24,6 +22,8 @@ def create_init_service() -> InitService:
     Returns:
         Configured InitService with real adapters.
     """
+    from nest.adapters.docling_downloader import DoclingModelDownloader
+
     filesystem = FileSystemAdapter()
     return InitService(
         filesystem=filesystem,

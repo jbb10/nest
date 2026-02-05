@@ -7,6 +7,7 @@ temporary project directories.
 import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -52,7 +53,12 @@ class CLIResult:
     stderr: str
 
 
-def run_cli(args: list[str], cwd: Path, timeout: int = 300) -> CLIResult:
+def run_cli(
+    args: list[str],
+    cwd: Path,
+    timeout: int = 300,
+    env: dict[str, str] | None = None,
+) -> CLIResult:
     """Run a nest CLI command via subprocess.
 
     Args:
@@ -63,12 +69,26 @@ def run_cli(args: list[str], cwd: Path, timeout: int = 300) -> CLIResult:
     Returns:
         CLIResult with exit code, stdout, and stderr.
     """
+    repo_root = Path(__file__).resolve().parents[2]
+    src_path = repo_root / "src"
+
+    merged_env = os.environ.copy()
+    if env:
+        merged_env.update(env)
+
+    existing_pythonpath = merged_env.get("PYTHONPATH", "")
+    if existing_pythonpath:
+        merged_env["PYTHONPATH"] = f"{src_path}{os.pathsep}{existing_pythonpath}"
+    else:
+        merged_env["PYTHONPATH"] = str(src_path)
+
     result = subprocess.run(
-        ["nest", *args],
+        [sys.executable, "-m", "nest.cli.main", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
         timeout=timeout,
+        env=merged_env,
     )
     return CLIResult(
         exit_code=result.returncode,

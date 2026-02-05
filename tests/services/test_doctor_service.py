@@ -72,6 +72,21 @@ class TestUvInstallationCheck:
         assert status.current_value == "0.4.12"
         assert status.message is None
 
+    def test_uv_installed_with_unexpected_output_warns(self) -> None:
+        """uv version output without version should warn."""
+        service = DoctorService()
+
+        with patch("shutil.which", return_value="/usr/local/bin/uv"):
+            with patch("subprocess.run") as mock_run:
+                mock_run.return_value = MagicMock(returncode=0, stdout="uv\n")
+
+                status = service._check_uv_installation()
+
+        assert status.name == "uv"
+        assert status.status == "warning"
+        assert status.current_value == "found"
+        assert "determine" in status.message.lower()
+
     def test_uv_not_in_path(self) -> None:
         """uv not found should fail with helpful suggestion."""
         service = DoctorService()
@@ -119,11 +134,26 @@ class TestNestVersionCheck:
         service = DoctorService()
 
         with patch("nest.__version__", "1.0.0"):
-            status = service._check_nest_version()
+            with patch.object(service, "_fetch_latest_version", return_value=None):
+                status = service._check_nest_version()
 
         assert status.name == "Nest"
         assert status.status == "pass"
         assert status.current_value == "1.0.0"
+
+    def test_nest_version_update_available_warns(self) -> None:
+        """Newer Nest version should be reported as available."""
+        service = DoctorService()
+
+        with patch("nest.__version__", "1.0.0"):
+            with patch.object(service, "_fetch_latest_version", return_value="1.2.0"):
+                status = service._check_nest_version()
+
+        assert status.name == "Nest"
+        assert status.status == "warning"
+        assert status.current_value == "1.0.0"
+        assert "available" in (status.message or "")
+        assert status.suggestion is not None
 
 
 class TestCheckEnvironment:

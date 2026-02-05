@@ -1,6 +1,6 @@
 # Story 3.2: Environment Validation
 
-Status: review
+Status: done
 Branch: feat/3-2-environment-validation
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -531,6 +531,17 @@ N/A - Implementation proceeded without issues
 - Ruff linting: ✓ All checks passed
 - Pyright type checking: ✓ 0 errors, 0 warnings
 
+**Review Fixes (2026-02-05):**
+- Added non-blocking latest-version lookup for Nest with safe fallback
+- Hardened uv version parsing for unexpected output
+- Updated doctor E2E tests to run CLI and validate output
+- Added E2E helper support for env overrides and repo-local CLI execution
+- Deferred Docling imports in CLI commands to keep `nest doctor` available without Docling
+
+**Review Fixes Test Results:**
+- `pytest tests/services/test_doctor_service.py`
+- `pytest tests/e2e/test_doctor_e2e.py -m e2e`
+
 ### File List
 
 **New Source Files:**
@@ -540,6 +551,9 @@ N/A - Implementation proceeded without issues
 
 **Modified Source Files:**
 - src/nest/cli/main.py (added doctor command registration)
+- src/nest/services/doctor_service.py (latest version check + uv parsing)
+- src/nest/cli/init_cmd.py (lazy Docling import)
+- src/nest/cli/sync_cmd.py (lazy Docling import)
 
 **New Test Files:**
 - tests/cli/test_doctor_cmd.py (4 tests)
@@ -547,4 +561,9 @@ N/A - Implementation proceeded without issues
 - tests/services/test_doctor_service.py (11 tests)
 - tests/ui/test_doctor_display.py (4 tests)
 
-**Total:** 3 new source files, 1 modified source file, 4 new test files
+**Modified Test Files:**
+- tests/e2e/conftest.py (env overrides + repo-local CLI execution)
+- tests/e2e/test_doctor_e2e.py (CLI-based E2E assertions)
+- tests/services/test_doctor_service.py (update-available + uv parsing tests)
+
+**Total:** 3 new source files, 4 modified source files, 4 new test files, 3 modified test files

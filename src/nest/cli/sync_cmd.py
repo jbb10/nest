@@ -9,8 +9,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
-
-from nest.adapters.docling_processor import DoclingProcessor
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
@@ -67,6 +65,8 @@ def create_sync_service(
         Configured SyncService with real adapters.
     """
     # Adapters: External system wrappers
+    from nest.adapters.docling_processor import DoclingProcessor
+
     filesystem = FileSystemAdapter()
     manifest_adapter = ManifestAdapter()
     processor = DoclingProcessor()

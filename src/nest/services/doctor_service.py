@@ -1,8 +1,12 @@
 """Doctor service for environment and project validation."""
 
+import json
+import re
 import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from typing import Literal
 
@@ -103,11 +107,19 @@ class DoctorService:
 
             if result.returncode == 0:
                 # Parse version from "uv 0.4.12 (abc123)"
-                version = result.stdout.strip().split()[1]
+                parts = result.stdout.strip().split()
+                if len(parts) >= 2:
+                    version = parts[1]
+                    return EnvironmentStatus(
+                        name="uv",
+                        status="pass",
+                        current_value=version,
+                    )
                 return EnvironmentStatus(
                     name="uv",
-                    status="pass",
-                    current_value=version,
+                    status="warning",
+                    current_value="found",
+                    message="could not determine version",
                 )
             else:
                 return EnvironmentStatus(
@@ -130,8 +142,80 @@ class DoctorService:
         Returns:
             Environment status for Nest version check.
         """
+        current_version = nest.__version__
+        latest_version = self._fetch_latest_version()
+
+        if latest_version and self._is_newer_version(latest_version, current_version):
+            return EnvironmentStatus(
+                name="Nest",
+                status="warning",
+                current_value=current_version,
+                message=f"{latest_version} available",
+                suggestion="Run `nest update` to upgrade",
+            )
+
         return EnvironmentStatus(
             name="Nest",
             status="pass",
-            current_value=nest.__version__,
+            current_value=current_version,
         )
+
+    def _fetch_latest_version(self) -> str | None:
+        """Fetch the latest Nest version from PyPI.
+
+        Returns:
+            Latest version string or None if unavailable.
+        """
+        url = "https://pypi.org/pypi/nest/json"
+        request = urllib.request.Request(url, headers={"User-Agent": "nest-doctor"})
+        try:
+            with urllib.request.urlopen(request, timeout=2) as response:
+                if response.status != 200:
+                    return None
+                data = json.loads(response.read().decode("utf-8"))
+        except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+            return None
+
+        version = data.get("info", {}).get("version")
+        if isinstance(version, str) and version:
+            return version
+        return None
+
+    def _is_newer_version(self, latest: str, current: str) -> bool:
+        """Compare two version strings.
+
+        Args:
+            latest: Latest available version string.
+            current: Current installed version string.
+
+        Returns:
+            True if latest is newer than current.
+        """
+        latest_parts = self._parse_version(latest)
+        current_parts = self._parse_version(current)
+
+        if latest_parts is None or current_parts is None:
+            return False
+
+        return latest_parts > current_parts
+
+    def _parse_version(self, version: str) -> tuple[int, ...] | None:
+        """Parse a version string into comparable numeric parts.
+
+        Args:
+            version: Version string to parse.
+
+        Returns:
+            Tuple of numeric parts or None if parsing fails.
+        """
+        normalized = version.strip().lstrip("v")
+        parts = re.split(r"[.+-]", normalized)
+        numbers: list[int] = []
+
+        for part in parts:
+            if part.isdigit():
+                numbers.append(int(part))
+            else:
+                break
+
+        return tuple(numbers) if numbers else None
