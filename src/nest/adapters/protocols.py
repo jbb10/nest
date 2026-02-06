@@ -358,3 +358,70 @@ class ModelCheckerProtocol(Protocol):
             "not_created" if directory doesn't exist.
         """
         ...
+
+
+@runtime_checkable
+class ProjectCheckerProtocol(Protocol):
+    """Protocol for project state validation.
+
+    Implementations handle checking project manifest, agent file,
+    and folder structure for diagnostics.
+    """
+
+    def manifest_exists(self, project_dir: Path) -> bool:
+        """Check if manifest file exists.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            True if .nest_manifest.json exists, False otherwise.
+        """
+        ...
+
+    def load_manifest(self, project_dir: Path) -> Manifest:
+        """Load manifest from file.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            The loaded Manifest instance.
+
+        Raises:
+            ManifestError: If manifest file is invalid or corrupt.
+        """
+        ...
+
+    def agent_file_exists(self, project_dir: Path) -> bool:
+        """Check if agent file exists.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            True if .github/agents/nest.agent.md exists, False otherwise.
+        """
+        ...
+
+    def source_folder_exists(self, project_dir: Path) -> bool:
+        """Check if source folder exists.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            True if _nest_sources/ directory exists, False otherwise.
+        """
+        ...
+
+    def context_folder_exists(self, project_dir: Path) -> bool:
+        """Check if context folder exists.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            True if _nest_context/ directory exists, False otherwise.
+        """
+        ...

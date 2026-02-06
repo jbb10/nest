@@ -120,9 +120,7 @@ class StatusService:
 
         supported = {ext.lower() for ext in SUPPORTED_EXTENSIONS}
         source_files = [
-            p
-            for p in self._filesystem.list_files(sources_dir)
-            if p.suffix.lower() in supported
+            p for p in self._filesystem.list_files(sources_dir) if p.suffix.lower() in supported
         ]
 
         new_count = 0

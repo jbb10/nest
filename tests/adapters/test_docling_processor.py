@@ -236,9 +236,7 @@ class TestDoclingProcessorBase64Exclusion:
         # Create HTML with a base64 embedded image
         source = tmp_path / "with_image.html"
         # Small 1x1 red pixel PNG encoded as base64
-        base64_img = (
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
-        )
+        base64_img = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
         source.write_text(
             f"""<!DOCTYPE html>
 <html>

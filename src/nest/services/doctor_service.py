@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import Literal
 
 import nest
-from nest.adapters.protocols import ModelCheckerProtocol
+from nest.adapters.protocols import ModelCheckerProtocol, ProjectCheckerProtocol
+from nest.core.exceptions import ManifestError
 
 
 @dataclass
@@ -37,9 +38,7 @@ class EnvironmentReport:
     @property
     def all_pass(self) -> bool:
         """True if all checks passed (no failures)."""
-        return all(
-            check.status != "fail" for check in [self.python, self.uv, self.nest]
-        )
+        return all(check.status != "fail" for check in [self.python, self.uv, self.nest])
 
 
 @dataclass
@@ -65,17 +64,62 @@ class ModelReport:
         return self.models.cached
 
 
+@dataclass
+class ProjectStatus:
+    """Status for project state validation."""
+
+    manifest_status: Literal[
+        "valid", "missing", "invalid_json", "invalid_structure", "version_mismatch"
+    ]
+    manifest_version: str | None
+    current_version: str
+    agent_file_present: bool
+    folders_status: Literal["intact", "sources_missing", "context_missing", "both_missing"]
+    suggestions: list[str]
+
+
+@dataclass
+class ProjectReport:
+    """Complete project state validation report."""
+
+    status: ProjectStatus
+
+    @property
+    def all_pass(self) -> bool:
+        """True if manifest valid, agent present, folders intact."""
+        return (
+            self.status.manifest_status == "valid"
+            and self.status.agent_file_present
+            and self.status.folders_status == "intact"
+        )
+
+    @property
+    def has_warnings(self) -> bool:
+        """True if only warnings (no errors)."""
+        return (
+            self.status.manifest_status in ("valid", "version_mismatch")
+            and self.status.folders_status == "intact"
+        )
+
+
 class DoctorService:
     """Validates development environment and project state."""
 
-    def __init__(self, model_checker: ModelCheckerProtocol | None = None) -> None:
+    def __init__(
+        self,
+        model_checker: ModelCheckerProtocol | None = None,
+        project_checker: ProjectCheckerProtocol | None = None,
+    ) -> None:
         """Initialize doctor service.
 
         Args:
             model_checker: Optional model checker for ML validation.
                           If None, model checks will be skipped.
+            project_checker: Optional project checker for project validation.
+                            If None, project checks will be skipped.
         """
         self._model_checker = model_checker
+        self._project_checker = project_checker
 
     def check_environment(self) -> EnvironmentReport:
         """Check Python, uv, and Nest versions.
@@ -282,5 +326,75 @@ class DoctorService:
                 cache_path=cache_path,
                 cache_status=cache_status,
                 suggestion=suggestion,
+            )
+        )
+
+    def check_project(self, project_dir: Path) -> ProjectReport | None:
+        """Check project state.
+
+        Args:
+            project_dir: Path to project root directory.
+
+        Returns:
+            ProjectReport if project checker is configured, None otherwise.
+        """
+        if self._project_checker is None:
+            return None
+
+        suggestions: list[str] = []
+
+        # Check manifest
+        if not self._project_checker.manifest_exists(project_dir):
+            manifest_status = "missing"
+            manifest_version = None
+            suggestions.append("Run `nest init` to create project")
+        else:
+            try:
+                manifest = self._project_checker.load_manifest(project_dir)
+                manifest_version = manifest.nest_version
+
+                # Check version compatibility
+                if manifest_version != nest.__version__:
+                    manifest_status = "version_mismatch"
+                    suggestions.append("Run `nest update` to migrate")
+                else:
+                    manifest_status = "valid"
+            except ManifestError as e:
+                if "invalid JSON" in str(e) or "JSON" in str(e):
+                    manifest_status = "invalid_json"
+                else:
+                    manifest_status = "invalid_structure"
+                manifest_version = None
+                suggestions.append("Run `nest doctor --fix` to rebuild")
+
+        # Check agent file
+        agent_present = self._project_checker.agent_file_exists(project_dir)
+        if not agent_present:
+            suggestions.append("Run `nest init` to regenerate agent file")
+
+        # Check folders
+        sources_exist = self._project_checker.source_folder_exists(project_dir)
+        context_exist = self._project_checker.context_folder_exists(project_dir)
+
+        if sources_exist and context_exist:
+            folders_status = "intact"
+        elif not sources_exist and not context_exist:
+            folders_status = "both_missing"
+            suggestions.append("Run `nest init` to recreate folders")
+        elif not sources_exist:
+            folders_status = "sources_missing"
+            suggestions.append("Run `nest init` to recreate _nest_sources/")
+        else:
+            folders_status = "context_missing"
+            suggestions.append("Run `nest init` to recreate _nest_context/")
+
+        return ProjectReport(
+            status=ProjectStatus(
+                manifest_status=manifest_status,
+                manifest_version=manifest_version,
+                current_version=nest.__version__,
+                agent_file_present=agent_present,
+                folders_status=folders_status,
+                suggestions=suggestions,
             )
         )

@@ -62,9 +62,7 @@ class DiscoveryService:
 
         # Discover files in sources directory
         sources_dir = project_dir / SOURCES_DIR
-        discovered_paths = self._file_discovery.discover(
-            sources_dir, set(SUPPORTED_EXTENSIONS)
-        )
+        discovered_paths = self._file_discovery.discover(sources_dir, set(SUPPORTED_EXTENSIONS))
 
         # Classify each discovered file
         result = DiscoveryResult()
