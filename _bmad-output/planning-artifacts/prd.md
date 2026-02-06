@@ -78,7 +78,13 @@ my-project/
 ## 4. Feature Specifications
 
 ### 4.1 Command: `nest init`
-**Trigger:** `nest init "Project Name"`
+**Trigger:** `nest init "Project Name" [OPTIONS]`
+
+**Options:**
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dir`, `-d` | Current directory | Target directory for project initialization |
+
 **Behavior:**
 1.  Creates directories: `_nest_sources/`, `_nest_context/`.
 2.  Creates `.github/agents/nest.agent.md`.
@@ -104,31 +110,49 @@ name: nest
 description: Expert analyst for [Project Name] project documents
 icon: book
 ---
-# ROLE
-You are the dedicated AI analyst for [Project Name].
-Your goal is to assist the user by navigating and synthesizing the project documentation located in `processed_context/`.
 
-# KNOWLEDGE BASE
-- Your entire world of knowledge is located in the `_nest_context/` directory.
-- **STEP 1:** Always read `_nest_context/00_MASTER_INDEX.md` first to understand what files are available.
-- **STEP 2:** Retrieve the specific files you need to answer the user's question.
+# Nest — Project Document Analyst
 
-# BEHAVIOR
-- **Citation:** Always cite the filename you used (e.g. "Source: `Q3_Report.md`").
-- **Honesty:** If the information is not in the files, state "I cannot find that in the provided documents."
-- **Focus:** Do not offer general coding advice unless it relates to the project context.
+You are an expert document analyst specialized in the [Project Name] project. Your role is to help users understand, search, and extract insights from project documents.
 
-# FORBIDDEN FILES (Never Read These)
-Your context window is precious. These files contain no useful content for answering user questions:
+## Core Responsibilities
 
-**Nest System Files:**
-- `.nest_manifest.json` — CLI metadata, just checksums and timestamps
-- `.nest_errors.log` — Internal error log
+1. **Start with the Index:** Always begin by reading `_nest_context/00_MASTER_INDEX.md` to understand available documents
+2. **Cite Sources:** When answering, always cite the specific filename(s) used
+3. **Navigate Structure:** Documents mirror the structure in `_nest_sources/` — use this to find related files
+4. **Stay Focused:** Never read `_nest_sources/` (raw documents) or system files (`.nest_manifest.json`, `.nest_errors.log`)
 
-**Raw Source Files:**
-- `_nest_sources/**` — Never read files from this folder. Always use the processed Markdown versions in `_nest_context/` instead. The raw files are PDFs/Excel/etc. that you cannot parse properly.
+## Response Guidelines
 
-**If you find yourself wanting to read any of these, STOP and reconsider. The answer to the user's question is in `_nest_context/`.**
+- **Found Information:** Provide answer with clear citations: "According to contracts/acme-sow-v2.md..."
+- **Not Found:** Be honest: "I cannot find information about X in the available documents. I checked: [list files]."
+- **Multiple Sources:** When information spans files, cite all relevant sources
+- **Clarification Needed:** Ask clarifying questions if the user's query is ambiguous
+
+## Technical Context
+
+- All files in `_nest_context/` are Markdown conversions of original documents or user-curated content
+- Tables from PDFs/Excel are converted to Markdown table format
+- File paths are relative to `_nest_context/` directory
+- The index is regenerated after each `nest sync` command
+
+## Example Interactions
+
+**User:** "What's the T&M rate cap in the SOW?"
+**You:** "According to `contracts/acme-sow-v2.md` (Section 4.2), the blended T&M rate is capped at $185/hour, with a 3% annual escalation clause. (Source: contracts/acme-sow-v2.md)"
+
+**User:** "What did we commit to in the RFP response about data migration?"
+**You:** "In `rfp-response/technical-approach.md` (Section 3.4), we committed to: 1) Full historical data migration for the past 7 years, 2) Data validation with <0.1% error tolerance, 3) Parallel run period of 30 days. (Source: rfp-response/technical-approach.md)"
+
+**User:** "What were the key risks identified in discovery?"
+**You:** "I found risk assessments in `discovery/current-state-assessment.md` and `discovery/stakeholder-interviews.md`. The top risks identified were: [details from both sources]."
+
+**User:** "When is the go-live date?"
+**You:** "I cannot find a specific go-live date in the available documents. I checked the SOW, project charter, and status reports. Would you like me to search for milestone or timeline information instead?"
+
+---
+
+**Remember:** Your strength is thorough document analysis with accurate citations. Always be precise, cite sources, and honest about limitations.
 ```
 
 ### 4.2 Command: `nest sync`
@@ -138,9 +162,10 @@ Your context window is precious. These files contain no useful content for answe
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--on-error` | `skip` | Error handling: `skip` (continue processing), `fail` (abort on first error) |
-| `--no-clean` | (clean is ON) | Disable orphan cleanup (by default, files are removed from `processed_context/` when source is deleted) |
+| `--no-clean` | (clean is ON) | Disable orphan cleanup (by default, files are removed from `_nest_context/` when source is deleted) |
 | `--dry-run` | `false` | Show what would be processed without making changes |
 | `--force` | `false` | Re-process all files regardless of checksum (ignore manifest) |
+| `--dir`, `-d` | Current directory | Target directory for sync operation |
 
 **Behavior:**
 1.  **Scan:** Recursively scans `_nest_sources/` for supported files (`.pdf`, `.docx`, `.pptx`, `.xlsx`, `.html`).
@@ -193,16 +218,13 @@ _nest_sources/                  _nest_context/
 }
 ```
 
-### 4.3 Command: `nest upgrade`
-**Trigger:** `nest upgrade`
-**Behavior:**
-1.  Runs `uv tool upgrade nest`.
-2.  Checks if the local `.github/agents/nest.agent.md` is outdated compared to the latest template.
-3.  If outdated, prompts: `Agent template has changed. Update? [y/N]`
-4.  Checks manifest version and warns if migration is needed.
+### 4.3 Command: `nest status`
+**Trigger:** `nest status [OPTIONS]`
 
-### 4.4 Command: `nest status`
-**Trigger:** `nest status`
+**Options:**
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dir`, `-d` | Current directory | Target directory for status operation |
 **Behavior:** Displays current project state at a glance.
 
 **Example Output:**
@@ -210,59 +232,27 @@ _nest_sources/                  _nest_context/
 📁 Project: Nike
    Nest Version: 1.0.0
 
-   Raw Inbox:
-   ├─ Total files:    47
-   ├─ New:            12  (not yet processed)
-   ├─ Modified:        3  (source changed since last sync)
-   └─ Unchanged:      32
+   Sources:
+   ├─ Total files: 47
+   ├─ New: 12
+   ├─ Modified: 3
+   └─ Unchanged: 32
 
-   Processed Context:
-   ├─ Files:          32
-   ├─ Orphaned:        2  (source deleted, run --clean to remove)
-   └─ Last sync:       2 hours ago
+   Context:
+   ├─ Files: 32
+   ├─ Orphaned: 2
+   └─ Last sync: 2 hours ago
 
    Run `nest sync` to process 15 pending files.
 ```
-
-### 4.5 Command: `nest doctor`
-**Trigger:** `nest doctor`
-**Behavior:** Validates environment and dependencies.
-
-**Example Output:**
-```
-🩺 Nest Doctor
-
-   Environment:
-   ├─ Python:         3.11.4 ✓
-   ├─ uv:             0.4.12 ✓
-   └─ Nest:           1.0.0 ✓
-
-   ML Models:
-   ├─ TableFormer:    cached ✓ (892MB)
-   ├─ LayoutLM:       cached ✓ (645MB)
-   └─ Cache path:     ~/.cache/docling/
-
-   Project:
-   ├─ Manifest:       valid ✓
-   ├─ Agent file:     present ✓
-   └─ Folders:        intact ✓
-
-   ✓ All systems operational.
-```
-
-**Error States Detected:**
-* Missing ML models → offers to download
-* Corrupt manifest → offers to rebuild
-* Missing agent file → offers to regenerate
-* Version mismatch → suggests `nest upgrade`
 
 **Implementation Note (DRY Principle):**
 The following operations must be implemented as **reusable internal components** shared across commands:
 | Component | Used By |
 |-----------|---------|
-| `download_models()` | `nest init`, `nest doctor` |
-| `build_manifest()` | `nest init`, `nest sync`, `nest doctor` |
-| `generate_agent_file()` | `nest init`, `nest doctor`, `nest upgrade` |
+| `download_models()` | `nest init` |
+| `build_manifest()` | `nest init`, `nest sync` |
+| `generate_agent_file()` | `nest init` |
 | `compute_checksum()` | `nest sync`, `nest status` |
 | `generate_index()` | `nest sync` |
 
@@ -402,6 +392,8 @@ policies/hr_handbook.md
 ---
 
 ## 7. Roadmap (Post-V1)
+* **`nest doctor` Command:** Validate environment, ML models, manifest integrity, and agent file presence. Offer to fix detected issues.
+* **`nest upgrade` Command:** Run `uv tool upgrade nest`, check for agent template updates, and handle manifest migrations.
 * **Image Captioning:** Use a local VLM or API to describe charts in PDFs.
 * **Recursive Sync:** Watch the folder for changes automatically (Daemon mode).
 * **Semantic Search:** Generate a local vector index (ChromaDB) for projects with >1000 files where linear scanning of `MASTER_INDEX` fails.
