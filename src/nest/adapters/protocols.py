@@ -5,7 +5,7 @@ Services depend on these protocols, not concrete implementations.
 """
 
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 from nest.core.models import Manifest, ProcessingResult
 
@@ -350,7 +350,7 @@ class ModelCheckerProtocol(Protocol):
         """
         ...
 
-    def get_cache_status(self) -> str:
+    def get_cache_status(self) -> Literal["exists", "empty", "not_created"]:
         """Get cache directory status.
 
         Returns:

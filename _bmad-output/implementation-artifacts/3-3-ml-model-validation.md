@@ -481,7 +481,12 @@ Claude Sonnet 4.5
 
 ### Debug Log References
 
-No blocking issues encountered.
+**Code Review Fixes (2026-02-06):**
+- Fixed architecture violation: Removed duplicate `ModelCheckerProtocol` from `doctor_service.py`
+- Added import of `ModelCheckerProtocol` from `adapters.protocols`
+- Fixed type signature: Updated `get_cache_status()` return type to `Literal["exists", "empty", "not_created"]`
+- Updated File List to document all changed files including deleted agent file
+- All tests passing (324), pyright clean, ruff clean
 
 ### Completion Notes List
 
@@ -513,7 +518,7 @@ No blocking issues encountered.
 ### File List
 
 #### Modified Files
-- `src/nest/services/doctor_service.py` - Added ModelStatus, ModelReport, ModelCheckerProtocol, check_ml_models()
+- `src/nest/services/doctor_service.py` - Added ModelStatus, ModelReport, check_ml_models(), imports ModelCheckerProtocol
 - `src/nest/adapters/docling_downloader.py` - Added get_cache_size(), get_cache_status()
 - `src/nest/adapters/protocols.py` - Added ModelCheckerProtocol
 - `src/nest/cli/doctor_cmd.py` - Injected DoclingModelDownloader, called check_ml_models()
@@ -522,6 +527,8 @@ No blocking issues encountered.
 - `tests/services/test_doctor_service.py` - Added TestModelValidation class with 6 tests
 - `tests/adapters/test_docling_downloader.py` - Added TestGetCacheSize and TestGetCacheStatus classes
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` - Updated story status
+- `_bmad-output/implementation-artifacts/3-3-ml-model-validation.md` - Story file updates
+- `.github/agents/nest.agent.md` - Deleted (leftover test fixture)
 
 #### New Files
 - `tests/ui/test_doctor_display.py` - Created with 9 tests for display functionality
@@ -540,4 +547,4 @@ No blocking issues encountered.
 
 ### Status
 
-review
+done

@@ -9,9 +9,10 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Literal
 
 import nest
+from nest.adapters.protocols import ModelCheckerProtocol
 
 
 @dataclass
@@ -62,26 +63,6 @@ class ModelReport:
     def all_pass(self) -> bool:
         """True if models are cached."""
         return self.models.cached
-
-
-class ModelCheckerProtocol(Protocol):
-    """Protocol for ML model cache operations."""
-
-    def are_models_cached(self) -> bool:
-        """Check if models are cached."""
-        ...
-
-    def get_cache_path(self) -> Path:
-        """Get cache directory path."""
-        ...
-
-    def get_cache_size(self) -> int:
-        """Get total cache size in bytes."""
-        ...
-
-    def get_cache_status(self) -> Literal["exists", "empty", "not_created"]:
-        """Get cache directory status."""
-        ...
 
 
 class DoctorService:
