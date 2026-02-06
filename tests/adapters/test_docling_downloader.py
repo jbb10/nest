@@ -175,3 +175,108 @@ class TestDoclingModelDownloader:
 
         assert "Insufficient disk space" in str(exc_info.value)
         assert "2500MB required" in str(exc_info.value)
+
+
+class TestGetCacheSize:
+    """Tests for get_cache_size() method."""
+
+    def test_get_cache_size_with_files(self, tmp_path: Path) -> None:
+        """Test cache size calculation with files in cache."""
+        downloader = DoclingModelDownloader()
+
+        # Create cache directory structure with files
+        cache_dir = tmp_path / "models"
+        cache_dir.mkdir(parents=True)
+
+        # Create some files with known sizes
+        (cache_dir / "model1.bin").write_bytes(b"x" * 1000)  # 1000 bytes
+        (cache_dir / "model2.bin").write_bytes(b"y" * 2000)  # 2000 bytes
+
+        subdir = cache_dir / "subfolder"
+        subdir.mkdir()
+        (subdir / "model3.bin").write_bytes(b"z" * 500)  # 500 bytes
+
+        with patch("nest.adapters.docling_downloader.settings") as mock_settings:
+            mock_settings.cache_dir = tmp_path
+            size = downloader.get_cache_size()
+
+        assert size == 3500  # 1000 + 2000 + 500
+
+    def test_get_cache_size_empty_directory(self, tmp_path: Path) -> None:
+        """Test cache size returns 0 for empty directory."""
+        downloader = DoclingModelDownloader()
+
+        cache_dir = tmp_path / "models"
+        cache_dir.mkdir(parents=True)
+
+        with patch("nest.adapters.docling_downloader.settings") as mock_settings:
+            mock_settings.cache_dir = tmp_path
+            size = downloader.get_cache_size()
+
+        assert size == 0
+
+    def test_get_cache_size_nonexistent_directory(self, tmp_path: Path) -> None:
+        """Test cache size returns 0 when cache doesn't exist."""
+        downloader = DoclingModelDownloader()
+
+        with patch("nest.adapters.docling_downloader.settings") as mock_settings:
+            mock_settings.cache_dir = tmp_path
+            size = downloader.get_cache_size()
+
+        assert size == 0
+
+
+class TestGetCacheStatus:
+    """Tests for get_cache_status() method."""
+
+    def test_get_cache_status_not_created(self, tmp_path: Path) -> None:
+        """Test cache status when directory doesn't exist."""
+        downloader = DoclingModelDownloader()
+
+        with patch("nest.adapters.docling_downloader.settings") as mock_settings:
+            mock_settings.cache_dir = tmp_path
+            status = downloader.get_cache_status()
+
+        assert status == "not_created"
+
+    def test_get_cache_status_empty(self, tmp_path: Path) -> None:
+        """Test cache status when directory is empty."""
+        downloader = DoclingModelDownloader()
+
+        cache_dir = tmp_path / "models"
+        cache_dir.mkdir(parents=True)
+
+        with patch("nest.adapters.docling_downloader.settings") as mock_settings:
+            mock_settings.cache_dir = tmp_path
+            status = downloader.get_cache_status()
+
+        assert status == "empty"
+
+    def test_get_cache_status_exists(self, tmp_path: Path) -> None:
+        """Test cache status when directory has files."""
+        downloader = DoclingModelDownloader()
+
+        cache_dir = tmp_path / "models"
+        cache_dir.mkdir(parents=True)
+        (cache_dir / "model.bin").write_bytes(b"content")
+
+        with patch("nest.adapters.docling_downloader.settings") as mock_settings:
+            mock_settings.cache_dir = tmp_path
+            status = downloader.get_cache_status()
+
+        assert status == "exists"
+
+    def test_get_cache_status_with_only_subdirectories(self, tmp_path: Path) -> None:
+        """Test cache status treats empty subdirectories as empty."""
+        downloader = DoclingModelDownloader()
+
+        cache_dir = tmp_path / "models"
+        cache_dir.mkdir(parents=True)
+        (cache_dir / "subdir").mkdir()  # Empty subdirectory
+
+        with patch("nest.adapters.docling_downloader.settings") as mock_settings:
+            mock_settings.cache_dir = tmp_path
+            status = downloader.get_cache_status()
+
+        # Should be "empty" since only directories exist, no files
+        assert status == "empty"
