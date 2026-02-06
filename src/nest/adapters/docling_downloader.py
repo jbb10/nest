@@ -6,6 +6,7 @@ Wraps Docling's download_models() utility for ML model management.
 import shutil
 import time
 from pathlib import Path
+from typing import Literal
 
 from docling.datamodel.settings import settings
 from docling.utils.model_downloader import download_models
@@ -137,3 +138,38 @@ class DoclingModelDownloader:
         cache_dir = self.get_cache_path()
         if cache_dir.exists():
             shutil.rmtree(cache_dir, ignore_errors=True)
+
+    def get_cache_size(self) -> int:
+        """Get total size of cached models in bytes.
+
+        Returns:
+            Total size in bytes, 0 if cache doesn't exist or is empty.
+        """
+        cache_dir = self.get_cache_path()
+        if not cache_dir.exists():
+            return 0
+
+        total_size = 0
+        for file_path in cache_dir.rglob("*"):
+            if file_path.is_file():
+                total_size += file_path.stat().st_size
+
+        return total_size
+
+    def get_cache_status(self) -> Literal["exists", "empty", "not_created"]:
+        """Get status of cache directory.
+
+        Returns:
+            "not_created" if directory doesn't exist,
+            "empty" if directory exists but has no files,
+            "exists" if directory has content.
+        """
+        cache_dir = self.get_cache_path()
+
+        if not cache_dir.exists():
+            return "not_created"
+
+        # Check if any files exist (not just directories)
+        has_files = any(path.is_file() for path in cache_dir.rglob("*"))
+        return "exists" if has_files else "empty"
+

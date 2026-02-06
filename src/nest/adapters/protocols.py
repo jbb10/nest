@@ -316,3 +316,45 @@ class FileDiscoveryProtocol(Protocol):
             ... )
         """
         ...
+
+
+@runtime_checkable
+class ModelCheckerProtocol(Protocol):
+    """Protocol for ML model cache operations.
+
+    Implementations handle checking model cache status, calculating sizes,
+    and determining cache directory state for diagnostics.
+    """
+
+    def are_models_cached(self) -> bool:
+        """Check if models are cached.
+
+        Returns:
+            True if all required models are cached, False otherwise.
+        """
+        ...
+
+    def get_cache_path(self) -> Path:
+        """Get cache directory path.
+
+        Returns:
+            Path to the model cache directory.
+        """
+        ...
+
+    def get_cache_size(self) -> int:
+        """Get total cache size in bytes.
+
+        Returns:
+            Total size of cached models in bytes, 0 if cache doesn't exist.
+        """
+        ...
+
+    def get_cache_status(self) -> str:
+        """Get cache directory status.
+
+        Returns:
+            "exists" if cache has files, "empty" if directory exists but empty,
+            "not_created" if directory doesn't exist.
+        """
+        ...

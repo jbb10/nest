@@ -75,7 +75,7 @@ development_status:
   epic-3: in-progress
   3-1-project-status-display: done
   3-2-environment-validation: done
-  3-3-ml-model-validation: backlog
+  3-3-ml-model-validation: review
   3-4-project-state-validation: backlog
   3-5-issue-remediation: backlog
   3-6-doctor-command-cli-integration: backlog
