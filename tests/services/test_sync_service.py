@@ -89,9 +89,7 @@ class TestSyncDiscovery:
 
         # Pre-calculated changes
         changes = DiscoveryResult(
-            new_files=[
-                DiscoveredFile(path=Path("/app/raw/a.pdf"), checksum="111", status="new")
-            ],
+            new_files=[DiscoveredFile(path=Path("/app/raw/a.pdf"), checksum="111", status="new")],
             modified_files=[],
             unchanged_files=[],
         )

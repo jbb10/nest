@@ -1,5 +1,6 @@
 """Tests for doctor display helpers."""
 
+from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -10,11 +11,24 @@ from nest.services.doctor_service import (
     EnvironmentStatus,
     ModelReport,
     ModelStatus,
+    ProjectReport,
+    ProjectStatus,
 )
 from nest.ui.doctor_display import (
     display_doctor_report,
     format_size,
 )
+
+
+def _render_report(
+    env_report: EnvironmentReport,
+    model_report: ModelReport | None = None,
+    project_report: ProjectReport | None = None,
+) -> str:
+    buffer = StringIO()
+    console = Console(file=buffer, force_terminal=False, color_system=None, width=120)
+    display_doctor_report(env_report, console, model_report, project_report)
+    return buffer.getvalue()
 
 
 class TestFormatSize:
@@ -150,3 +164,89 @@ class TestDisplayDoctorReport:
 
         # Should not raise any exceptions
         display_doctor_report(env_report, console, None)
+
+
+class TestDisplayProjectReport:
+    """Tests for project report display functionality."""
+
+    def test_display_doctor_report_with_valid_project(self) -> None:
+        """Test display with project report showing valid project."""
+        env_report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+        )
+
+        project_report = ProjectReport(
+            status=ProjectStatus(
+                manifest_status="valid",
+                manifest_version="1.0.0",
+                current_version="1.0.0",
+                agent_file_present=True,
+                folders_status="intact",
+                suggestions=[],
+            )
+        )
+
+        output = _render_report(env_report, None, project_report)
+        assert "Project" in output
+        assert "Manifest: valid" in output
+        assert "Agent file: present" in output
+        assert "Folders: intact" in output
+
+    def test_display_doctor_report_with_issues(self) -> None:
+        """Test display with project report showing multiple issues."""
+        env_report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+        )
+
+        project_report = ProjectReport(
+            status=ProjectStatus(
+                manifest_status="missing",
+                manifest_version=None,
+                current_version="1.0.0",
+                agent_file_present=False,
+                folders_status="sources_missing",
+                suggestions=[
+                    "Run `nest init` to create project",
+                    "Run `nest init` to regenerate agent file",
+                    "Run `nest init` to recreate _nest_sources/",
+                ],
+            )
+        )
+
+        output = _render_report(env_report, None, project_report)
+        assert "Project" in output
+        assert "Manifest: missing" in output
+        assert "Agent file: missing" in output
+        assert "Folders: _nest_sources/ missing" in output
+        assert "→ Run `nest init` to create project" in output
+        assert "→ Run `nest init` to regenerate agent file" in output
+        assert "→ Run `nest init` to recreate _nest_sources/" in output
+
+    def test_display_doctor_report_with_version_mismatch(self) -> None:
+        """Test display with project report showing version mismatch."""
+        env_report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+        )
+
+        project_report = ProjectReport(
+            status=ProjectStatus(
+                manifest_status="version_mismatch",
+                manifest_version="0.9.0",
+                current_version="1.0.0",
+                agent_file_present=True,
+                folders_status="intact",
+                suggestions=["Run `nest update` to migrate"],
+            )
+        )
+
+        output = _render_report(env_report, None, project_report)
+        assert "Project" in output
+        assert "Manifest: v0.9.0" in output
+        assert "migration available" in output
+        assert "→ Run `nest update` to migrate" in output

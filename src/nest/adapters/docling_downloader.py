@@ -172,4 +172,3 @@ class DoclingModelDownloader:
         # Check if any files exist (not just directories)
         has_files = any(path.is_file() for path in cache_dir.rglob("*"))
         return "exists" if has_files else "empty"
-

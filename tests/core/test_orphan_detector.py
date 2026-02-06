@@ -36,8 +36,10 @@ class TestOrphanDetector:
         with patch.object(Path, "exists") as mock_exists:
             # valid.pdf exists, orphan_source.pdf does not
             mock_exists.side_effect = lambda: False  # Default
+
             def exists_check(self):
                 return "valid.pdf" in str(self)
+
             with patch.object(Path, "exists", exists_check):
                 orphans = detector.detect(output_files, manifest_sources, output_dir)
 

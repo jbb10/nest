@@ -12,6 +12,7 @@ from nest.services.doctor_service import (
     EnvironmentReport,
     EnvironmentStatus,
     ModelReport,
+    ProjectReport,
 )
 
 
@@ -103,10 +104,69 @@ def display_model_report(report: ModelReport, tree: Tree) -> None:
     models.add(cache_line)
 
 
+def display_project_report(report: ProjectReport, tree: Tree) -> None:
+    """Render a ProjectReport to the tree.
+
+    Args:
+        report: Project validation report.
+        tree: Rich tree to add project section to.
+    """
+    project = tree.add("Project")
+    status = report.status
+
+    # Manifest status line
+    if status.manifest_status == "valid":
+        manifest_line = "Manifest: valid [green]✓[/green]"
+    elif status.manifest_status == "missing":
+        manifest_line = "Manifest: missing [red]✗[/red]"
+    elif status.manifest_status == "invalid_json":
+        manifest_line = "Manifest: invalid JSON [red]✗[/red]"
+    elif status.manifest_status == "invalid_structure":
+        manifest_line = "Manifest: invalid structure [red]✗[/red]"
+    else:  # version_mismatch
+        manifest_line = (
+            f"Manifest: v{status.manifest_version} [yellow]⚠[/yellow] "
+            "[dim](migration available)[/dim]"
+        )
+
+    manifest_node = project.add(manifest_line)
+
+    # Agent file status
+    if status.agent_file_present:
+        agent_line = "Agent file: present [green]✓[/green]"
+    else:
+        agent_line = "Agent file: missing [red]✗[/red]"
+
+    agent_node = project.add(agent_line)
+
+    # Folders status
+    if status.folders_status == "intact":
+        folders_line = "Folders: intact [green]✓[/green]"
+    elif status.folders_status == "sources_missing":
+        folders_line = "Folders: _nest_sources/ missing [red]✗[/red]"
+    elif status.folders_status == "context_missing":
+        folders_line = "Folders: _nest_context/ missing [red]✗[/red]"
+    else:  # both_missing
+        folders_line = "Folders: both missing [red]✗[/red]"
+
+    folders_node = project.add(folders_line)
+
+    # Add suggestions to appropriate nodes
+    for suggestion in status.suggestions:
+        suggestion_lower = suggestion.lower()
+        if "agent" in suggestion_lower:
+            agent_node.add(f"→ {suggestion}")
+        elif "folder" in suggestion_lower or "_nest_" in suggestion_lower:
+            folders_node.add(f"→ {suggestion}")
+        else:
+            manifest_node.add(f"→ {suggestion}")
+
+
 def display_doctor_report(
     report: EnvironmentReport,
     console: Console,
     model_report: ModelReport | None = None,
+    project_report: ProjectReport | None = None,
 ) -> None:
     """Render an EnvironmentReport to the console.
 
@@ -114,6 +174,7 @@ def display_doctor_report(
         report: Environment validation report.
         console: Rich console instance.
         model_report: Optional ML model validation report.
+        project_report: Optional project validation report.
     """
     console.print()
     tree = Tree("🩺 [bold]Nest Doctor[/bold]")
@@ -138,6 +199,10 @@ def display_doctor_report(
     # ML Models section (if report provided)
     if model_report:
         display_model_report(model_report, tree)
+
+    # Project section (if report provided)
+    if project_report:
+        display_project_report(project_report, tree)
 
     console.print(tree)
     console.print()

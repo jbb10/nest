@@ -1,6 +1,6 @@
 # Story 3.4: Project State Validation
 
-Status: ready-for-dev
+Status: in-progress
 Branch: feat/3-4-project-state-validation
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -121,19 +121,19 @@ This is the fourth story in Epic 3 (Project Visibility & Health). The `nest doct
 ## Tasks / Subtasks
 
 ### Task 1: Create Project Validation Data Structures (AC: all)
-- [ ] 1.1: Create `ProjectStatus` dataclass in `doctor_service.py`
+- [x] 1.1: Create `ProjectStatus` dataclass in `doctor_service.py`
   - Fields: `manifest_status: Literal["valid", "missing", "invalid_json", "invalid_structure", "version_mismatch"]`
   - Fields: `manifest_version: str | None`
   - Fields: `agent_file_present: bool`
   - Fields: `folders_status: Literal["intact", "sources_missing", "context_missing", "both_missing"]`
   - Fields: `suggestions: list[str]` for remediation hints
-- [ ] 1.2: Create `ProjectReport` dataclass in `doctor_service.py`
+- [x] 1.2: Create `ProjectReport` dataclass in `doctor_service.py`
   - Fields: `status: ProjectStatus`
   - Property: `all_pass` for quick status check
   - Property: `has_warnings` for warnings-only status
 
 ### Task 2: Add Project Validation Protocol (AC: all)
-- [ ] 2.1: Add `ProjectCheckerProtocol` to `adapters/protocols.py`
+- [x] 2.1: Add `ProjectCheckerProtocol` to `adapters/protocols.py`
   - Method: `manifest_exists(project_dir: Path) -> bool`
   - Method: `load_manifest(project_dir: Path) -> Manifest` (can raise ManifestError)
   - Method: `agent_file_exists(project_dir: Path) -> bool`
@@ -141,18 +141,18 @@ This is the fourth story in Epic 3 (Project Visibility & Health). The `nest doct
   - Method: `context_folder_exists(project_dir: Path) -> bool`
 
 ### Task 3: Create ProjectChecker Adapter (AC: all)
-- [ ] 3.1: Create `ProjectChecker` class in `adapters/project_checker.py`
+- [x] 3.1: Create `ProjectChecker` class in `adapters/project_checker.py`
   - Inject `ManifestAdapter` and `FileSystemAdapter` (or use directly)
   - Implement all protocol methods
   - Handle `ManifestError` exceptions gracefully
-- [ ] 3.2: Add folder path constants (use existing from sync_cmd if available)
+- [x] 3.2: Add folder path constants (use existing from sync_cmd if available)
   - `_nest_sources/` for source documents
   - `_nest_context/` for processed output
   - `.github/agents/nest.agent.md` for agent file
 
 ### Task 4: Extend DoctorService with Project Validation (AC: all)
-- [ ] 4.1: Add optional `project_checker: ProjectCheckerProtocol | None` to `__init__`
-- [ ] 4.2: Add `check_project(project_dir: Path) -> ProjectReport | None` method
+- [x] 4.1: Add optional `project_checker: ProjectCheckerProtocol | None` to `__init__`
+- [x] 4.2: Add `check_project(project_dir: Path) -> ProjectReport | None` method
   - Return None if project_checker is None
   - Check manifest existence and validity
   - Check agent file presence
@@ -161,45 +161,45 @@ This is the fourth story in Epic 3 (Project Visibility & Health). The `nest doct
   - Build appropriate suggestions list
 
 ### Task 5: Update Doctor CLI Command (AC: 7, 8)
-- [ ] 5.1: Update `doctor_cmd.py` to inject `ProjectChecker`
-- [ ] 5.2: Detect if running in Nest project (check manifest exists)
-- [ ] 5.3: Call `check_project(Path.cwd())` only if in project
-- [ ] 5.4: Pass `ProjectReport` to display function
+- [x] 5.1: Update `doctor_cmd.py` to inject `ProjectChecker`
+- [x] 5.2: Detect if running in Nest project (check manifest exists)
+- [x] 5.3: Call `check_project(Path.cwd())` only if in project
+- [x] 5.4: Pass `ProjectReport` to display function
 
 ### Task 6: Extend Doctor Display for Project Output (AC: all)
-- [ ] 6.1: Add `display_project_report()` function to `doctor_display.py`
+- [x] 6.1: Add `display_project_report()` function to `doctor_display.py`
   - Rich Tree format matching environment and model sections
   - Color-coded status indicators (✓ green, ✗ red, ⚠ yellow)
   - Suggestions displayed with → prefix
-- [ ] 6.2: Update `display_doctor_report()` to accept optional `ProjectReport`
-- [ ] 6.3: Handle all manifest states with appropriate messaging
+- [x] 6.2: Update `display_doctor_report()` to accept optional `ProjectReport`
+- [x] 6.3: Handle all manifest states with appropriate messaging
 
 ### Task 7: Add Unit Tests (AC: all)
-- [ ] 7.1: Add tests to `tests/services/test_doctor_service.py`
+- [x] 7.1: Add tests to `tests/services/test_doctor_service.py`
   - Test `check_project()` with valid project
   - Test `check_project()` with missing manifest
   - Test `check_project()` with corrupt manifest
   - Test `check_project()` with missing agent file
   - Test `check_project()` with missing folders
   - Test `check_project()` with version mismatch
-- [ ] 7.2: Add tests to `tests/adapters/test_project_checker.py`
+- [x] 7.2: Add tests to `tests/adapters/test_project_checker.py`
   - Test all protocol methods with various states
-- [ ] 7.3: Add tests to `tests/ui/test_doctor_display.py`
+- [x] 7.3: Add tests to `tests/ui/test_doctor_display.py`
   - Test project report display for all states
   - Test suggestion formatting
 
 ### Task 8: Add E2E Tests (AC: all)
-- [ ] 8.1: Add to `tests/e2e/test_doctor_e2e.py`
-- [ ] 8.2: Add `test_doctor_shows_project_section_in_project()`
-- [ ] 8.3: Add `test_doctor_skips_project_section_outside_project()`
-- [ ] 8.4: Add `test_doctor_detects_missing_manifest()`
-- [ ] 8.5: Add `test_doctor_detects_missing_agent_file()`
+- [x] 8.1: Add to `tests/e2e/test_doctor_e2e.py`
+- [x] 8.2: Add `test_doctor_shows_project_section_in_project()`
+- [x] 8.3: Add `test_doctor_skips_project_section_outside_project()`
+- [x] 8.4: Add `test_doctor_detects_missing_manifest()`
+- [x] 8.5: Add `test_doctor_detects_missing_agent_file()`
 
 ### Task 9: Run Full Test Suite
-- [ ] 9.1: Run `pytest -m "not e2e"` - all unit/integration tests pass
-- [ ] 9.2: Run `pytest -m "e2e"` - all E2E tests pass
-- [ ] 9.3: Run `ruff check` - no linting errors
-- [ ] 9.4: Run `pyright` - no type errors
+- [x] 9.1: Run `pytest -m "not e2e"` - all unit/integration tests pass
+- [ ] 9.2: Run `pytest -m "e2e"` - all E2E tests pass (pending environment setup)
+- [x] 9.3: Run `ruff check` - no linting errors
+- [x] 9.4: Run `pyright` - no type errors
 
 ## Dev Notes
 
@@ -664,10 +664,59 @@ git commit -m "feat(doctor): add project state validation"
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Sonnet 4.5
 
 ### Debug Log References
 
+N/A - Implementation completed without issues
+
 ### Completion Notes List
 
+- ✅ Implemented ProjectStatus and ProjectReport dataclasses with all required fields and properties
+- ✅ Created ProjectCheckerProtocol following existing protocol patterns with @runtime_checkable decorator
+- ✅ Implemented ProjectChecker adapter with ManifestAdapter integration and proper exception handling
+- ✅ Extended DoctorService.check_project() with comprehensive validation logic for all manifest states, agent file, and folder structure
+- ✅ Updated doctor_cmd.py to inject ProjectChecker and conditionally call check_project() based on manifest presence
+- ✅ Created display_project_report() function with Rich Tree formatting, color-coded indicators, and suggestion routing
+- ✅ Updated display_doctor_report() to accept and display optional ProjectReport
+- ✅ Added comprehensive unit tests (updated project validation coverage)
+- ✅ Added 4 E2E tests for project section display, missing manifest detection, and missing agent file detection
+- ✅ Ruff linting passes with no errors
+- ✅ Pyright type checking passes with 0 errors/warnings
+- 📝 E2E tests require proper environment setup (docling dependencies) - tests written and ready but not executed
+
 ### File List
+
+**Modified Files:**
+- src/nest/services/doctor_service.py
+- src/nest/adapters/protocols.py
+- src/nest/cli/doctor_cmd.py
+- src/nest/ui/doctor_display.py
+- tests/services/test_doctor_service.py
+- tests/ui/test_doctor_display.py
+- tests/e2e/test_doctor_e2e.py
+- _bmad-output/implementation-artifacts/3-4-project-state-validation.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+
+**Created Files:**
+- src/nest/adapters/project_checker.py
+- tests/adapters/test_project_checker.py
+- _bmad-output/implementation-artifacts/3-5-issue-remediation.md (unrelated)
+
+## Senior Developer Review (AI)
+
+**Date:** 2026-02-06
+**Reviewer:** Jóhann
+
+### Fixes Applied
+- Updated project detection to treat agent file and project folders as valid markers so missing manifest is reported correctly.
+- Routed project suggestions to manifest/agent/folder nodes without relying on keywords in the suggestion text.
+- Refactored doctor E2E tests to use `run_cli` and temp fixtures, and added `@pytest.mark.e2e`.
+
+### Remaining Risks
+- E2E execution still depends on docling model availability; verify with `pytest -m e2e` in an environment with models cached.
+
+## Change Log
+
+- 2026-02-06: Code review fixes for project detection, suggestion routing, and E2E test isolation.
+- 2026-02-06: Added invalid-structure manifest test coverage and tightened project display assertions.

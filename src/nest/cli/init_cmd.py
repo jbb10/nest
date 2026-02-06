@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.agents.vscode_writer import VSCodeAgentWriter
