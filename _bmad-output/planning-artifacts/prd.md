@@ -44,7 +44,9 @@ my-project/
 └── _nest_context/              <-- AI Knowledge Base (Generated + User-Curated)
     ├── 00_MASTER_INDEX.md      <-- The Map
     ├── policy_v1.md            <-- Generated from sources
-    ├── developer-guide.md      <-- User-added (no processing needed)
+    ├── developer-guide.md      <-- User-added (.md, no processing needed)
+    ├── api-reference.yaml      <-- User-added (.yaml, included in index)
+    ├── meeting-notes.txt       <-- User-added (.txt, included in index)
     └── financial_data.md       <-- Generated from sources
 ```
 
@@ -135,6 +137,7 @@ You are an expert document analyst specialized in the [Project Name] project. Yo
 - Tables from PDFs/Excel are converted to Markdown table format
 - File paths are relative to `_nest_context/` directory
 - The index is regenerated after each `nest sync` command
+- User-curated files may be any supported text format: `.md`, `.txt`, `.text`, `.rst`, `.csv`, `.json`, `.yaml`, `.yml`, `.toml`, `.xml`
 
 ## Example Interactions
 
@@ -178,7 +181,7 @@ You are an expert document analyst specialized in the [Project Name] project. Yo
     * Saves plain Markdown to `_nest_context/` **mirroring the source folder hierarchy**.
     * (No YAML header in output — metadata lives only in manifest.)
 4.  **Orphan Cleanup:** By default, removes files from `_nest_context/` **that are tracked in the manifest** whose source no longer exists in `_nest_sources/`. Files not in the manifest (user-curated) are never touched. Disable with `--no-clean`.
-5.  **Index Generation:** Regenerates `00_MASTER_INDEX.md` with file listing from entire `_nest_context/` directory (both generated and user-curated files).
+5.  **Index Generation:** Regenerates `00_MASTER_INDEX.md` with file listing from entire `_nest_context/` directory. Includes both Docling-generated files and user-curated plain text files. Supported context text extensions: `.md`, `.txt`, `.text`, `.rst`, `.csv`, `.json`, `.yaml`, `.yml`, `.toml`, `.xml`. Binary or unsupported file types placed in `_nest_context/` are excluded from the index.
 6.  **Manifest Update:** Updates `.nest_manifest.json` with processed file metadata.
 
 **Directory Mirroring Example:**
@@ -191,8 +194,9 @@ _nest_sources/                  _nest_context/
 │       └── beta.pdf      →     │       └── beta.md
 ├── reports/                    ├── reports/
 │   └── Q3_summary.xlsx   →     │   └── Q3_summary.md
-└── (manual files go           └── developer-guide.md  <-- User-curated
-    directly in _nest_context/)    onboarding.md       <-- User-curated
+└── (manual text files go       └── developer-guide.md  <-- User-curated (.md)
+    directly in _nest_context/)    onboarding.txt      <-- User-curated (.txt)
+                                   api-spec.yaml       <-- User-curated (.yaml)
 ```
 
 **Manifest Schema (`.nest_manifest.json`):**
@@ -255,6 +259,7 @@ The following operations must be implemented as **reusable internal components**
 | `generate_agent_file()` | `nest init` |
 | `compute_checksum()` | `nest sync`, `nest status` |
 | `generate_index()` | `nest sync` |
+| `CONTEXT_TEXT_EXTENSIONS` | `nest sync` (index), `nest status` (counting), orphan service (user-curated counting) |
 
 ---
 

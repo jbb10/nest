@@ -17,7 +17,13 @@ from nest.adapters.protocols import FileSystemProtocol, ManifestProtocol
 from nest.core.checksum import compute_sha256
 from nest.core.models import Manifest
 from nest.core.orphan_detector import OrphanDetector
-from nest.core.paths import CONTEXT_DIR, MASTER_INDEX_FILE, SOURCES_DIR, SUPPORTED_EXTENSIONS
+from nest.core.paths import (
+    CONTEXT_DIR,
+    CONTEXT_TEXT_EXTENSIONS,
+    MASTER_INDEX_FILE,
+    SOURCES_DIR,
+    SUPPORTED_EXTENSIONS,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +154,9 @@ class StatusService:
     def analyze_context_files(self, project_root: Path, manifest: Manifest) -> tuple[int, int]:
         """Analyze context directory files and detect orphans.
 
+        Only counts files whose extension is in CONTEXT_TEXT_EXTENSIONS.
+        Unsupported file types (e.g., .png, .zip) are excluded from counts.
+
         Args:
             project_root: Project root directory.
             manifest: Loaded manifest model.
@@ -163,11 +172,14 @@ class StatusService:
             return (0, 0)
 
         output_files = self._filesystem.list_files(context_dir)
+        supported_text = {ext.lower() for ext in CONTEXT_TEXT_EXTENSIONS}
 
         context_files = 0
         for path in output_files:
             rel = path.relative_to(context_dir).as_posix()
             if rel == MASTER_INDEX_FILE:
+                continue
+            if path.suffix.lower() not in supported_text:
                 continue
             context_files += 1
 

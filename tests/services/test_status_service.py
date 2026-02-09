@@ -103,3 +103,46 @@ class TestStatusService:
         assert report.source_new == 0
         assert report.source_modified == 0
         assert report.source_unchanged == 0
+
+    def test_context_counts_txt_files(self, tmp_path: Path) -> None:
+        """AC5: .txt files in context directory are counted."""
+        project_root = tmp_path
+        _write_context_file(project_root, MASTER_INDEX_FILE, "# Index\n")
+        _write_context_file(project_root, "notes.txt", "some notes")
+        _write_context_file(project_root, "doc.md", "# doc")
+
+        manifest = Manifest(
+            nest_version="0.0.0",
+            project_name="TestProject",
+            last_sync=None,
+            files={},
+        )
+        ManifestAdapter().save(project_root, manifest)
+
+        service = StatusService(filesystem=FileSystemAdapter(), manifest=ManifestAdapter())
+        report = service.get_status(project_root)
+
+        assert report.context_files == 2  # notes.txt + doc.md
+
+    def test_context_excludes_unsupported_extensions(self, tmp_path: Path) -> None:
+        """AC5: .png files are excluded from context file count."""
+        project_root = tmp_path
+        _write_context_file(project_root, MASTER_INDEX_FILE, "# Index\n")
+        _write_context_file(project_root, "doc.md", "# doc")
+        # Create a .png file (unsupported)
+        png_path = project_root / CONTEXT_DIR / "diagram.png"
+        png_path.parent.mkdir(parents=True, exist_ok=True)
+        png_path.write_bytes(b"\x89PNG\r\n")
+
+        manifest = Manifest(
+            nest_version="0.0.0",
+            project_name="TestProject",
+            last_sync=None,
+            files={},
+        )
+        ManifestAdapter().save(project_root, manifest)
+
+        service = StatusService(filesystem=FileSystemAdapter(), manifest=ManifestAdapter())
+        report = service.get_status(project_root)
+
+        assert report.context_files == 1  # only doc.md, png excluded

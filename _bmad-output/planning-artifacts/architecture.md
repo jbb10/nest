@@ -1046,6 +1046,33 @@ Format: `{timestamp} {level} [{context}] {file}: {technical_detail}`
 
 **Rule: Always use `pathlib.Path`. Never string concatenation.**
 
+**Centralized Path Constants (`core/paths.py`):**
+
+All directory names, special filenames, and extension lists are defined as constants in `core/paths.py`. All modules MUST import from this single source of truth.
+
+```python
+# core/paths.py — Single source of truth for path constants
+SOURCES_DIR = "_nest_sources"
+CONTEXT_DIR = "_nest_context"
+MASTER_INDEX_FILE = "00_MASTER_INDEX.md"
+
+# Extensions for Docling source processing (files that need conversion)
+SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
+
+# Extensions for context text files (indexable in _nest_context/)
+# These are plain-text formats an LLM can reason about as project context.
+# Used by: index generation, status counting, user-curated file counting.
+CONTEXT_TEXT_EXTENSIONS = [
+    ".md", ".txt", ".text", ".rst",
+    ".csv", ".json", ".yaml", ".yml", ".toml", ".xml",
+]
+```
+
+**Usage Rules:**
+- `SUPPORTED_EXTENSIONS` — Used **only** by discovery service when scanning `_nest_sources/` for files needing Docling processing.
+- `CONTEXT_TEXT_EXTENSIONS` — Used by index service, status service, and orphan service when scanning `_nest_context/` to determine which files are text-based context. Any file in `_nest_context/` whose extension is NOT in this list is ignored (not indexed, not counted).
+- Both constants MUST be imported from `nest.core.paths`. Never hardcode extension lists elsewhere.
+
 ```python
 # ✓ Correct
 from pathlib import Path
@@ -1384,6 +1411,7 @@ Service Layer (sync_service.py)
     │
     ├─ Remove orphans (if enabled)
     ├─ core.index_generator.generate() → 00_MASTER_INDEX.md
+    │     (scans _nest_context/ for CONTEXT_TEXT_EXTENSIONS files)
     ├─ manifest.save(updated_manifest)
     │
     └─ Return SyncResult

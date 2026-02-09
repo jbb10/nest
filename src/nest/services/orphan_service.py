@@ -9,7 +9,7 @@ from pathlib import Path
 from nest.adapters.protocols import FileSystemProtocol, ManifestProtocol
 from nest.core.models import OrphanCleanupResult
 from nest.core.orphan_detector import OrphanDetector
-from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
+from nest.core.paths import CONTEXT_DIR, CONTEXT_TEXT_EXTENSIONS, SOURCES_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,9 @@ class OrphanService:
     def count_user_curated_files(self) -> int:
         """Count files in context directory that are NOT in manifest (user-curated).
 
+        Only counts files whose extension is in CONTEXT_TEXT_EXTENSIONS.
+        Binary and unsupported file types are excluded from the count.
+
         Returns:
             Number of user-curated files.
         """
@@ -146,13 +149,17 @@ class OrphanService:
 
         # List all files in context directory
         output_files = self._filesystem.list_files(output_dir)
+        supported_text = {ext.lower() for ext in CONTEXT_TEXT_EXTENSIONS}
 
-        # Count files NOT in manifest (excluding system files)
+        # Count files NOT in manifest (excluding system files and unsupported types)
         user_curated = 0
         for file_path in output_files:
             relative = file_path.relative_to(output_dir).as_posix()
             # Skip system files
             if relative == "00_MASTER_INDEX.md":
+                continue
+            # Skip unsupported file types
+            if file_path.suffix.lower() not in supported_text:
                 continue
             # Count if NOT in manifest
             if relative not in manifest_outputs:

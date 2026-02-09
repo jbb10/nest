@@ -12,6 +12,12 @@ CONTEXT_DIR = "_nest_context"
 MASTER_INDEX_FILE = "00_MASTER_INDEX.md"
 SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
 
+# Text file extensions supported in context directory (for indexing and counting)
+CONTEXT_TEXT_EXTENSIONS = [
+    ".md", ".txt", ".text", ".rst",
+    ".csv", ".json", ".yaml", ".yml", ".toml", ".xml",
+]
+
 
 def mirror_path(
     source: Path,
