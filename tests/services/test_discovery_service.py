@@ -15,9 +15,9 @@ class TestDiscoveryService:
     def test_discovers_new_files_not_in_manifest(self, tmp_path: Path) -> None:
         """Verify files not in manifest are classified as 'new'."""
         # Arrange
-        raw_inbox = tmp_path / "raw_inbox"
-        raw_inbox.mkdir()
-        pdf_file = raw_inbox / "document.pdf"
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
+        pdf_file = sources / "document.pdf"
         pdf_file.write_bytes(b"pdf content")
 
         # Mock file discovery
@@ -50,9 +50,9 @@ class TestDiscoveryService:
     def test_discovers_modified_files_with_different_checksum(self, tmp_path: Path) -> None:
         """Verify files with different checksums are classified as 'modified'."""
         # Arrange
-        raw_inbox = tmp_path / "raw_inbox"
-        raw_inbox.mkdir()
-        pdf_file = raw_inbox / "document.pdf"
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
+        pdf_file = sources / "document.pdf"
         pdf_file.write_bytes(b"updated content")
 
         mock_discovery = Mock(spec=FileDiscoveryProtocol)
@@ -64,7 +64,7 @@ class TestDiscoveryService:
             nest_version="0.1.0",
             project_name="test",
             files={
-                "raw_inbox/document.pdf": FileEntry(
+                "document.pdf": FileEntry(
                     sha256="old_different_checksum",
                     processed_at=datetime.now(),
                     output="processed_context/document.md",
@@ -92,10 +92,10 @@ class TestDiscoveryService:
         # Arrange
         import hashlib
 
-        raw_inbox = tmp_path / "raw_inbox"
-        raw_inbox.mkdir()
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
         content = b"same content"
-        pdf_file = raw_inbox / "document.pdf"
+        pdf_file = sources / "document.pdf"
         pdf_file.write_bytes(content)
         same_checksum = hashlib.sha256(content).hexdigest()
 
@@ -107,7 +107,7 @@ class TestDiscoveryService:
             nest_version="0.1.0",
             project_name="test",
             files={
-                "raw_inbox/document.pdf": FileEntry(
+                "document.pdf": FileEntry(
                     sha256=same_checksum,
                     processed_at=datetime.now(),
                     output="processed_context/document.md",
@@ -135,18 +135,18 @@ class TestDiscoveryService:
         # Arrange
         import hashlib
 
-        raw_inbox = tmp_path / "raw_inbox"
-        raw_inbox.mkdir()
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
 
         # Create 3 files: 1 new, 1 modified, 1 unchanged
-        new_file = raw_inbox / "new.pdf"
+        new_file = sources / "new.pdf"
         new_file.write_bytes(b"new content")
 
-        modified_file = raw_inbox / "modified.pdf"
+        modified_file = sources / "modified.pdf"
         modified_file.write_bytes(b"modified content")
 
         unchanged_content = b"unchanged content"
-        unchanged_file = raw_inbox / "unchanged.pdf"
+        unchanged_file = sources / "unchanged.pdf"
         unchanged_file.write_bytes(unchanged_content)
         unchanged_hash = hashlib.sha256(unchanged_content).hexdigest()
 
@@ -158,13 +158,13 @@ class TestDiscoveryService:
             nest_version="0.1.0",
             project_name="test",
             files={
-                "raw_inbox/modified.pdf": FileEntry(
+                "modified.pdf": FileEntry(
                     sha256="old_hash",
                     processed_at=datetime.now(),
                     output="processed_context/modified.md",
                     status="success",
                 ),
-                "raw_inbox/unchanged.pdf": FileEntry(
+                "unchanged.pdf": FileEntry(
                     sha256=unchanged_hash,
                     processed_at=datetime.now(),
                     output="processed_context/unchanged.md",
@@ -280,9 +280,9 @@ class TestDiscoveryService:
     def test_handles_missing_manifest_gracefully(self, tmp_path: Path) -> None:
         """Verify missing manifest (first run) is treated as empty."""
         # Arrange
-        raw_inbox = tmp_path / "raw_inbox"
-        raw_inbox.mkdir()
-        pdf_file = raw_inbox / "doc.pdf"
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
+        pdf_file = sources / "doc.pdf"
         pdf_file.write_bytes(b"content")
 
         mock_discovery = Mock(spec=FileDiscoveryProtocol)
@@ -309,9 +309,9 @@ class TestDiscoveryService:
         from unittest.mock import patch
 
         # Arrange
-        raw_inbox = tmp_path / "raw_inbox"
-        raw_inbox.mkdir()
-        pdf_file = raw_inbox / "doc.pdf"
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
+        pdf_file = sources / "doc.pdf"
 
         mock_discovery = Mock(spec=FileDiscoveryProtocol)
         mock_discovery.discover.return_value = [pdf_file]

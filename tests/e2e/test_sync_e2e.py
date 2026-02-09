@@ -82,20 +82,62 @@ class TestSyncE2E:
         assert "4" in result.stdout or "processed" in result.stdout.lower()
 
     def test_sync_idempotent_no_changes(self, sample_documents: Path):
-        """Test that running sync twice skips unchanged files."""
+        """Test that running sync twice skips unchanged files.
+
+        The second sync must NOT re-process any documents. We verify this
+        by checking that:
+        - Manifest checksums are identical before and after the second sync
+        - Output file mtimes are not changed (files were not rewritten)
+        - CLI output reports 0 new and 0 modified files
+        """
         project_dir = sample_documents
+        manifest_path = project_dir / ".nest_manifest.json"
+        processed_dir = project_dir / "_nest_context"
 
-        # First sync
+        # First sync — processes all 4 documents
         result1 = run_cli(["sync"], cwd=project_dir)
-        assert result1.exit_code == 0
+        assert result1.exit_code == 0, f"First sync failed: {result1.stderr}\n{result1.stdout}"
 
-        # Second sync should skip everything
+        # Snapshot manifest state after first sync
+        manifest_before = json.loads(manifest_path.read_text())
+        checksums_before = {
+            k: v["sha256"] for k, v in manifest_before["files"].items()
+        }
+
+        # Snapshot output file mtimes after first sync
+        output_files = sorted(processed_dir.rglob("*.md"))
+        # Filter out index files which may be regenerated
+        content_files = [f for f in output_files if not f.name.startswith("00_")]
+        assert len(content_files) >= 4, f"Expected >= 4 output files, got {len(content_files)}"
+        mtimes_before = {str(f): f.stat().st_mtime for f in content_files}
+
+        # Second sync — should skip everything
         result2 = run_cli(["sync"], cwd=project_dir)
-        assert result2.exit_code == 0
+        assert result2.exit_code == 0, f"Second sync failed: {result2.stderr}\n{result2.stdout}"
 
-        # Should indicate files were skipped (no changes)
-        # Output may contain "skip" or show 0 processed
-        assert "0" in result2.stdout or "skip" in result2.stdout.lower()
+        # Verify manifest checksums are identical
+        manifest_after = json.loads(manifest_path.read_text())
+        checksums_after = {
+            k: v["sha256"] for k, v in manifest_after["files"].items()
+        }
+        assert checksums_before == checksums_after, (
+            f"Manifest checksums changed between syncs!\n"
+            f"Before: {checksums_before}\nAfter: {checksums_after}"
+        )
+
+        # Verify output files were not rewritten (mtimes unchanged)
+        mtimes_after = {str(f): f.stat().st_mtime for f in content_files}
+        for fpath, mtime in mtimes_before.items():
+            assert mtimes_after[fpath] == mtime, (
+                f"Output file was rewritten on second sync: {fpath}"
+            )
+
+        # Verify CLI output indicates nothing was processed
+        stdout_lower = result2.stdout.lower()
+        # Should NOT report any files as new or modified
+        assert "new" not in stdout_lower or "0 new" in stdout_lower or "0" in result2.stdout, (
+            f"Second sync appears to have processed files:\n{result2.stdout}"
+        )
 
 
 @pytest.mark.e2e
