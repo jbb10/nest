@@ -1,19 +1,33 @@
 """Doctor service for environment and project validation."""
 
 import json
+import logging
 import re
 import shutil
 import subprocess
 import sys
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import nest
 from nest.adapters.protocols import ModelCheckerProtocol, ProjectCheckerProtocol
+from nest.core.checksum import compute_sha256
 from nest.core.exceptions import ManifestError
+from nest.core.models import FileEntry, Manifest
+
+logger = logging.getLogger("nest.errors")
+
+if TYPE_CHECKING:
+    from nest.adapters.protocols import (
+        AgentWriterProtocol,
+        FileSystemProtocol,
+        ManifestProtocol,
+    )
 
 
 @dataclass
@@ -93,13 +107,35 @@ class ProjectReport:
             and self.status.folders_status == "intact"
         )
 
+
+@dataclass
+class RemediationResult:
+    """Result of a single remediation action."""
+
+    issue: str  # Description of the issue (e.g., "missing_manifest")
+    attempted: bool  # Whether the fix was attempted
+    success: bool  # Whether the fix succeeded
+    message: str  # Result message for the user
+
+
+@dataclass
+class RemediationReport:
+    """Complete remediation report."""
+
+    results: list[RemediationResult]
+
     @property
-    def has_warnings(self) -> bool:
-        """True if only warnings (no errors)."""
-        return (
-            self.status.manifest_status in ("valid", "version_mismatch")
-            and self.status.folders_status == "intact"
-        )
+    def all_succeeded(self) -> bool:
+        """True if all attempted fixes succeeded."""
+        attempted = [r for r in self.results if r.attempted]
+        if not attempted:
+            return True  # Vacuous truth
+        return all(r.success for r in attempted)
+
+    @property
+    def any_attempted(self) -> bool:
+        """True if any fix was attempted."""
+        return any(r.attempted for r in self.results)
 
 
 class DoctorService:
@@ -109,6 +145,9 @@ class DoctorService:
         self,
         model_checker: ModelCheckerProtocol | None = None,
         project_checker: ProjectCheckerProtocol | None = None,
+        manifest_adapter: "ManifestProtocol | None" = None,
+        filesystem: "FileSystemProtocol | None" = None,
+        agent_writer: "AgentWriterProtocol | None" = None,
     ) -> None:
         """Initialize doctor service.
 
@@ -117,9 +156,18 @@ class DoctorService:
                           If None, model checks will be skipped.
             project_checker: Optional project checker for project validation.
                             If None, project checks will be skipped.
+            manifest_adapter: Optional manifest adapter for manifest operations.
+                             If None, manifest rebuild will not be available.
+            filesystem: Optional filesystem adapter for file operations.
+                       If None, folder recreation will not be available.
+            agent_writer: Optional agent writer for file regeneration.
+                         If None, agent file regeneration will not be available.
         """
         self._model_checker = model_checker
         self._project_checker = project_checker
+        self._manifest_adapter = manifest_adapter
+        self._filesystem = filesystem
+        self._agent_writer = agent_writer
 
     def check_environment(self) -> EnvironmentReport:
         """Check Python, uv, and Nest versions.
@@ -398,3 +446,385 @@ class DoctorService:
                 suggestions=suggestions,
             )
         )
+
+    def rebuild_manifest(
+        self,
+        project_dir: Path,
+        project_name: str,
+    ) -> RemediationResult:
+        """Rebuild manifest from processed files.
+
+        Scans _nest_sources to find tracked files, computes their checksums,
+        and checks if they have corresponding processed output in _nest_context.
+        Builds a new manifest reflecting the current state.
+
+        Args:
+            project_dir: Path to the project root directory.
+            project_name: Name of the project.
+
+        Returns:
+            RemediationResult indicating success or failure.
+        """
+        if self._manifest_adapter is None:
+            return RemediationResult(
+                issue="corrupt_manifest",
+                attempted=False,
+                success=False,
+                message="Manifest adapter not available",
+            )
+
+        if self._filesystem is None:
+            return RemediationResult(
+                issue="corrupt_manifest",
+                attempted=False,
+                success=False,
+                message="Filesystem adapter not available",
+            )
+
+        try:
+            manifest = Manifest(
+                nest_version=nest.__version__,
+                project_name=project_name,
+                last_sync=datetime.now(timezone.utc),
+                files={},
+            )
+
+            sources_dir = project_dir / "_nest_sources"
+            context_dir = project_dir / "_nest_context"
+
+            if not self._filesystem.exists(sources_dir):
+                self._manifest_adapter.save(project_dir, manifest)
+                return RemediationResult(
+                    issue="corrupt_manifest",
+                    attempted=True,
+                    success=True,
+                    message="Manifest rebuilt (empty - no sources found)",
+                )
+
+            source_files = self._filesystem.list_files(sources_dir)
+
+            restored_count = 0
+            for source_path in source_files:
+                rel_path = source_path.relative_to(sources_dir)
+                key = str(rel_path)
+                sha256 = compute_sha256(source_path)
+
+                output_rel_path = rel_path.with_suffix(".md")
+                output_path = context_dir / output_rel_path
+
+                if self._filesystem.exists(output_path):
+                    processed_at = datetime.now(timezone.utc)
+
+                    entry = FileEntry(
+                        sha256=sha256,
+                        processed_at=processed_at,
+                        output=str(output_rel_path),
+                        status="success",
+                    )
+                    manifest.files[key] = entry
+                    restored_count += 1
+
+            self._manifest_adapter.save(project_dir, manifest)
+
+            return RemediationResult(
+                issue="corrupt_manifest",
+                attempted=True,
+                success=True,
+                message=f"Manifest rebuilt successfully ({restored_count} files restored)",
+            )
+        except Exception as e:
+            logger.exception("Failed to rebuild manifest in %s", project_dir)
+            return RemediationResult(
+                issue="corrupt_manifest",
+                attempted=True,
+                success=False,
+                message=f"Failed to rebuild manifest: {e}",
+            )
+
+    def recreate_folders(self, project_dir: Path) -> RemediationResult:
+        """Recreate missing project folders.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            RemediationResult indicating success or failure.
+        """
+        if self._filesystem is None:
+            return RemediationResult(
+                issue="missing_folders",
+                attempted=False,
+                success=False,
+                message="Filesystem adapter not available",
+            )
+
+        sources_dir = project_dir / "_nest_sources"
+        context_dir = project_dir / "_nest_context"
+
+        sources_exist = self._filesystem.exists(sources_dir)
+        context_exist = self._filesystem.exists(context_dir)
+
+        if sources_exist and context_exist:
+            return RemediationResult(
+                issue="missing_folders",
+                attempted=False,
+                success=True,
+                message="Folders already exist",
+            )
+
+        created: list[str] = []
+        if not sources_exist:
+            self._filesystem.create_directory(sources_dir)
+            created.append("_nest_sources/")
+        if not context_exist:
+            self._filesystem.create_directory(context_dir)
+            created.append("_nest_context/")
+
+        return RemediationResult(
+            issue="missing_folders",
+            attempted=True,
+            success=True,
+            message=f"Created folders: {', '.join(created)}",
+        )
+
+    def regenerate_agent_file(
+        self,
+        project_dir: Path,
+        project_name: str,
+    ) -> RemediationResult:
+        """Regenerate agent file.
+
+        Args:
+            project_dir: Path to the project root directory.
+            project_name: Name of the project.
+
+        Returns:
+            RemediationResult indicating success or failure.
+        """
+        if self._agent_writer is None:
+            return RemediationResult(
+                issue="missing_agent_file",
+                attempted=False,
+                success=False,
+                message="Agent writer not available",
+            )
+
+        try:
+            output_path = project_dir / ".github" / "agents" / "nest.agent.md"
+            self._agent_writer.generate(project_name, output_path)
+            return RemediationResult(
+                issue="missing_agent_file",
+                attempted=True,
+                success=True,
+                message=f"Agent file regenerated at {output_path.relative_to(project_dir)}",
+            )
+        except Exception as e:
+            logger.exception("Failed to regenerate agent file in %s", project_dir)
+            return RemediationResult(
+                issue="missing_agent_file",
+                attempted=True,
+                success=False,
+                message=f"Failed to regenerate agent file: {e}",
+            )
+
+    def download_models(self) -> RemediationResult:
+        """Download ML models.
+
+        Returns:
+            RemediationResult indicating success or failure.
+        """
+        if self._model_checker is None:
+            return RemediationResult(
+                issue="missing_models",
+                attempted=False,
+                success=False,
+                message="Model checker not available",
+            )
+
+        # Get the download method if it exists
+        download_method = getattr(self._model_checker, "download_if_needed", None)
+        if download_method is None:
+            return RemediationResult(
+                issue="missing_models",
+                attempted=False,
+                success=False,
+                message="Model checker does not support download",
+            )
+
+        try:
+            downloaded = download_method(progress=True)
+            if downloaded:
+                message = "Models downloaded successfully"
+            else:
+                message = "Models already cached"
+            return RemediationResult(
+                issue="missing_models",
+                attempted=True,
+                success=True,
+                message=message,
+            )
+        except Exception as e:
+            logger.exception("Failed to download ML models")
+            return RemediationResult(
+                issue="missing_models",
+                attempted=True,
+                success=False,
+                message=f"Failed to download models: {e}",
+            )
+
+    def remediate_issues_auto(
+        self,
+        project_dir: Path,
+        env_report: EnvironmentReport,
+        model_report: ModelReport | None,
+        project_report: ProjectReport | None,
+    ) -> RemediationReport:
+        """Remediate all detected issues automatically.
+
+        Args:
+            project_dir: Path to the project root directory.
+            env_report: Environment validation report.
+            model_report: ML model validation report (if available).
+            project_report: Project state validation report (if available).
+
+        Returns:
+            RemediationReport with all remediation results.
+        """
+        results: list[RemediationResult] = []
+
+        # Check ML models
+        if model_report and not model_report.all_pass:
+            result = self.download_models()
+            results.append(result)
+
+        # Check project issues if in a project
+        if project_report:
+            # Recreate folders
+            if project_report.status.folders_status != "intact":
+                result = self.recreate_folders(project_dir)
+                results.append(result)
+
+            # Rebuild manifest
+            if project_report.status.manifest_status in (
+                "missing",
+                "invalid_json",
+                "invalid_structure",
+            ):
+                project_name = self._get_project_name(project_dir)
+                result = self.rebuild_manifest(project_dir, project_name)
+                results.append(result)
+
+            # Regenerate agent file
+            if not project_report.status.agent_file_present:
+                project_name = self._get_project_name(project_dir)
+                result = self.regenerate_agent_file(project_dir, project_name)
+                results.append(result)
+
+        return RemediationReport(results=results)
+
+    def remediate_issues_interactive(
+        self,
+        project_dir: Path,
+        env_report: EnvironmentReport,
+        model_report: ModelReport | None,
+        project_report: ProjectReport | None,
+        confirm_callback: Callable[[str], bool] | None = None,
+        input_callback: Callable[[str], str] | None = None,
+    ) -> RemediationReport:
+        """Remediate issues sequentially with user confirmation.
+
+        Args:
+            project_dir: Path to the project root directory.
+            env_report: Environment validation report.
+            model_report: ML model validation report.
+            project_report: Project state validation report.
+            confirm_callback: Function that returns True if user confirms action.
+            input_callback: Function that returns user string input.
+
+        Returns:
+            RemediationReport with results.
+        """
+        results: list[RemediationResult] = []
+
+        def _confirm(msg: str) -> bool:
+            if confirm_callback:
+                return confirm_callback(msg)
+            return True
+
+        # Resolve project name once if needed for manifest or agent file fixes
+        project_name = self._get_project_name(project_dir)
+        if project_report:
+            needs_name = (
+                project_report.status.manifest_status
+                in ("missing", "invalid_json", "invalid_structure")
+                or not project_report.status.agent_file_present
+            )
+            if needs_name and project_name == "Nest Project" and input_callback:
+                user_input = input_callback(
+                    "Enter project name (default: Nest Project)"
+                )
+                if user_input.strip():
+                    project_name = user_input.strip()
+
+        # 1. ML models (Foundational)
+        if model_report and not model_report.all_pass:
+            if _confirm("Download missing ML models?"):
+                result = self.download_models()
+                results.append(result)
+            else:
+                results.append(
+                    RemediationResult("missing_models", False, False, "User declined")
+                )
+
+        # 2. Folders (Structural)
+        if project_report and project_report.status.folders_status != "intact":
+            if _confirm("Recreate missing project folders?"):
+                result = self.recreate_folders(project_dir)
+                results.append(result)
+            else:
+                results.append(
+                    RemediationResult("missing_folders", False, False, "User declined")
+                )
+
+        # 3. Manifest (State)
+        if project_report and project_report.status.manifest_status in (
+            "missing",
+            "invalid_json",
+            "invalid_structure",
+        ):
+            if _confirm(f"Rebuild manifest for '{project_name}'?"):
+                result = self.rebuild_manifest(project_dir, project_name)
+                results.append(result)
+            else:
+                results.append(
+                    RemediationResult("corrupt_manifest", False, False, "User declined")
+                )
+
+        # 4. Agent file (Last)
+        if project_report and not project_report.status.agent_file_present:
+            if _confirm("Regenerate agent file?"):
+                result = self.regenerate_agent_file(project_dir, project_name)
+                results.append(result)
+            else:
+                results.append(
+                    RemediationResult("missing_agent_file", False, False, "User declined")
+                )
+
+        return RemediationReport(results=results)
+
+    def _get_project_name(self, project_dir: Path) -> str:
+        """Get project name from manifest or return default.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            Project name from manifest or "Nest Project" as default.
+        """
+        if self._manifest_adapter and self._manifest_adapter.exists(project_dir):
+            try:
+                manifest = self._manifest_adapter.load(project_dir)
+                return manifest.project_name
+            except Exception:
+                pass
+        return "Nest Project"

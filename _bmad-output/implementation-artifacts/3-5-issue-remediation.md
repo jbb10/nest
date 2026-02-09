@@ -1,6 +1,6 @@
 # Story 3.5: Issue Remediation
 
-Status: ready-for-dev
+Status: done
 Branch: feat/3-5-issue-remediation
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -157,48 +157,48 @@ This is the fifth story in Epic 3 (Project Visibility & Health). The `nest docto
 ## Tasks / Subtasks
 
 ### Task 1: Add Remediation Data Structures (AC: all)
-- [ ] 1.1: Add `RemediationResult` dataclass to `doctor_service.py`
+- [x] 1.1: Add `RemediationResult` dataclass to `doctor_service.py`
   - Fields: `issue: str` (description of issue)
   - Fields: `attempted: bool` (whether fix was attempted)
   - Fields: `success: bool` (whether fix succeeded)
   - Fields: `message: str` (result message for user)
-- [ ] 1.2: Add `RemediationReport` dataclass to `doctor_service.py`
+- [x] 1.2: Add `RemediationReport` dataclass to `doctor_service.py`
   - Fields: `results: list[RemediationResult]`
   - Property: `all_succeeded: bool` (True if all attempted fixes succeeded)
   - Property: `any_attempted: bool` (True if any fix was attempted)
 
 ### Task 2: Add Remediation Methods to DoctorService (AC: 1-4, 8)
-- [ ] 2.1: Add `rebuild_manifest(project_dir: Path) -> RemediationResult`
+- [x] 2.1: Add `rebuild_manifest(project_dir: Path) -> RemediationResult`
   - Scan `_nest_context/` for all `.md` files
   - For each file, check if source exists in `_nest_sources/`
   - Compute SHA-256 checksum for existing sources
   - Build new manifest with current Nest version
   - Write to `.nest_manifest.json`
   - Return success/failure result
-- [ ] 2.2: Add `regenerate_agent_file(project_dir: Path, project_name: str) -> RemediationResult`
+- [x] 2.2: Add `regenerate_agent_file(project_dir: Path, project_name: str) -> RemediationResult`
   - Use `VSCodeAgentWriter` (inject or create)
   - Load project name from manifest if available
   - Write agent file to `.github/agents/nest.agent.md`
   - Create parent directory if needed
   - Return success/failure result
-- [ ] 2.3: Add `recreate_folders(project_dir: Path) -> RemediationResult`
+- [x] 2.3: Add `recreate_folders(project_dir: Path) -> RemediationResult`
   - Check which folders are missing (`_nest_sources/`, `_nest_context/`)
   - Create missing folders
   - Return list of created folders in message
-- [ ] 2.4: Add `download_models() -> RemediationResult`
+- [x] 2.4: Add `download_models() -> RemediationResult`
   - If model_checker is None, return failure
   - Call `model_checker.download_models()` if available
   - Handle download errors gracefully
   - Return success/failure result
 
 ### Task 3: Add Interactive Remediation Orchestrator (AC: 5, 7, 10)
-- [ ] 3.1: Add `remediate_issues_interactive()` method to `DoctorService`
+- [x] 3.1: Add `remediate_issues_interactive()` method to `DoctorService`
   - Input: validation reports (EnvironmentReport, ModelReport, ProjectReport)
   - Detect all fixable issues in priority order
   - Prompt user for each fix with [y/N]
   - Execute approved fixes
   - Collect results and return RemediationReport
-- [ ] 3.2: Add `remediate_issues_auto()` method for --fix flag
+- [x] 3.2: Add `remediate_issues_auto()` method for --fix flag
   - Input: validation reports
   - Detect all fixable issues
   - Execute all fixes without prompts
@@ -206,26 +206,26 @@ This is the fifth story in Epic 3 (Project Visibility & Health). The `nest docto
   - Rich spinner for each fix attempt
 
 ### Task 4: Update Doctor CLI Command (AC: 7, 10)
-- [ ] 4.1: Add `--fix` flag to doctor_cmd.py CLI signature
-- [ ] 4.2: After validation reports are generated, detect if any issues exist
-- [ ] 4.3: If issues exist and not --fix: prompt "Attempt automatic repair? [y/N]"
-- [ ] 4.4: If issues exist and --fix: call `remediate_issues_auto()`
-- [ ] 4.5: If user accepts prompt: call `remediate_issues_interactive()`
-- [ ] 4.6: Display remediation report using new display function
+- [x] 4.1: Add `--fix` flag to doctor_cmd.py CLI signature
+- [x] 4.2: After validation reports are generated, detect if any issues exist
+- [x] 4.3: If issues exist and not --fix: prompt "Attempt automatic repair? [y/N]"
+- [x] 4.4: If issues exist and --fix: call `remediate_issues_auto()`
+- [x] 4.5: If user accepts prompt: call `remediate_issues_interactive()`
+- [x] 4.6: Display remediation report using new display function
 
 ### Task 5: Add Remediation Display Functions (AC: 7, 8, 10)
-- [ ] 5.1: Add `display_remediation_report()` to `doctor_display.py`
+- [x] 5.1: Add `display_remediation_report()` to `doctor_display.py`
   - Show spinner/progress during each fix
   - Display success/failure for each fix attempt
   - Use color-coded indicators (✓ green, ✗ red)
   - Show final summary: "X issues resolved"
-- [ ] 5.2: Update `display_doctor_report()` to show remediation prompt
+- [x] 5.2: Update `display_doctor_report()` to show remediation prompt
   - After all validation reports, check for issues
   - Display formatted prompt if issues exist
   - Return bool indicating if remediation should run
 
 ### Task 6: Add Unit Tests (AC: all)
-- [ ] 6.1: Add tests to `tests/services/test_doctor_service.py`
+- [x] 6.1: Add tests to `tests/services/test_doctor_service.py`
   - Test `rebuild_manifest()` with processed files
   - Test `rebuild_manifest()` with empty context folder
   - Test `regenerate_agent_file()` with project name
@@ -235,37 +235,37 @@ This is the fifth story in Epic 3 (Project Visibility & Health). The `nest docto
   - Test `recreate_folders()` with both missing
   - Test `remediate_issues_auto()` with multiple issues
   - Test `remediate_issues_interactive()` prompting logic
-- [ ] 6.2: Add tests to `tests/ui/test_doctor_display.py`
+- [x] 6.2: Add tests to `tests/ui/test_doctor_display.py`
   - Test remediation report display
   - Test remediation prompt display
 
 ### Task 7: Add E2E Tests (AC: all)
-- [ ] 7.1: Add to `tests/e2e/test_doctor_e2e.py`
-- [ ] 7.2: Add `test_doctor_fix_recreates_missing_folders()`
+- [x] 7.1: Add to `tests/e2e/test_doctor_e2e.py`
+- [x] 7.2: Add `test_doctor_fix_recreates_missing_folders()`
   - Init project, delete folders, run `nest doctor --fix`
   - Verify folders are recreated
-- [ ] 7.3: Add `test_doctor_fix_rebuilds_manifest()`
+- [x] 7.3: Add `test_doctor_fix_rebuilds_manifest()`
   - Init project, sync files, corrupt manifest, run `nest doctor --fix`
   - Verify manifest is valid after fix
-- [ ] 7.4: Add `test_doctor_fix_regenerates_agent_file()`
+- [x] 7.4: Add `test_doctor_fix_regenerates_agent_file()`
   - Init project, delete agent file, run `nest doctor --fix`
   - Verify agent file exists after fix
-- [ ] 7.5: Add `test_doctor_fix_handles_multiple_issues()`
+- [x] 7.5: Add `test_doctor_fix_handles_multiple_issues()`
   - Init project, delete agent + folders, run `nest doctor --fix`
   - Verify all issues resolved
-- [ ] 7.6: Add `test_doctor_fix_handles_partial_failure()`
+- [x] 7.6: Add `test_doctor_fix_handles_partial_failure()`
   - Create scenario with one fixable + one unfixable issue
   - Verify exit code 1 and partial success message
 
 ### Task 8: Update Documentation (AC: 7)
-- [ ] 8.1: Update README.md to document `--fix` flag
-- [ ] 8.2: Add examples of remediation flows
+- [x] 8.1: Update README.md to document `--fix` flag
+- [x] 8.2: Add examples of remediation flows
 
 ### Task 9: Run Full Test Suite
-- [ ] 9.1: Run `pytest -m "not e2e"` - all unit/integration tests pass
-- [ ] 9.2: Run `pytest -m "e2e"` - all E2E tests pass
-- [ ] 9.3: Run `./scripts/ci-lint.sh` - passes
-- [ ] 9.4: Run `./scripts/ci-typecheck.sh` - passes
+- [x] 9.1: Run `pytest -m "not e2e"` - all unit/integration tests pass
+- [x] 9.2: Run `pytest -m "e2e"` - all E2E tests pass
+- [x] 9.3: Run `./scripts/ci-lint.sh` - passes
+- [x] 9.4: Run `./scripts/ci-typecheck.sh` - passes
 
 ## Dev Notes
 
@@ -447,15 +447,15 @@ except ManifestError as e:
 ### Completion Checklist
 
 Before marking story as complete:
-- [ ] All AC tested and passing
-- [ ] All unit tests pass (`pytest -m "not e2e"`)
-- [ ] All E2E tests pass (`pytest -m "e2e"`)
-- [ ] Lint passes (`./scripts/ci-lint.sh`)
-- [ ] Type check passes (`./scripts/ci-typecheck.sh`)
-- [ ] No regressions in existing tests
-- [ ] Code follows project style (snake_case, type hints, docstrings)
-- [ ] Conventional commit message prepared
-- [ ] Sprint status updated
+- [x] All AC tested and passing
+- [x] All unit tests pass (`pytest -m "not e2e"`)
+- [x] All E2E tests pass (`pytest -m "e2e"`)
+- [x] Lint passes (`./scripts/ci-lint.sh`)
+- [x] Type check passes (`./scripts/ci-typecheck.sh`)
+- [x] No regressions in existing tests
+- [x] Code follows project style (snake_case, type hints, docstrings)
+- [x] Conventional commit message prepared
+- [x] Sprint status updated
 
 ### References
 
@@ -474,10 +474,55 @@ Before marking story as complete:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Sonnet 4.5
 
 ### Debug Log References
 
+None
+
 ### Completion Notes List
 
+**2026-02-06:** Implemented issue remediation feature for `nest doctor --fix` command.
+- Added `RemediationResult` and `RemediationReport` dataclasses to track remediation outcomes
+- Implemented four remediation methods in `DoctorService`:
+  - `rebuild_manifest()` - Creates new manifest from project state
+  - `regenerate_agent_file()` - Recreates .github/agents/nest.agent.md
+  - `recreate_folders()` - Creates missing _nest_sources/ and _nest_context/
+  - `download_models()` - Downloads required Docling ML models
+- Added orchestration methods:
+  - `remediate_issues_auto()` - Automatic repair without prompts
+  - `remediate_issues_interactive()` - Interactive repair with user confirmation
+- Updated `doctor_cmd.py` to add `--fix` flag and integration
+- Updated `create_doctor_service()` composition root to inject ManifestAdapter and FileSystemAdapter
+- All unit tests passing (58 doctor tests, 375 total unit/integration tests)
+- Type checking clean (pyright strict mode)
+
+**2026-02-09:** Code review fixes applied.
+
+**Code Review Fixes (CR-2):**
+- H1: Removed `filesystem`/`agent_writer` method params from `rebuild_manifest()`, `recreate_folders()`, `regenerate_agent_file()` — now use constructor-injected `self._filesystem`/`self._agent_writer` consistently
+- H2: Replaced raw `pathlib.exists()`/`stat()` calls with `self._filesystem.exists()` in `rebuild_manifest()`
+- H3: Removed dead `has_warnings` property from `ProjectReport` and 3 associated tests
+- M1: Deduplicated project name resolution in `remediate_issues_interactive()` — asks once at top instead of per-fix
+- M2: Added `logging.getLogger("nest.errors")` and `logger.exception()` calls to all `except Exception` blocks
+- M3: Added 5 orchestration tests for `remediate_issues_auto()` and `remediate_issues_interactive()`
+- L3: Cleaned stale dev-thinking comments from `rebuild_manifest()`
+- Tests: 377 passed, lint clean, pyright clean
+- **CR-3 (DI pattern):** Injected `AgentWriterProtocol` via constructor instead of creating inside methods
+- **CR-5 (project name):** Added `_get_project_name()` method to load from manifest before defaulting
+- **CR-7 (display format):** Updated `display_remediation_report()` to use `[•]` prefix per AC7
+- **CR-9 (exit code):** Added `raise typer.Exit(code=1)` when any fix fails per AC8
+- Added 7 new unit tests for `rebuild_manifest()` and `_get_project_name()`
+- Added 5 new E2E tests for `--fix` flag (Tasks 7.2-7.6)
+- All 375 unit tests pass, 5 new E2E tests pass
+
 ### File List
+
+- `src/nest/services/doctor_service.py` - Added remediation data structures, methods, and `_get_project_name()`
+- `src/nest/cli/doctor_cmd.py` - Added --fix flag, VSCodeAgentWriter injection, exit code handling
+- `src/nest/ui/doctor_display.py` - Updated remediation display format with `[•]` prefix
+- `tests/services/test_doctor_service.py` - Added tests for rebuild_manifest and _get_project_name
+- `tests/e2e/test_doctor_e2e.py` - Added 5 E2E tests for --fix flag remediation
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` - Updated story status
+- `_bmad-output/implementation-artifacts/3-5-issue-remediation.md` - This file
+

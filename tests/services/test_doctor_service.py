@@ -396,48 +396,6 @@ class TestProjectReportDataclass:
 
         assert report.all_pass is False
 
-    def test_project_report_has_warnings_true_for_agent_missing(self) -> None:
-        """ProjectReport.has_warnings should be True for agent file warning."""
-        status = ProjectStatus(
-            manifest_status="valid",
-            manifest_version="1.0.0",
-            current_version="1.0.0",
-            agent_file_present=False,
-            folders_status="intact",
-            suggestions=[],
-        )
-        report = ProjectReport(status=status)
-
-        assert report.has_warnings is True
-
-    def test_project_report_has_warnings_true_for_version_mismatch(self) -> None:
-        """ProjectReport.has_warnings should be True for version mismatch."""
-        status = ProjectStatus(
-            manifest_status="version_mismatch",
-            manifest_version="0.9.0",
-            current_version="1.0.0",
-            agent_file_present=True,
-            folders_status="intact",
-            suggestions=[],
-        )
-        report = ProjectReport(status=status)
-
-        assert report.has_warnings is True
-
-    def test_project_report_has_warnings_false_for_manifest_errors(self) -> None:
-        """ProjectReport.has_warnings should be False for manifest errors."""
-        status = ProjectStatus(
-            manifest_status="invalid_json",
-            manifest_version=None,
-            current_version="1.0.0",
-            agent_file_present=True,
-            folders_status="intact",
-            suggestions=[],
-        )
-        report = ProjectReport(status=status)
-
-        assert report.has_warnings is False
-
 
 class MockProjectChecker:
     """Mock implementation of ProjectCheckerProtocol for testing."""
@@ -567,7 +525,6 @@ class TestCheckProject:
         assert report.status.manifest_status == "version_mismatch"
         assert report.status.manifest_version == "0.9.0"
         assert report.status.current_version == "1.0.0"
-        assert report.has_warnings is True
         assert "nest update" in " ".join(report.status.suggestions)
 
     def test_check_project_missing_agent_file(self, tmp_path: Path) -> None:
@@ -620,3 +577,515 @@ class TestCheckProject:
         assert report is not None
         assert report.status.folders_status == "both_missing"
         assert report.all_pass is False
+
+
+class TestRemediationResult:
+    """Tests for RemediationResult dataclass."""
+
+    def test_remediation_result_success(self) -> None:
+        """RemediationResult should store successful remediation."""
+        from nest.services.doctor_service import RemediationResult
+
+        result = RemediationResult(
+            issue="missing_manifest",
+            attempted=True,
+            success=True,
+            message="Manifest rebuilt successfully",
+        )
+
+        assert result.issue == "missing_manifest"
+        assert result.attempted is True
+        assert result.success is True
+        assert result.message == "Manifest rebuilt successfully"
+
+    def test_remediation_result_failure(self) -> None:
+        """RemediationResult should store failed remediation."""
+        from nest.services.doctor_service import RemediationResult
+
+        result = RemediationResult(
+            issue="model_download",
+            attempted=True,
+            success=False,
+            message="Network error: connection timeout",
+        )
+
+        assert result.issue == "model_download"
+        assert result.attempted is True
+        assert result.success is False
+        assert "timeout" in result.message
+
+    def test_remediation_result_not_attempted(self) -> None:
+        """RemediationResult should handle not attempted."""
+        from nest.services.doctor_service import RemediationResult
+
+        result = RemediationResult(
+            issue="agent_file",
+            attempted=False,
+            success=False,
+            message="User declined",
+        )
+
+        assert result.attempted is False
+        assert result.success is False
+
+
+class TestRemediationReport:
+    """Tests for RemediationReport dataclass."""
+
+    def test_remediation_report_all_succeeded(self) -> None:
+        """RemediationReport should detect all successes."""
+        from nest.services.doctor_service import RemediationReport, RemediationResult
+
+        results = [
+            RemediationResult("manifest", True, True, "Manifest rebuilt"),
+            RemediationResult("folders", True, True, "Folders created"),
+        ]
+        report = RemediationReport(results=results)
+
+        assert report.all_succeeded is True
+        assert report.any_attempted is True
+        assert len(report.results) == 2
+
+    def test_remediation_report_partial_failure(self) -> None:
+        """RemediationReport should detect partial failures."""
+        from nest.services.doctor_service import RemediationReport, RemediationResult
+
+        results = [
+            RemediationResult("manifest", True, True, "Success"),
+            RemediationResult("models", True, False, "Failed"),
+        ]
+        report = RemediationReport(results=results)
+
+        assert report.all_succeeded is False
+        assert report.any_attempted is True
+
+    def test_remediation_report_none_attempted(self) -> None:
+        """RemediationReport should detect when nothing attempted."""
+        from nest.services.doctor_service import RemediationReport, RemediationResult
+
+        results = [
+            RemediationResult("manifest", False, False, "User declined"),
+            RemediationResult("folders", False, False, "User declined"),
+        ]
+        report = RemediationReport(results=results)
+
+        assert report.all_succeeded is True  # None failed because none attempted
+        assert report.any_attempted is False
+
+    def test_remediation_report_empty(self) -> None:
+        """RemediationReport should handle empty results."""
+        from nest.services.doctor_service import RemediationReport
+
+        report = RemediationReport(results=[])
+
+        assert report.all_succeeded is True  # Vacuous truth
+        assert report.any_attempted is False
+
+
+class TestRemediationMethods:
+    """Tests for DoctorService remediation methods."""
+
+    def test_recreate_folders_both_exist(self, tmp_path: Path) -> None:
+        """recreate_folders() should report no action when both exist."""
+        from nest.services.doctor_service import DoctorService, RemediationResult
+
+        mock_fs = MagicMock()
+        mock_fs.exists.side_effect = lambda p: True
+
+        service = DoctorService(filesystem=mock_fs)
+        result = service.recreate_folders(tmp_path)
+
+        assert isinstance(result, RemediationResult)
+        assert result.issue == "missing_folders"
+        assert result.attempted is False
+        assert result.success is True
+        assert "already exist" in result.message.lower()
+
+    def test_recreate_folders_creates_missing(self, tmp_path: Path) -> None:
+        """recreate_folders() should create missing folders."""
+        from nest.services.doctor_service import DoctorService
+
+        mock_fs = MagicMock()
+        mock_fs.exists.return_value = False
+
+        service = DoctorService(filesystem=mock_fs)
+        result = service.recreate_folders(tmp_path)
+
+        assert result.attempted is True
+        assert result.success is True
+        # Should have called create_directory for both folders
+        assert mock_fs.create_directory.call_count == 2
+
+    def test_regenerate_agent_file_success(self, tmp_path: Path) -> None:
+        """regenerate_agent_file() should use AgentWriterProtocol."""
+        from nest.services.doctor_service import DoctorService, RemediationResult
+
+        mock_writer = MagicMock()
+        service = DoctorService(agent_writer=mock_writer)
+
+        result = service.regenerate_agent_file(tmp_path, "TestProject")
+
+        assert isinstance(result, RemediationResult)
+        assert result.attempted is True
+        assert result.success is True
+        assert mock_writer.generate.called
+
+    def test_regenerate_agent_file_handles_error(self, tmp_path: Path) -> None:
+        """regenerate_agent_file() should handle generation errors."""
+        from nest.services.doctor_service import DoctorService
+
+        mock_writer = MagicMock()
+        mock_writer.generate.side_effect = OSError("Write failed")
+
+        service = DoctorService(agent_writer=mock_writer)
+        result = service.regenerate_agent_file(tmp_path, "TestProject")
+
+        assert result.attempted is True
+        assert result.success is False
+        assert "failed" in result.message.lower()
+
+    def test_download_models_when_checker_none(self, tmp_path: Path) -> None:
+        """download_models() should fail gracefully when no model checker."""
+        from nest.services.doctor_service import DoctorService, RemediationResult
+
+        service = DoctorService(model_checker=None)
+        result = service.download_models()
+
+        assert isinstance(result, RemediationResult)
+        assert result.attempted is False
+        assert result.success is False
+        assert "not available" in result.message.lower() or "no checker" in result.message.lower()
+
+    def test_download_models_success(self) -> None:
+        """download_models() should trigger model download."""
+        from nest.services.doctor_service import DoctorService
+
+        mock_checker = MagicMock()
+        mock_checker.download_if_needed.return_value = True
+
+        service = DoctorService(model_checker=mock_checker)
+        result = service.download_models()
+
+        assert result.attempted is True
+        assert result.success is True
+        assert mock_checker.download_if_needed.called
+
+
+class TestRebuildManifest:
+    """Tests for DoctorService.rebuild_manifest()."""
+
+    def test_rebuild_manifest_no_manifest_adapter(self, tmp_path: Path) -> None:
+        """rebuild_manifest() should fail when no manifest adapter."""
+        from nest.services.doctor_service import DoctorService
+
+        service = DoctorService(manifest_adapter=None)
+        result = service.rebuild_manifest(tmp_path, "TestProject")
+
+        assert result.attempted is False
+        assert result.success is False
+        assert "not available" in result.message.lower()
+
+    def test_rebuild_manifest_no_filesystem_adapter(self, tmp_path: Path) -> None:
+        """rebuild_manifest() should fail when no filesystem adapter."""
+        from nest.services.doctor_service import DoctorService
+
+        mock_manifest = MagicMock()
+        service = DoctorService(manifest_adapter=mock_manifest, filesystem=None)
+        result = service.rebuild_manifest(tmp_path, "TestProject")
+
+        assert result.attempted is False
+        assert result.success is False
+        assert "not available" in result.message.lower()
+
+    def test_rebuild_manifest_empty_sources(self, tmp_path: Path) -> None:
+        """rebuild_manifest() should create empty manifest when no sources."""
+        from nest.services.doctor_service import DoctorService
+
+        mock_manifest = MagicMock()
+        mock_fs = MagicMock()
+        mock_fs.exists.return_value = False
+
+        service = DoctorService(manifest_adapter=mock_manifest, filesystem=mock_fs)
+
+        result = service.rebuild_manifest(tmp_path, "TestProject")
+
+        assert result.attempted is True
+        assert result.success is True
+        assert "empty" in result.message.lower() or "no sources" in result.message.lower()
+
+    def test_rebuild_manifest_with_processed_files(self, tmp_path: Path) -> None:
+        """rebuild_manifest() should restore entries from processed files."""
+        from nest.services.doctor_service import DoctorService
+
+        # Create real directories and files
+        sources_dir = tmp_path / "_nest_sources"
+        context_dir = tmp_path / "_nest_context"
+        sources_dir.mkdir()
+        context_dir.mkdir()
+
+        # Create source file
+        source_file = sources_dir / "doc.pdf"
+        source_file.write_text("dummy content")
+
+        # Create matching processed output
+        output_file = context_dir / "doc.md"
+        output_file.write_text("# Processed content")
+
+        mock_manifest = MagicMock()
+        mock_fs = MagicMock()
+        mock_fs.list_files.return_value = [source_file]
+        mock_fs.exists.return_value = True
+
+        service = DoctorService(manifest_adapter=mock_manifest, filesystem=mock_fs)
+        result = service.rebuild_manifest(tmp_path, "TestProject")
+
+        assert result.attempted is True
+        assert result.success is True
+        assert "1 files restored" in result.message
+        assert mock_manifest.save.called
+
+
+class TestGetProjectName:
+    """Tests for DoctorService._get_project_name()."""
+
+    def test_get_project_name_from_manifest(self, tmp_path: Path) -> None:
+        """_get_project_name() should return name from manifest if available."""
+        from nest.services.doctor_service import DoctorService
+
+        mock_manifest = MagicMock()
+        mock_manifest.exists.return_value = True
+        mock_manifest.load.return_value = MagicMock(project_name="MyProject")
+
+        service = DoctorService(manifest_adapter=mock_manifest)
+        name = service._get_project_name(tmp_path)
+
+        assert name == "MyProject"
+
+    def test_get_project_name_default_when_no_manifest(self, tmp_path: Path) -> None:
+        """_get_project_name() should return default when no manifest."""
+        from nest.services.doctor_service import DoctorService
+
+        service = DoctorService(manifest_adapter=None)
+        name = service._get_project_name(tmp_path)
+
+        assert name == "Nest Project"
+
+    def test_get_project_name_default_when_manifest_error(self, tmp_path: Path) -> None:
+        """_get_project_name() should return default when manifest load fails."""
+        from nest.services.doctor_service import DoctorService
+
+        mock_manifest = MagicMock()
+        mock_manifest.exists.return_value = True
+        mock_manifest.load.side_effect = Exception("Load failed")
+
+        service = DoctorService(manifest_adapter=mock_manifest)
+        name = service._get_project_name(tmp_path)
+
+        assert name == "Nest Project"
+
+
+class TestRemediateIssuesAuto:
+    """Tests for DoctorService.remediate_issues_auto() orchestration."""
+
+    def test_auto_fixes_multiple_issues(self, tmp_path: Path) -> None:
+        """remediate_issues_auto() should fix folders, manifest, and agent file."""
+        mock_fs = MagicMock()
+        mock_fs.exists.return_value = False
+        mock_manifest = MagicMock()
+        mock_manifest.exists.return_value = False
+        mock_writer = MagicMock()
+
+        service = DoctorService(
+            manifest_adapter=mock_manifest,
+            filesystem=mock_fs,
+            agent_writer=mock_writer,
+        )
+
+        env_report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+        )
+        project_report = ProjectReport(
+            status=ProjectStatus(
+                manifest_status="missing",
+                manifest_version=None,
+                current_version="1.0.0",
+                agent_file_present=False,
+                folders_status="both_missing",
+                suggestions=[],
+            )
+        )
+
+        report = service.remediate_issues_auto(
+            tmp_path, env_report, None, project_report
+        )
+
+        assert report.any_attempted is True
+        assert len(report.results) == 3
+        assert mock_fs.create_directory.called
+        assert mock_manifest.save.called
+        assert mock_writer.generate.called
+
+    def test_auto_skips_when_no_issues(self, tmp_path: Path) -> None:
+        """remediate_issues_auto() should return empty when no issues."""
+        service = DoctorService()
+
+        env_report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+        )
+        project_report = ProjectReport(
+            status=ProjectStatus(
+                manifest_status="valid",
+                manifest_version="1.0.0",
+                current_version="1.0.0",
+                agent_file_present=True,
+                folders_status="intact",
+                suggestions=[],
+            )
+        )
+
+        report = service.remediate_issues_auto(
+            tmp_path, env_report, None, project_report
+        )
+
+        assert report.any_attempted is False
+        assert len(report.results) == 0
+
+
+class TestRemediateIssuesInteractive:
+    """Tests for DoctorService.remediate_issues_interactive() orchestration."""
+
+    def test_interactive_prompts_for_each_issue(self, tmp_path: Path) -> None:
+        """remediate_issues_interactive() should prompt for each fixable issue."""
+        mock_fs = MagicMock()
+        mock_fs.exists.return_value = False
+        mock_manifest = MagicMock()
+        mock_manifest.exists.return_value = False
+        mock_writer = MagicMock()
+
+        confirm_calls: list[str] = []
+
+        def mock_confirm(msg: str) -> bool:
+            confirm_calls.append(msg)
+            return True
+
+        service = DoctorService(
+            manifest_adapter=mock_manifest,
+            filesystem=mock_fs,
+            agent_writer=mock_writer,
+        )
+
+        env_report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+        )
+        project_report = ProjectReport(
+            status=ProjectStatus(
+                manifest_status="missing",
+                manifest_version=None,
+                current_version="1.0.0",
+                agent_file_present=False,
+                folders_status="both_missing",
+                suggestions=[],
+            )
+        )
+
+        report = service.remediate_issues_interactive(
+            tmp_path,
+            env_report,
+            None,
+            project_report,
+            confirm_callback=mock_confirm,
+            input_callback=lambda msg: "TestProject",
+        )
+
+        assert len(confirm_calls) == 3
+        assert report.any_attempted is True
+        assert len(report.results) == 3
+
+    def test_interactive_user_declines_all(self, tmp_path: Path) -> None:
+        """remediate_issues_interactive() should respect user declining fixes."""
+        service = DoctorService(
+            filesystem=MagicMock(),
+            manifest_adapter=MagicMock(),
+        )
+
+        env_report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+        )
+        project_report = ProjectReport(
+            status=ProjectStatus(
+                manifest_status="missing",
+                manifest_version=None,
+                current_version="1.0.0",
+                agent_file_present=False,
+                folders_status="both_missing",
+                suggestions=[],
+            )
+        )
+
+        report = service.remediate_issues_interactive(
+            tmp_path,
+            env_report,
+            None,
+            project_report,
+            confirm_callback=lambda msg: False,
+            input_callback=lambda msg: "",
+        )
+
+        assert report.any_attempted is False
+        assert all(not r.attempted for r in report.results)
+
+    def test_interactive_asks_project_name_once(self, tmp_path: Path) -> None:
+        """remediate_issues_interactive() should ask project name only once."""
+        input_calls: list[str] = []
+
+        def mock_input(msg: str) -> str:
+            input_calls.append(msg)
+            return "TestProject"
+
+        mock_fs = MagicMock()
+        mock_fs.exists.return_value = False
+        mock_manifest = MagicMock()
+        mock_manifest.exists.return_value = False
+        mock_writer = MagicMock()
+
+        service = DoctorService(
+            manifest_adapter=mock_manifest,
+            filesystem=mock_fs,
+            agent_writer=mock_writer,
+        )
+
+        env_report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+        )
+        project_report = ProjectReport(
+            status=ProjectStatus(
+                manifest_status="missing",
+                manifest_version=None,
+                current_version="1.0.0",
+                agent_file_present=False,
+                folders_status="intact",
+                suggestions=[],
+            )
+        )
+
+        report = service.remediate_issues_interactive(
+            tmp_path,
+            env_report,
+            None,
+            project_report,
+            confirm_callback=lambda msg: True,
+            input_callback=mock_input,
+        )
+
+        assert len(input_calls) == 1
+        assert report.any_attempted is True
