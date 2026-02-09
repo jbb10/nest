@@ -1,6 +1,6 @@
 # Story 3.5: Issue Remediation
 
-Status: review
+Status: done
 Branch: feat/3-5-issue-remediation
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -450,12 +450,12 @@ Before marking story as complete:
 - [x] All AC tested and passing
 - [x] All unit tests pass (`pytest -m "not e2e"`)
 - [x] All E2E tests pass (`pytest -m "e2e"`)
-- [ ] Lint passes (`./scripts/ci-lint.sh`)
+- [x] Lint passes (`./scripts/ci-lint.sh`)
 - [x] Type check passes (`./scripts/ci-typecheck.sh`)
 - [x] No regressions in existing tests
 - [x] Code follows project style (snake_case, type hints, docstrings)
-- [ ] Conventional commit message prepared
-- [ ] Sprint status updated
+- [x] Conventional commit message prepared
+- [x] Sprint status updated
 
 ### References
 
@@ -498,6 +498,16 @@ None
 - Type checking clean (pyright strict mode)
 
 **2026-02-09:** Code review fixes applied.
+
+**Code Review Fixes (CR-2):**
+- H1: Removed `filesystem`/`agent_writer` method params from `rebuild_manifest()`, `recreate_folders()`, `regenerate_agent_file()` — now use constructor-injected `self._filesystem`/`self._agent_writer` consistently
+- H2: Replaced raw `pathlib.exists()`/`stat()` calls with `self._filesystem.exists()` in `rebuild_manifest()`
+- H3: Removed dead `has_warnings` property from `ProjectReport` and 3 associated tests
+- M1: Deduplicated project name resolution in `remediate_issues_interactive()` — asks once at top instead of per-fix
+- M2: Added `logging.getLogger("nest.errors")` and `logger.exception()` calls to all `except Exception` blocks
+- M3: Added 5 orchestration tests for `remediate_issues_auto()` and `remediate_issues_interactive()`
+- L3: Cleaned stale dev-thinking comments from `rebuild_manifest()`
+- Tests: 377 passed, lint clean, pyright clean
 - **CR-3 (DI pattern):** Injected `AgentWriterProtocol` via constructor instead of creating inside methods
 - **CR-5 (project name):** Added `_get_project_name()` method to load from manifest before defaulting
 - **CR-7 (display format):** Updated `display_remediation_report()` to use `[•]` prefix per AC7

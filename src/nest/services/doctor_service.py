@@ -1,6 +1,7 @@
 """Doctor service for environment and project validation."""
 
 import json
+import logging
 import re
 import shutil
 import subprocess
@@ -18,6 +19,8 @@ from nest.adapters.protocols import ModelCheckerProtocol, ProjectCheckerProtocol
 from nest.core.checksum import compute_sha256
 from nest.core.exceptions import ManifestError
 from nest.core.models import FileEntry, Manifest
+
+logger = logging.getLogger("nest.errors")
 
 if TYPE_CHECKING:
     from nest.adapters.protocols import (
@@ -101,14 +104,6 @@ class ProjectReport:
         return (
             self.status.manifest_status == "valid"
             and self.status.agent_file_present
-            and self.status.folders_status == "intact"
-        )
-
-    @property
-    def has_warnings(self) -> bool:
-        """True if only warnings (no errors)."""
-        return (
-            self.status.manifest_status in ("valid", "version_mismatch")
             and self.status.folders_status == "intact"
         )
 
@@ -456,7 +451,6 @@ class DoctorService:
         self,
         project_dir: Path,
         project_name: str,
-        filesystem: "FileSystemProtocol | None" = None,
     ) -> RemediationResult:
         """Rebuild manifest from processed files.
 
@@ -467,7 +461,6 @@ class DoctorService:
         Args:
             project_dir: Path to the project root directory.
             project_name: Name of the project.
-            filesystem: Filesystem adapter (required for scanning).
 
         Returns:
             RemediationResult indicating success or failure.
@@ -480,20 +473,15 @@ class DoctorService:
                 message="Manifest adapter not available",
             )
 
-        if filesystem is None:
-            # Fallback to os/pathlib if no adapter, but for now strict
-            if self._filesystem:
-                filesystem = self._filesystem
-            else:
-                return RemediationResult(
-                    issue="corrupt_manifest",
-                    attempted=False,
-                    success=False,
-                    message="Filesystem adapter not available",
-                )
+        if self._filesystem is None:
+            return RemediationResult(
+                issue="corrupt_manifest",
+                attempted=False,
+                success=False,
+                message="Filesystem adapter not available",
+            )
 
         try:
-            # Create a new manifest structure
             manifest = Manifest(
                 nest_version=nest.__version__,
                 project_name=project_name,
@@ -504,8 +492,7 @@ class DoctorService:
             sources_dir = project_dir / "_nest_sources"
             context_dir = project_dir / "_nest_context"
 
-            if not sources_dir.exists():
-                # Nothing to scan, just save empty manifest
+            if not self._filesystem.exists(sources_dir):
                 self._manifest_adapter.save(project_dir, manifest)
                 return RemediationResult(
                     issue="corrupt_manifest",
@@ -514,33 +501,19 @@ class DoctorService:
                     message="Manifest rebuilt (empty - no sources found)",
                 )
 
-            # recursive scan of sources
-            # We can use filesystem.list_files if available, or just rglob
-            # Since FileSystemProtocol.list_files returns absolute paths
-            source_files = filesystem.list_files(sources_dir)
+            source_files = self._filesystem.list_files(sources_dir)
 
             restored_count = 0
             for source_path in source_files:
-                # Compute relative path for manifest key
                 rel_path = source_path.relative_to(sources_dir)
                 key = str(rel_path)
-
-                # Compute checksum
                 sha256 = compute_sha256(source_path)
 
-                # Check for output file
-                # Assuming .md extension for all processed files
-                # This is a simplification but covers standard behavior
                 output_rel_path = rel_path.with_suffix(".md")
                 output_path = context_dir / output_rel_path
 
-                if output_path.exists():
-                    # It exists - assume success.
-                    # Use file modification time as processed_at
-                    stats = output_path.stat()
-                    processed_at = datetime.fromtimestamp(
-                        stats.st_mtime, tz=timezone.utc
-                    )
+                if self._filesystem.exists(output_path):
+                    processed_at = datetime.now(timezone.utc)
 
                     entry = FileEntry(
                         sha256=sha256,
@@ -550,12 +523,6 @@ class DoctorService:
                     )
                     manifest.files[key] = entry
                     restored_count += 1
-                else:
-                    # Source exists but no output - treat as new/unprocessed?
-                    # Manifest tracks processed state. If not processed, maybe valid to omit?
-                    # Or add with status="failed"?
-                    # For now, we only add if output exists to match "state restoration"
-                    pass
 
             self._manifest_adapter.save(project_dir, manifest)
 
@@ -566,6 +533,7 @@ class DoctorService:
                 message=f"Manifest rebuilt successfully ({restored_count} files restored)",
             )
         except Exception as e:
+            logger.exception("Failed to rebuild manifest in %s", project_dir)
             return RemediationResult(
                 issue="corrupt_manifest",
                 attempted=True,
@@ -573,19 +541,16 @@ class DoctorService:
                 message=f"Failed to rebuild manifest: {e}",
             )
 
-    def recreate_folders(
-        self, project_dir: Path, filesystem: "FileSystemProtocol | None" = None
-    ) -> RemediationResult:
+    def recreate_folders(self, project_dir: Path) -> RemediationResult:
         """Recreate missing project folders.
 
         Args:
             project_dir: Path to the project root directory.
-            filesystem: Filesystem adapter for directory operations.
 
         Returns:
             RemediationResult indicating success or failure.
         """
-        if filesystem is None:
+        if self._filesystem is None:
             return RemediationResult(
                 issue="missing_folders",
                 attempted=False,
@@ -596,9 +561,8 @@ class DoctorService:
         sources_dir = project_dir / "_nest_sources"
         context_dir = project_dir / "_nest_context"
 
-        # Check which folders are missing
-        sources_exist = filesystem.exists(sources_dir)
-        context_exist = filesystem.exists(context_dir)
+        sources_exist = self._filesystem.exists(sources_dir)
+        context_exist = self._filesystem.exists(context_dir)
 
         if sources_exist and context_exist:
             return RemediationResult(
@@ -608,13 +572,12 @@ class DoctorService:
                 message="Folders already exist",
             )
 
-        # Create missing folders
         created: list[str] = []
         if not sources_exist:
-            filesystem.create_directory(sources_dir)
+            self._filesystem.create_directory(sources_dir)
             created.append("_nest_sources/")
         if not context_exist:
-            filesystem.create_directory(context_dir)
+            self._filesystem.create_directory(context_dir)
             created.append("_nest_context/")
 
         return RemediationResult(
@@ -628,19 +591,17 @@ class DoctorService:
         self,
         project_dir: Path,
         project_name: str,
-        agent_writer: "AgentWriterProtocol | None" = None,
     ) -> RemediationResult:
         """Regenerate agent file.
 
         Args:
             project_dir: Path to the project root directory.
             project_name: Name of the project.
-            agent_writer: Agent writer adapter for file generation.
 
         Returns:
             RemediationResult indicating success or failure.
         """
-        if agent_writer is None:
+        if self._agent_writer is None:
             return RemediationResult(
                 issue="missing_agent_file",
                 attempted=False,
@@ -650,7 +611,7 @@ class DoctorService:
 
         try:
             output_path = project_dir / ".github" / "agents" / "nest.agent.md"
-            agent_writer.generate(project_name, output_path)
+            self._agent_writer.generate(project_name, output_path)
             return RemediationResult(
                 issue="missing_agent_file",
                 attempted=True,
@@ -658,6 +619,7 @@ class DoctorService:
                 message=f"Agent file regenerated at {output_path.relative_to(project_dir)}",
             )
         except Exception as e:
+            logger.exception("Failed to regenerate agent file in %s", project_dir)
             return RemediationResult(
                 issue="missing_agent_file",
                 attempted=True,
@@ -702,6 +664,7 @@ class DoctorService:
                 message=message,
             )
         except Exception as e:
+            logger.exception("Failed to download ML models")
             return RemediationResult(
                 issue="missing_models",
                 attempted=True,
@@ -738,7 +701,7 @@ class DoctorService:
         if project_report:
             # Recreate folders
             if project_report.status.folders_status != "intact":
-                result = self.recreate_folders(project_dir, self._filesystem)
+                result = self.recreate_folders(project_dir)
                 results.append(result)
 
             # Rebuild manifest
@@ -747,7 +710,6 @@ class DoctorService:
                 "invalid_json",
                 "invalid_structure",
             ):
-                # Try to get project name from manifest or use default
                 project_name = self._get_project_name(project_dir)
                 result = self.rebuild_manifest(project_dir, project_name)
                 results.append(result)
@@ -755,17 +717,7 @@ class DoctorService:
             # Regenerate agent file
             if not project_report.status.agent_file_present:
                 project_name = self._get_project_name(project_dir)
-                if self._agent_writer:
-                    result = self.regenerate_agent_file(
-                        project_dir, project_name, self._agent_writer
-                    )
-                else:
-                    result = RemediationResult(
-                        issue="missing_agent_file",
-                        attempted=False,
-                        success=False,
-                        message="Agent writer not available",
-                    )
+                result = self.regenerate_agent_file(project_dir, project_name)
                 results.append(result)
 
         return RemediationReport(results=results)
@@ -794,13 +746,27 @@ class DoctorService:
         """
         results: list[RemediationResult] = []
 
-        # Helper to check confirmation
         def _confirm(msg: str) -> bool:
             if confirm_callback:
                 return confirm_callback(msg)
-            return True  # Default to yes if no callback (shouldn't happen in interactive)
+            return True
 
-        # 1. Check ML models (Foundational)
+        # Resolve project name once if needed for manifest or agent file fixes
+        project_name = self._get_project_name(project_dir)
+        if project_report:
+            needs_name = (
+                project_report.status.manifest_status
+                in ("missing", "invalid_json", "invalid_structure")
+                or not project_report.status.agent_file_present
+            )
+            if needs_name and project_name == "Nest Project" and input_callback:
+                user_input = input_callback(
+                    "Enter project name (default: Nest Project)"
+                )
+                if user_input.strip():
+                    project_name = user_input.strip()
+
+        # 1. ML models (Foundational)
         if model_report and not model_report.all_pass:
             if _confirm("Download missing ML models?"):
                 result = self.download_models()
@@ -810,58 +776,34 @@ class DoctorService:
                     RemediationResult("missing_models", False, False, "User declined")
                 )
 
-        # 2. Check Folders (Structural)
+        # 2. Folders (Structural)
         if project_report and project_report.status.folders_status != "intact":
             if _confirm("Recreate missing project folders?"):
-                result = self.recreate_folders(project_dir, self._filesystem)
+                result = self.recreate_folders(project_dir)
                 results.append(result)
             else:
                 results.append(
                     RemediationResult("missing_folders", False, False, "User declined")
                 )
 
-        # 3. Check Manifest (State)
+        # 3. Manifest (State)
         if project_report and project_report.status.manifest_status in (
             "missing",
             "invalid_json",
             "invalid_structure",
         ):
-            # Resolve project name
-            project_name = "Nest Project"
-            # If we need a project name and don't have a valid manifest, ask
-            if input_callback:
-                user_input = input_callback("Enter project name (default: Nest Project): ")
-                if user_input.strip():
-                    project_name = user_input.strip()
-
             if _confirm(f"Rebuild manifest for '{project_name}'?"):
-                result = self.rebuild_manifest(
-                    project_dir, project_name, self._filesystem
-                )
+                result = self.rebuild_manifest(project_dir, project_name)
                 results.append(result)
             else:
                 results.append(
                     RemediationResult("corrupt_manifest", False, False, "User declined")
                 )
 
-        # 4. Check Agent File (Last)
+        # 4. Agent file (Last)
         if project_report and not project_report.status.agent_file_present:
             if _confirm("Regenerate agent file?"):
-                # Try to load project name from manifest, or ask user
-                project_name = self._get_project_name(project_dir)
-                if project_name == "Nest Project" and input_callback:
-                    user_input = input_callback("Enter project name for agent file: ")
-                    if user_input.strip():
-                        project_name = user_input.strip()
-
-                if self._agent_writer:
-                    result = self.regenerate_agent_file(
-                        project_dir, project_name, self._agent_writer
-                    )
-                else:
-                    result = RemediationResult(
-                        "missing_agent_file", False, False, "Agent writer not available"
-                    )
+                result = self.regenerate_agent_file(project_dir, project_name)
                 results.append(result)
             else:
                 results.append(
