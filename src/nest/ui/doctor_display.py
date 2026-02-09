@@ -13,6 +13,7 @@ from nest.services.doctor_service import (
     EnvironmentStatus,
     ModelReport,
     ProjectReport,
+    RemediationReport,
 )
 
 
@@ -206,3 +207,40 @@ def display_doctor_report(
 
     console.print(tree)
     console.print()
+
+
+def display_remediation_report(
+    report: RemediationReport,
+    console: Console,
+) -> None:
+    """Render a RemediationReport to the console.
+
+    Args:
+        report: Remediation validation report.
+        console: Rich console instance.
+    """
+    if not report.any_attempted:
+        return
+
+    # Display results with [•] prefix per AC7
+    for result in report.results:
+        if not result.attempted:
+            console.print(f"   [dim]○[/dim] {result.message}")
+            continue
+
+        if result.success:
+            console.print(f"   [•] {result.message} [green]✓[/green]")
+        else:
+            console.print(f"   [•] {result.message} [red]✗[/red]")
+
+    attempted_count = len([r for r in report.results if r.attempted])
+    failed_count = len([r for r in report.results if r.attempted and not r.success])
+
+    if report.all_succeeded:
+        console.print(
+            f"\n   [green]{attempted_count} issues resolved.[/green] Run `nest doctor` to verify."
+        )
+    else:
+        console.print(
+            f"\n   [yellow]{failed_count} fixes failed[/yellow] out of {attempted_count} attempted."
+        )
