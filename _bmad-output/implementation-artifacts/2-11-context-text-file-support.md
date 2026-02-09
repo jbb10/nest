@@ -1,6 +1,6 @@
 # Story 2.11: Context Text File Support in Index and Status
 
-Status: review
+Status: done
 Branch: feat/2-11-context-text-file-support
 
 ## Story
@@ -241,4 +241,7 @@ Claude Opus 4.6 (GitHub Copilot)
 
 ## Change Log
 
-- 2026-02-09: Implemented Story 2.11 — Context Text File Support. Added `CONTEXT_TEXT_EXTENSIONS` constant and applied it consistently across index generation, status counting, and user-curated file counting. All 420 tests pass.
+- 2026-02-09: Implemented Story 2.11 — Context Text File Support. Added `CONTEXT_TEXT_EXTENSIONS` constant and applied it consistently across index generation, status counting, and user-curated file counting. All 420 tests pass.- 2026-02-09: Code Review Fixes (Amelia): 
+  - Fixed hardcoded string in orphan service (used constant).
+  - Improved index sort order to be case-insensitive.
+  - Fixed CRITICAL CLI fragility by implementing lazy imports and NoOp fallbacks for `docling` dependency in init, sync, and doctor commands. This allows E2E tests to run even if docling is missing.

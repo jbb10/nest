@@ -30,7 +30,8 @@ class IndexService:
             Formatted Markdown content for the index.
         """
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        sorted_files = sorted(files)
+        # Sort files case-insensitively for better UX
+        sorted_files = sorted(files, key=str.casefold)
         count = len(sorted_files)
 
         lines = [
