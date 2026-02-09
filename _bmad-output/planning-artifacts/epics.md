@@ -38,6 +38,7 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 **FR20:** `nest doctor` validates ML models (cached status, size)
 **FR21:** `nest doctor` validates project state (manifest integrity, agent file presence, folder structure)
 **FR22:** `nest doctor` offers remediation for detected issues (download models, rebuild manifest, regenerate agent file)
+**FR23:** `nest sync` index generation and status counting recognize all supported context text extensions (`.md`, `.txt`, `.text`, `.rst`, `.csv`, `.json`, `.yaml`, `.yml`, `.toml`, `.xml`) for user-curated files in `_nest_context/`
 
 ### Non-Functional Requirements
 
@@ -113,6 +114,7 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 | FR20 | Epic 3 | Doctor: ML model validation |
 | FR21 | Epic 3 | Doctor: project state validation |
 | FR22 | Epic 3 | Doctor: issue remediation |
+| FR23 | Epic 2 | Context text extension support for index/status |
 
 ## Epic List
 
@@ -133,7 +135,7 @@ As a user starting a new project, I can run a single command to create a smart, 
 ### Epic 2: Document Processing & Sync
 As a user with project documents, I can drop them into a folder and have them automatically converted into AI-readable Markdown, so my Copilot agent can understand them.
 
-**FRs covered:** FR5, FR6, FR7, FR8, FR9, FR10, FR11, FR12, FR13, FR14, NFR11
+**FRs covered:** FR5, FR6, FR7, FR8, FR9, FR10, FR11, FR12, FR13, FR14, FR23, NFR11
 
 **Scope:**
 - Scans for supported files (.pdf, .docx, .pptx, .xlsx, .html)
@@ -802,6 +804,73 @@ This story was added after v0.1.0 release revealed a bug that would have been ca
 **When** the refactoring is complete
 **Then** all tests pass with updated folder names
 **And** no regressions are introduced
+
+---
+
+### Story 2.11: Context Text File Support in Index and Status
+
+**As a** user who manually adds plain text files (`.txt`, `.yaml`, `.csv`, etc.) to `_nest_context/`,
+**I want** those files to appear in the master index and be counted correctly in status,
+**So that** my AI agent can discover and reference all text-based context I've curated, not just Markdown files.
+
+**Scope:** Introduces a `CONTEXT_TEXT_EXTENSIONS` constant defining the 10 supported plain-text file types for the context directory. Updates index generation, status counting, and user-curated file counting to use this single constant instead of hardcoded `.md` filters.
+
+**Acceptance Criteria:**
+
+**Context Text Extensions Constant:**
+
+**Given** the `core/paths.py` module
+**When** the developer references supported context file types
+**Then** a `CONTEXT_TEXT_EXTENSIONS` constant is available containing:
+`.md`, `.txt`, `.text`, `.rst`, `.csv`, `.json`, `.yaml`, `.yml`, `.toml`, `.xml`
+**And** all modules that filter context files import this constant from `core/paths.py`
+
+**Index Generation Includes All Text Types:**
+
+**Given** `_nest_context/` contains files with various text extensions (`.md`, `.txt`, `.yaml`, `.csv`, `.json`, etc.)
+**When** `nest sync` runs and regenerates `00_MASTER_INDEX.md`
+**Then** ALL files matching `CONTEXT_TEXT_EXTENSIONS` are listed in the index
+**And** files with unsupported extensions (e.g., `.png`, `.zip`, `.exe`) are NOT listed
+
+**Given** I manually add `meeting-notes.txt` to `_nest_context/`
+**When** `nest sync` runs
+**Then** `meeting-notes.txt` appears in `00_MASTER_INDEX.md`
+
+**Given** I manually add `api-spec.yaml` to `_nest_context/`
+**When** `nest sync` runs
+**Then** `api-spec.yaml` appears in `00_MASTER_INDEX.md`
+
+**Status Counting Uses Text Extensions:**
+
+**Given** `_nest_context/` contains files of varying types
+**When** `nest status` analyzes context files
+**Then** only files matching `CONTEXT_TEXT_EXTENSIONS` are counted in the context file total
+**And** unsupported file types are excluded from counts
+
+**User-Curated Counting Uses Text Extensions:**
+
+**Given** `_nest_context/` contains both manifest-tracked `.md` files and user-added `.txt`/`.yaml`/`.csv` files
+**When** orphan service counts user-curated files
+**Then** only files matching `CONTEXT_TEXT_EXTENSIONS` (and not in manifest) are counted as user-curated
+**And** binary/unsupported files are excluded from user-curated count
+
+**Orphan Detection Unchanged:**
+
+**Given** a user adds `report.txt` directly to `_nest_context/` (not via sync)
+**When** `nest sync` runs orphan cleanup
+**Then** `report.txt` is NOT removed (not in manifest = user-curated, preserved)
+
+**Agent Template Updated:**
+
+**Given** the VS Code agent template
+**When** `nest init` generates the agent file
+**Then** the agent instructions mention that context files may be in various text formats (not just Markdown)
+
+**All Existing Tests Pass:**
+
+**Given** all unit, integration, and E2E tests
+**When** the changes are complete
+**Then** all tests pass with no regressions
 
 ---
 

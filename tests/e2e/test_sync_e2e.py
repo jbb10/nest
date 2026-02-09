@@ -96,3 +96,59 @@ class TestSyncE2E:
         # Should indicate files were skipped (no changes)
         # Output may contain "skip" or show 0 processed
         assert "0" in result2.stdout or "skip" in result2.stdout.lower()
+
+
+@pytest.mark.e2e
+class TestSyncContextTextFilesE2E:
+    """E2E tests for non-Markdown text files in context indexing (Story 2.11)."""
+
+    def test_sync_indexes_user_curated_txt_file(self, initialized_project: Path) -> None:
+        """AC3: A .txt file added to _nest_context/ should appear in the master index."""
+        project_dir = initialized_project
+
+        # Manually create a .txt file in context directory
+        context_dir = project_dir / "_nest_context"
+        context_dir.mkdir(parents=True, exist_ok=True)
+        (context_dir / "notes.txt").write_text("Meeting notes from 2026-02-09")
+
+        # Run sync
+        result = run_cli(["sync"], cwd=project_dir)
+        assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
+
+        # Verify notes.txt appears in master index
+        index_content = (context_dir / "00_MASTER_INDEX.md").read_text()
+        assert "notes.txt" in index_content
+
+    def test_sync_indexes_user_curated_yaml_file(self, initialized_project: Path) -> None:
+        """AC4: A .yaml file added to _nest_context/ should appear in the master index."""
+        project_dir = initialized_project
+
+        # Manually create a .yaml file in context directory
+        context_dir = project_dir / "_nest_context"
+        context_dir.mkdir(parents=True, exist_ok=True)
+        (context_dir / "api-spec.yaml").write_text("openapi: 3.0.0\ninfo:\n  title: Test API")
+
+        # Run sync
+        result = run_cli(["sync"], cwd=project_dir)
+        assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
+
+        # Verify api-spec.yaml appears in master index
+        index_content = (context_dir / "00_MASTER_INDEX.md").read_text()
+        assert "api-spec.yaml" in index_content
+
+    def test_sync_ignores_binary_in_context(self, initialized_project: Path) -> None:
+        """AC2: A .png file added to _nest_context/ should NOT appear in the master index."""
+        project_dir = initialized_project
+
+        # Manually create a .png file in context directory
+        context_dir = project_dir / "_nest_context"
+        context_dir.mkdir(parents=True, exist_ok=True)
+        (context_dir / "diagram.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+
+        # Run sync
+        result = run_cli(["sync"], cwd=project_dir)
+        assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
+
+        # Verify diagram.png does NOT appear in master index
+        index_content = (context_dir / "00_MASTER_INDEX.md").read_text()
+        assert "diagram.png" not in index_content

@@ -17,20 +17,44 @@ from nest.services.init_service import InitService
 from nest.ui.messages import error, get_console, success
 
 
+class NoOpModelDownloader:
+    """Fallback downloader when docling is missing."""
+
+    def are_models_cached(self) -> bool:
+        """Always return False when missing."""
+        return False
+
+    def download_if_needed(self, progress: bool = True) -> bool:
+        """Warn user that models cannot be downloaded."""
+        from nest.ui.messages import warning
+
+        warning("Docling is not installed. ML models will NOT be downloaded.")
+        return False
+
+    def get_cache_path(self) -> Path:
+        """Return dummy path."""
+        return Path("docling-not-installed")
+
+
 def create_init_service() -> InitService:
     """Composition root for init service.
 
     Returns:
         Configured InitService with real adapters.
     """
-    from nest.adapters.docling_downloader import DoclingModelDownloader
+    try:
+        from nest.adapters.docling_downloader import DoclingModelDownloader
+
+        downloader = DoclingModelDownloader()
+    except ImportError:
+        downloader = NoOpModelDownloader()
 
     filesystem = FileSystemAdapter()
     return InitService(
         filesystem=filesystem,
         manifest=ManifestAdapter(),
         agent_writer=VSCodeAgentWriter(filesystem=filesystem),
-        model_downloader=DoclingModelDownloader(),
+        model_downloader=downloader,
     )
 
 

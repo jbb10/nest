@@ -14,7 +14,7 @@ from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.exceptions import NestError, ProcessingError
-from nest.core.models import DryRunResult, SyncResult
+from nest.core.models import DryRunResult, ProcessingResult, SyncResult
 from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService
@@ -28,6 +28,19 @@ from nest.ui.progress import SyncProgress
 
 if TYPE_CHECKING:
     from rich.console import Console
+
+
+class NoOpProcessor:
+    """Fallback processor when docling is missing."""
+
+    def process(self, source: Path, output: Path) -> ProcessingResult:
+        """Fail all processing."""
+        return ProcessingResult(
+            source=source,
+            output=output,
+            status="failed",
+            error="Docling is not installed",
+        )
 
 
 def create_sync_service(
@@ -66,11 +79,15 @@ def create_sync_service(
         Configured SyncService with real adapters.
     """
     # Adapters: External system wrappers
-    from nest.adapters.docling_processor import DoclingProcessor
+    try:
+        from nest.adapters.docling_processor import DoclingProcessor
+
+        processor = DoclingProcessor()
+    except ImportError:
+        processor = NoOpProcessor()
 
     filesystem = FileSystemAdapter()
     manifest_adapter = ManifestAdapter()
-    processor = DoclingProcessor()
 
     # Project paths
     raw_inbox = project_root / SOURCES_DIR

@@ -192,7 +192,7 @@ class SyncService:
         # 4. Orphan Cleanup (after manifest commit)
         orphan_result = self._orphan.cleanup(no_clean=no_clean)
 
-        # 5. Update Index (scans entire context directory for all .md files)
+        # 5. Update Index (scans entire context directory for all supported text files)
         # Use project directory name as project name
         project_name = self._project_root.name
         self._index.update_index(project_name)

@@ -66,6 +66,7 @@ development_status:
   2-8-sync-command-cli-integration: done
   2-9-e2e-testing-framework: done
   2-10-folder-naming-refactor: done
+  2-11-context-text-file-support: done
   epic-2-retrospective: optional
 
   # ============================================================

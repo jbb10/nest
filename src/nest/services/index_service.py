@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from nest.adapters.protocols import FileSystemProtocol
-from nest.core.paths import CONTEXT_DIR, MASTER_INDEX_FILE
+from nest.core.paths import CONTEXT_DIR, CONTEXT_TEXT_EXTENSIONS, MASTER_INDEX_FILE
 
 
 class IndexService:
@@ -30,7 +30,8 @@ class IndexService:
             Formatted Markdown content for the index.
         """
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        sorted_files = sorted(files)
+        # Sort files case-insensitively for better UX
+        sorted_files = sorted(files, key=str.casefold)
         count = len(sorted_files)
 
         lines = [
@@ -62,25 +63,27 @@ class IndexService:
         self._fs.write_text(index_path, content)
 
     def update_index(self, project_name: str) -> None:
-        """Update the master index by scanning all .md files in context directory.
+        """Update the master index by scanning all supported text files in context directory.
 
-        Scans the entire context directory for all .md files (both manifest-tracked
-        and user-curated), sorts them, and generates the index.
+        Scans the entire context directory for all supported text files (both
+        manifest-tracked and user-curated), sorts them, and generates the index.
 
         Args:
             project_name: Name of the project.
         """
-        # Scan entire context directory for all .md files
+        # Scan entire context directory for all supported text files
         all_files = self._fs.list_files(self._context_dir)
 
-        # Filter to .md files and exclude the index itself
-        md_files: list[str] = []
+        supported = {ext.lower() for ext in CONTEXT_TEXT_EXTENSIONS}
+
+        # Filter to supported text files and exclude the index itself
+        text_files: list[str] = []
         for file_path in all_files:
-            if file_path.suffix == ".md":
+            if file_path.suffix.lower() in supported:
                 relative = file_path.relative_to(self._context_dir).as_posix()
                 # Exclude the master index itself
                 if relative != MASTER_INDEX_FILE:
-                    md_files.append(relative)
+                    text_files.append(relative)
 
-        content = self.generate_content(md_files, project_name)
+        content = self.generate_content(text_files, project_name)
         self.write_index(content)

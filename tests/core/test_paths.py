@@ -5,7 +5,33 @@ Tests the pure path manipulation functions used for output mirroring.
 
 from pathlib import Path
 
-from nest.core.paths import mirror_path, relative_to_project, source_path_to_manifest_key
+from nest.core.paths import (
+    CONTEXT_TEXT_EXTENSIONS,
+    mirror_path,
+    relative_to_project,
+    source_path_to_manifest_key,
+)
+
+
+class TestContextTextExtensions:
+    """Tests for CONTEXT_TEXT_EXTENSIONS constant."""
+
+    def test_contains_all_expected_extensions(self) -> None:
+        """AC1: Constant contains all 10 expected text extensions."""
+        expected = {
+            ".md", ".txt", ".text", ".rst",
+            ".csv", ".json", ".yaml", ".yml", ".toml", ".xml",
+        }
+        assert set(CONTEXT_TEXT_EXTENSIONS) == expected
+
+    def test_has_exactly_ten_extensions(self) -> None:
+        """AC1: Constant has exactly 10 extensions."""
+        assert len(CONTEXT_TEXT_EXTENSIONS) == 10
+
+    def test_all_extensions_start_with_dot(self) -> None:
+        """All extensions should start with a dot."""
+        for ext in CONTEXT_TEXT_EXTENSIONS:
+            assert ext.startswith("."), f"Extension {ext!r} missing leading dot"
 
 
 class TestMirrorPath:

@@ -8,7 +8,6 @@ from pathlib import Path
 import typer
 from rich.prompt import Confirm, Prompt
 
-from nest.adapters.docling_downloader import DoclingModelDownloader
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.project_checker import ProjectChecker
@@ -24,6 +23,8 @@ def create_doctor_service(project_checker: ProjectChecker) -> DoctorService:
     Returns:
         Configured DoctorService.
     """
+    from nest.adapters.docling_downloader import DoclingModelDownloader
+
     filesystem = FileSystemAdapter()
     return DoctorService(
         model_checker=DoclingModelDownloader(),

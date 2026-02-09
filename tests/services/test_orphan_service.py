@@ -267,3 +267,76 @@ class TestOrphanService:
         # Assert - user-curated file is NOT an orphan
         assert len(result.orphans_detected) == 0
         assert len(mock_fs.deleted_files) == 0
+
+
+class TestCountUserCuratedFiles:
+    """Tests for AC6: user-curated file counting with text extension filter."""
+
+    def test_txt_user_curated_file_counted(self, tmp_path: Path) -> None:
+        """AC6: A .txt user-curated file is counted."""
+        project_root = tmp_path / "project"
+        output_dir = project_root / "_nest_context"
+        user_txt = output_dir / "notes.txt"
+
+        mock_fs = MockFileSystem()
+        mock_fs.files = [user_txt]
+
+        manifest = Manifest(
+            nest_version="1.0.0",
+            project_name="test",
+            files={},
+        )
+        mock_manifest = MockManifest(manifest)
+
+        service = OrphanService(mock_fs, mock_manifest, project_root)
+        count = service.count_user_curated_files()
+
+        assert count == 1
+
+    def test_png_file_not_counted_as_user_curated(self, tmp_path: Path) -> None:
+        """AC6: A .png file is NOT counted as user-curated."""
+        project_root = tmp_path / "project"
+        output_dir = project_root / "_nest_context"
+        user_png = output_dir / "diagram.png"
+
+        mock_fs = MockFileSystem()
+        mock_fs.files = [user_png]
+
+        manifest = Manifest(
+            nest_version="1.0.0",
+            project_name="test",
+            files={},
+        )
+        mock_manifest = MockManifest(manifest)
+
+        service = OrphanService(mock_fs, mock_manifest, project_root)
+        count = service.count_user_curated_files()
+
+        assert count == 0
+
+    def test_mixed_extensions_only_counts_supported(self, tmp_path: Path) -> None:
+        """AC6: Only supported text extensions are counted as user-curated."""
+        project_root = tmp_path / "project"
+        output_dir = project_root / "_nest_context"
+
+        mock_fs = MockFileSystem()
+        mock_fs.files = [
+            output_dir / "notes.txt",
+            output_dir / "config.yaml",
+            output_dir / "diagram.png",
+            output_dir / "archive.zip",
+            output_dir / "00_MASTER_INDEX.md",
+        ]
+
+        manifest = Manifest(
+            nest_version="1.0.0",
+            project_name="test",
+            files={},
+        )
+        mock_manifest = MockManifest(manifest)
+
+        service = OrphanService(mock_fs, mock_manifest, project_root)
+        count = service.count_user_curated_files()
+
+        # notes.txt + config.yaml = 2 (png, zip excluded; index excluded)
+        assert count == 2

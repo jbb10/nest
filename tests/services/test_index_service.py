@@ -184,3 +184,84 @@ class TestIndexAccuracy:
         assert "b.md" not in content_v2
         assert "c.md" in content_v2
         assert "Files: 2" in content_v2
+
+
+class TestUpdateIndexTextExtensions:
+    """Tests for AC2/AC3/AC4: update_index includes all supported text types."""
+
+    def test_txt_file_included_in_index(self):
+        """AC3: A .txt file in context directory is included in the index."""
+        fs = Mock(spec=FileSystemProtocol)
+        fs.exists.return_value = True
+        fs.list_files.return_value = [Path("/app/_nest_context/notes.txt")]
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        service.update_index(project_name="Test")
+
+        args, _ = fs.write_text.call_args
+        assert "notes.txt" in args[1]
+
+    def test_yaml_file_included_in_index(self):
+        """AC4: A .yaml file in context directory is included in the index."""
+        fs = Mock(spec=FileSystemProtocol)
+        fs.exists.return_value = True
+        fs.list_files.return_value = [Path("/app/_nest_context/api-spec.yaml")]
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        service.update_index(project_name="Test")
+
+        args, _ = fs.write_text.call_args
+        assert "api-spec.yaml" in args[1]
+
+    def test_png_file_excluded_from_index(self):
+        """AC2: A .png file in context directory is NOT included in the index."""
+        fs = Mock(spec=FileSystemProtocol)
+        fs.exists.return_value = True
+        fs.list_files.return_value = [Path("/app/_nest_context/diagram.png")]
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        service.update_index(project_name="Test")
+
+        args, _ = fs.write_text.call_args
+        assert "diagram.png" not in args[1]
+        assert "Files: 0" in args[1]
+
+    def test_mixed_extensions_filters_correctly(self):
+        """AC2: Only supported text extensions are indexed, unsupported excluded."""
+        fs = Mock(spec=FileSystemProtocol)
+        fs.exists.return_value = True
+        fs.list_files.return_value = [
+            Path("/app/_nest_context/doc.md"),
+            Path("/app/_nest_context/notes.txt"),
+            Path("/app/_nest_context/config.yaml"),
+            Path("/app/_nest_context/data.csv"),
+            Path("/app/_nest_context/image.png"),
+            Path("/app/_nest_context/archive.zip"),
+            Path("/app/_nest_context/00_MASTER_INDEX.md"),
+        ]
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        service.update_index(project_name="Test")
+
+        args, _ = fs.write_text.call_args
+        content = args[1]
+        assert "doc.md" in content
+        assert "notes.txt" in content
+        assert "config.yaml" in content
+        assert "data.csv" in content
+        assert "image.png" not in content
+        assert "archive.zip" not in content
+        assert "00_MASTER_INDEX.md" not in content
+        assert "Files: 4" in content
+
+    def test_case_insensitive_extension_matching(self):
+        """Edge case: uppercase extensions like .TXT are included."""
+        fs = Mock(spec=FileSystemProtocol)
+        fs.exists.return_value = True
+        fs.list_files.return_value = [Path("/app/_nest_context/NOTES.TXT")]
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        service.update_index(project_name="Test")
+
+        args, _ = fs.write_text.call_args
+        assert "NOTES.TXT" in args[1]
