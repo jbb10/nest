@@ -2,6 +2,21 @@
 
 All notable changes to Nest.
 
+## [0.1.3] - 2026-02-10
+
+### Features
+- **doctor**: Complete `nest doctor` CLI integration with `--fix` flag, issue summary display, and actionable guidance (Story 3.6)
+- **doctor**: Exit code semantics — informational returns 0, `--fix` returns 1 on unresolved failures
+- **Epic 3 complete**: All project visibility & health commands (`nest status`, `nest doctor`) fully operational
+
+### Bug Fixes
+- **adapters**: Lazy docling imports in `docling_downloader.py` — nest no longer crashes when docling package is not installed
+- **cli**: Composition roots catch `(ImportError, ModelError)` for graceful degradation without docling
+
+### Infrastructure
+- Comprehensive test suite: **448 tests** (414 unit + 34 E2E)
+- Strict type checking with Pyright (0 errors)
+
 ## [0.1.2] - 2026-02-10
 
 ### Features
