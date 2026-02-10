@@ -209,6 +209,36 @@ def display_doctor_report(
     console.print()
 
 
+def display_issue_summary(issues: list[str], console: Console) -> None:
+    """Display summary of detected issues.
+
+    Args:
+        issues: List of issue description strings.
+        console: Rich console instance.
+    """
+    count = len(issues)
+    label = "issue" if count == 1 else "issues"
+    console.print(f"   [yellow]⚠[/yellow] {count} {label} found:")
+    for i, issue in enumerate(issues, 1):
+        console.print(f"   {i}. {issue}")
+    console.print()
+    console.print("   [dim]Run `nest doctor --fix` to attempt automatic repair.[/dim]")
+
+
+def display_success_message(console: Console, *, fix_mode: bool = False) -> None:
+    """Display success message when all checks pass.
+
+    Args:
+        console: Rich console instance.
+        fix_mode: If True, append 'No repairs needed.' (AC6).
+    """
+    msg = "[green]✓[/green] All systems operational"
+    if fix_mode:
+        msg += ". No repairs needed."
+    console.print()
+    console.print(f"   {msg}")
+
+
 def display_remediation_report(
     report: RemediationReport,
     console: Console,

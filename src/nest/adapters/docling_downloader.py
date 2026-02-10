@@ -8,10 +8,29 @@ import time
 from pathlib import Path
 from typing import Literal
 
-from docling.datamodel.settings import settings
-from docling.utils.model_downloader import download_models
-
 from nest.core.exceptions import ModelError
+
+
+def _get_docling_settings():
+    """Lazy import of docling settings to avoid top-level import crash."""
+    try:
+        from docling.datamodel.settings import settings
+    except ImportError as exc:
+        raise ModelError(
+            "Docling is not installed. Install it with: uv pip install docling"
+        ) from exc
+    return settings
+
+
+def _get_download_models():
+    """Lazy import of docling download_models to avoid top-level import crash."""
+    try:
+        from docling.utils.model_downloader import download_models
+    except ImportError as exc:
+        raise ModelError(
+            "Docling is not installed. Install it with: uv pip install docling"
+        ) from exc
+    return download_models
 
 
 class DoclingModelDownloader:
@@ -76,7 +95,7 @@ class DoclingModelDownloader:
         Returns:
             Path to the cache directory (~/.cache/docling/models/).
         """
-        return settings.cache_dir / "models"
+        return _get_docling_settings().cache_dir / "models"
 
     def check_disk_space(self) -> bool:
         """Check if sufficient disk space is available for model download.
@@ -84,7 +103,7 @@ class DoclingModelDownloader:
         Returns:
             True if sufficient space (2.5GB+) available, False otherwise.
         """
-        cache_dir = settings.cache_dir
+        cache_dir = _get_docling_settings().cache_dir
         cache_dir.mkdir(parents=True, exist_ok=True)
         free_mb = shutil.disk_usage(cache_dir).free // (1024 * 1024)
         return free_mb >= self.REQUIRED_DISK_SPACE_MB
@@ -100,16 +119,18 @@ class DoclingModelDownloader:
         """
         # Check disk space before attempting download
         if not self.check_disk_space():
+            docling_settings = _get_docling_settings()
             raise ModelError(
                 f"Insufficient disk space for ML models. "
-                f"At least {self.REQUIRED_DISK_SPACE_MB}MB required in {settings.cache_dir}"
+                f"At least {self.REQUIRED_DISK_SPACE_MB}MB required in {docling_settings.cache_dir}"
             )
 
+        _download = _get_download_models()
         last_exception: Exception | None = None
 
         for attempt in range(self.MAX_RETRIES):
             try:
-                download_models(
+                _download(
                     output_dir=None,  # Uses default cache location
                     force=False,
                     progress=progress,

@@ -11,9 +11,21 @@ from rich.prompt import Confirm, Prompt
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.project_checker import ProjectChecker
+from nest.adapters.protocols import ModelCheckerProtocol
 from nest.agents.vscode_writer import VSCodeAgentWriter
-from nest.services.doctor_service import DoctorService
-from nest.ui.doctor_display import display_doctor_report, display_remediation_report
+from nest.core.exceptions import ModelError
+from nest.services.doctor_service import (
+    DoctorService,
+    EnvironmentReport,
+    ModelReport,
+    ProjectReport,
+)
+from nest.ui.doctor_display import (
+    display_doctor_report,
+    display_issue_summary,
+    display_remediation_report,
+    display_success_message,
+)
 from nest.ui.messages import get_console
 
 
@@ -23,16 +35,76 @@ def create_doctor_service(project_checker: ProjectChecker) -> DoctorService:
     Returns:
         Configured DoctorService.
     """
-    from nest.adapters.docling_downloader import DoclingModelDownloader
+    try:
+        from nest.adapters.docling_downloader import DoclingModelDownloader
+
+        model_checker: ModelCheckerProtocol | None = DoclingModelDownloader()
+        # Eagerly verify docling is importable
+        model_checker.get_cache_path()
+    except (ImportError, ModelError):
+        model_checker = None
 
     filesystem = FileSystemAdapter()
     return DoctorService(
-        model_checker=DoclingModelDownloader(),
+        model_checker=model_checker,
         project_checker=project_checker,
         manifest_adapter=ManifestAdapter(),
         filesystem=filesystem,
         agent_writer=VSCodeAgentWriter(filesystem),
     )
+
+
+def _count_issues(
+    env_report: EnvironmentReport,
+    model_report: ModelReport | None,
+    project_report: ProjectReport | None,
+) -> list[str]:
+    """Count and describe all detected issues.
+
+    Args:
+        env_report: Environment validation report.
+        model_report: ML model validation report (if available).
+        project_report: Project state validation report (if available).
+
+    Returns:
+        List of issue description strings. Empty if all pass.
+    """
+    issues: list[str] = []
+
+    # Environment failures
+    for check in [env_report.python, env_report.uv, env_report.nest]:
+        if check.status == "fail":
+            msg = f"{check.name} check failed"
+            if check.message:
+                msg += f" ({check.message})"
+            issues.append(msg)
+
+    # ML model issues
+    if model_report and not model_report.all_pass:
+        issues.append("ML models not cached")
+
+    # Project issues
+    if project_report:
+        status = project_report.status
+        if status.manifest_status != "valid":
+            label_map = {
+                "missing": "Manifest missing",
+                "invalid_json": "Manifest has invalid JSON",
+                "invalid_structure": "Manifest has invalid structure",
+                "version_mismatch": "Manifest version mismatch",
+            }
+            issues.append(label_map.get(status.manifest_status, "Manifest issue"))
+        if not status.agent_file_present:
+            issues.append("Agent file missing")
+        if status.folders_status != "intact":
+            folder_map = {
+                "sources_missing": "_nest_sources/ folder missing",
+                "context_missing": "_nest_context/ folder missing",
+                "both_missing": "Project folders missing",
+            }
+            issues.append(folder_map.get(status.folders_status, "Folders issue"))
+
+    return issues
 
 
 def _is_nest_project(project_dir: Path, project_checker: ProjectChecker) -> bool:
@@ -79,32 +151,29 @@ def doctor_command(
     else:
         project_report = None
 
+    # Detect issues
+    issues = _count_issues(env_report, model_report, project_report)
+
     display_doctor_report(env_report, console, model_report, project_report)
 
-    # Handle remediation if --fix flag or if issues detected
-    has_issues = False
-    if model_report and not model_report.all_pass:
-        has_issues = True
-    if project_report and not project_report.all_pass:
-        has_issues = True
+    if issues:
+        display_issue_summary(issues, console)
 
-    if has_issues:
         if fix:
-            # Auto-fix mode
+            # Auto-fix mode (AC4)
             console.print("\n🔧 [bold]Attempting repairs...[/bold]\n")
             remediation_report = service.remediate_issues_auto(
                 project_dir, env_report, model_report, project_report
             )
             display_remediation_report(remediation_report, console)
 
-            # Exit code 1 if any fix failed (AC8)
+            # Exit code 1 if any fix failed (AC5)
             if not remediation_report.all_succeeded:
                 raise typer.Exit(code=1)
 
         elif console.is_terminal:
-            # Interactive mode - prompt for repair
-            console.print()
-            if Confirm.ask("⚠ Issues detected. Attempt automatic repair?"):
+            # Interactive mode — prompt for repair (AC8)
+            if Confirm.ask("Attempt automatic repair?", default=False):
                 console.print()
                 remediation_report = service.remediate_issues_interactive(
                     project_dir,
@@ -116,10 +185,17 @@ def doctor_command(
                 )
                 display_remediation_report(remediation_report, console)
 
-                # Exit code 1 if any fix failed (AC8)
+                # Exit code 1 if any fix failed (AC5)
                 if not remediation_report.all_succeeded:
                     raise typer.Exit(code=1)
-        # Non-interactive mode without --fix: just show report (no prompt)
+        # Non-interactive mode without --fix: issue summary already shown
+
+    elif fix:
+        # --fix with no issues (AC6)
+        display_success_message(console, fix_mode=True)
+    else:
+        # All pass (AC3)
+        display_success_message(console)
 
     # Show hint when outside project
     if project_report is None:
