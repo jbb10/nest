@@ -2,6 +2,18 @@
 
 All notable changes to Nest.
 
+## [0.1.2] - 2026-02-10
+
+### Features
+- **sync**: Add context text file support for multi-format context indexing (Story 2.11)
+- **doctor**: Add project state validation — manifest integrity, agent file, folder checks (Story 3.4)
+- **doctor**: Add issue remediation with `--fix` flag (Story 3.5)
+
+### Bug Fixes
+- **sync**: Fix re-processing all files due to manifest key mismatch (relative vs absolute paths)
+- **doctor**: Code review fixes — consistent DI, error logging, orchestration tests
+- **sync**: Fix hardcoded strings, sort order, lazy docling imports for robustness (Story 2.11 review)
+
 ## [0.1.1] - 2026-01-16
 
 ### Documentation
