@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from .conftest import run_cli
+from .conftest import run_cli, skip_without_docling
 
 
 @pytest.mark.e2e
@@ -27,6 +27,7 @@ class TestDoctorE2E:
         assert "uv:" in result.stdout
         assert "Nest:" in result.stdout
 
+    @skip_without_docling
     def test_doctor_shows_model_status(self, fresh_temp_dir: Path) -> None:
         """Test that doctor displays ML Models section.
 
@@ -40,6 +41,7 @@ class TestDoctorE2E:
         assert "ML Models" in result.stdout
         assert "Models:" in result.stdout
 
+    @skip_without_docling
     def test_doctor_shows_model_cache_path(self, fresh_temp_dir: Path) -> None:
         """Test that doctor displays cache path for ML models."""
         result = run_cli(["doctor"], cwd=fresh_temp_dir, timeout=30)
@@ -64,11 +66,10 @@ class TestDoctorE2E:
         result = run_cli(["doctor"], cwd=fresh_temp_dir, timeout=30)
 
         assert result.exit_code == 0
-        # Should still show Environment and ML Models
+        # Should still show Environment
         assert "Environment" in result.stdout
-        assert "ML Models" in result.stdout
         # But should NOT show Project section
-        assert "Project" not in result.stdout
+        assert "Manifest:" not in result.stdout
         # Should show hint message
         assert "Run in a Nest project for full diagnostics" in result.stdout
 

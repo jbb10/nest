@@ -46,7 +46,9 @@ def create_init_service() -> InitService:
         from nest.adapters.docling_downloader import DoclingModelDownloader
 
         downloader = DoclingModelDownloader()
-    except ImportError:
+        # Eagerly verify docling is importable
+        downloader.get_cache_path()
+    except (ImportError, ModelError):
         downloader = NoOpModelDownloader()
 
     filesystem = FileSystemAdapter()

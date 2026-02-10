@@ -11,7 +11,9 @@ from rich.prompt import Confirm, Prompt
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.project_checker import ProjectChecker
+from nest.adapters.protocols import ModelCheckerProtocol
 from nest.agents.vscode_writer import VSCodeAgentWriter
+from nest.core.exceptions import ModelError
 from nest.services.doctor_service import (
     DoctorService,
     EnvironmentReport,
@@ -33,11 +35,18 @@ def create_doctor_service(project_checker: ProjectChecker) -> DoctorService:
     Returns:
         Configured DoctorService.
     """
-    from nest.adapters.docling_downloader import DoclingModelDownloader
+    try:
+        from nest.adapters.docling_downloader import DoclingModelDownloader
+
+        model_checker: ModelCheckerProtocol | None = DoclingModelDownloader()
+        # Eagerly verify docling is importable
+        model_checker.get_cache_path()
+    except (ImportError, ModelError):
+        model_checker = None
 
     filesystem = FileSystemAdapter()
     return DoctorService(
-        model_checker=DoclingModelDownloader(),
+        model_checker=model_checker,
         project_checker=project_checker,
         manifest_adapter=ManifestAdapter(),
         filesystem=filesystem,

@@ -15,7 +15,11 @@ import pytest
 
 
 def docling_available() -> bool:
-    """Check if Docling models are downloaded."""
+    """Check if Docling package is installed and models are downloaded."""
+    try:
+        import docling  # noqa: F401
+    except ImportError:
+        return False
     cache_dir = Path.home() / ".cache" / "docling"
     return cache_dir.exists() and any(cache_dir.iterdir())
 
