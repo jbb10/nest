@@ -76,7 +76,8 @@ class DiscoveryService:
                 continue
 
             # Get relative path for manifest comparison
-            relative_path = file_path.relative_to(project_dir)
+            # Keys must be relative to sources_dir to match ManifestService key format
+            relative_path = file_path.relative_to(sources_dir)
 
             # Classify based on manifest (or force mode)
             if force:
