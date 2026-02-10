@@ -1,6 +1,6 @@
 # Story 3.6: Doctor Command CLI Integration
 
-Status: review
+Status: done
 Branch: feat/3-6-doctor-command-cli-integration
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->

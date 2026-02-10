@@ -79,7 +79,7 @@ development_status:
   3-3-ml-model-validation: done
   3-4-project-state-validation: done
   3-5-issue-remediation: done
-  3-6-doctor-command-cli-integration: review
+  3-6-doctor-command-cli-integration: done
   epic-3-retrospective: optional
 
   # ============================================================
