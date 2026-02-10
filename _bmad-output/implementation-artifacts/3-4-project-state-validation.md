@@ -1,6 +1,6 @@
 # Story 3.4: Project State Validation
 
-Status: in-progress
+Status: done
 Branch: feat/3-4-project-state-validation
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
@@ -197,7 +197,7 @@ This is the fourth story in Epic 3 (Project Visibility & Health). The `nest doct
 
 ### Task 9: Run Full Test Suite
 - [x] 9.1: Run `pytest -m "not e2e"` - all unit/integration tests pass
-- [ ] 9.2: Run `pytest -m "e2e"` - all E2E tests pass (pending environment setup)
+- [x] 9.2: Run `pytest -m "e2e"` - all 30 E2E tests pass
 - [x] 9.3: Run `ruff check` - no linting errors
 - [x] 9.4: Run `pyright` - no type errors
 
