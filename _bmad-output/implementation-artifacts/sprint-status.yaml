@@ -44,7 +44,7 @@ development_status:
   # Epic 1: Project Initialization
   # FR1, FR2, FR3, FR4 - nest init command
   # ============================================================
-  epic-1: in-progress
+  epic-1: done
   1-1-project-scaffolding: done
   1-2-vs-code-agent-file-generation: done
   1-3-ml-model-download-and-caching: done
@@ -55,7 +55,7 @@ development_status:
   # Epic 2: Document Processing & Sync
   # FR5-FR14, NFR11 - nest sync command + E2E testing
   # ============================================================
-  epic-2: in-progress
+  epic-2: done
   2-1-file-discovery-and-checksum-engine: done
   2-2-docling-document-processing: done
   2-3-output-mirroring-and-file-writing: done
@@ -73,7 +73,7 @@ development_status:
   # Epic 3: Project Visibility & Health
   # FR18-FR22 - nest status & nest doctor commands
   # ============================================================
-  epic-3: in-progress
+  epic-3: done
   3-1-project-status-display: done
   3-2-environment-validation: done
   3-3-ml-model-validation: done
