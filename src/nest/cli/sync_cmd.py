@@ -36,8 +36,7 @@ class NoOpProcessor:
     def process(self, source: Path, output: Path) -> ProcessingResult:
         """Fail all processing."""
         return ProcessingResult(
-            source=source,
-            output=output,
+            source_path=source,
             status="failed",
             error="Docling is not installed",
         )
