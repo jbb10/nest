@@ -199,3 +199,52 @@ class TestDoctorE2E:
         assert "✓" in result.stdout or "✗" in result.stdout
 
         assert "regenerate" in result.stdout or "nest init" in result.stdout
+
+    def test_doctor_fix_handles_all_pass(self, initialized_project: Path) -> None:
+        """Test that --fix with no issues shows success message (AC6)."""
+        result = run_cli(["doctor", "--fix"], cwd=initialized_project, timeout=30)
+
+        assert result.exit_code == 0
+        assert "All systems operational" in result.stdout
+        assert "No repairs needed" in result.stdout
+
+    def test_doctor_fix_returns_exit_code_1_on_failure(self, initialized_project: Path) -> None:
+        """Test that --fix exits 1 when a fix fails (AC5)."""
+        import shutil
+
+        # Delete agent directory entirely, then place a *file* where the
+        # directory should be, so regeneration fails with a write error.
+        agent_dir = initialized_project / ".github" / "agents"
+        shutil.rmtree(agent_dir)
+        # Create a regular file where the directory should be
+        agent_dir.write_text("blocker")
+
+        result = run_cli(["doctor", "--fix"], cwd=initialized_project, timeout=30)
+
+        # Agent file regeneration should fail → exit code 1
+        assert result.exit_code == 1
+        assert "✗" in result.stdout
+
+    def test_doctor_shows_issue_summary(self, initialized_project: Path) -> None:
+        """Test that issue summary with count and list is displayed (AC2)."""
+        # Create an issue: delete the agent file
+        agent_file = initialized_project / ".github" / "agents" / "nest.agent.md"
+        agent_file.unlink()
+
+        result = run_cli(["doctor"], cwd=initialized_project, timeout=30)
+
+        assert result.exit_code == 0
+        # Issue summary should appear
+        assert "issue" in result.stdout
+        assert "found" in result.stdout
+        assert "Agent file missing" in result.stdout
+        assert "nest doctor --fix" in result.stdout
+
+    def test_doctor_shows_success_message_when_all_pass(
+        self, initialized_project: Path
+    ) -> None:
+        """Test that 'All systems operational' is shown when all pass (AC3)."""
+        result = run_cli(["doctor"], cwd=initialized_project, timeout=30)
+
+        assert result.exit_code == 0
+        assert "All systems operational" in result.stdout
