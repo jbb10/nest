@@ -2,6 +2,22 @@
 
 All notable changes to Nest.
 
+## [0.2.0] - 2026-02-12
+
+### Features
+- **update**: New `nest update` command for self-updating nest via `uv tool install` (Epic 4)
+- **update**: Version discovery via git remote tags with semver parsing and comparison
+- **update**: Interactive version selection with Rich UI — current version display, update prompts, spinner during install
+- **update**: `--check` flag for non-interactive update availability check
+- **update**: `--dir` flag to specify project directory
+- **update**: Agent template migration — detects outdated `.github/agents/nest.agent.md`, offers backup + regeneration
+- **update**: User config management — TOML-based config at `~/.config/nest/config.toml` tracking installed version
+
+### Infrastructure
+- Comprehensive test suite: **581 tests** (547 unit + 34 E2E)
+- Strict type checking with Pyright (0 errors)
+- Epic 4 complete: All 4 epics done — `nest init`, `nest sync`, `nest status`, `nest doctor`, `nest update`
+
 ## [0.1.3] - 2026-02-10
 
 ### Features
