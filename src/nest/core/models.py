@@ -169,3 +169,91 @@ class SyncResult(BaseModel):
     orphans_detected: int = 0
     skipped_orphan_cleanup: bool = False
     user_curated_count: int = 0
+
+
+class InstallConfig(BaseModel):
+    """Installation source and version tracking.
+
+    Attributes:
+        source: Git URL for `uv tool install` (e.g., "git+https://github.com/jbjornsson/nest").
+        installed_version: Currently installed Nest version string.
+        installed_at: Timestamp when this version was installed/updated.
+    """
+
+    source: str
+    installed_version: str
+    installed_at: datetime
+
+
+class UserConfig(BaseModel):
+    """User-level configuration stored at ~/.config/nest/config.toml.
+
+    Attributes:
+        install: Installation source and version tracking.
+    """
+
+    install: InstallConfig
+
+
+class UpdateCheckResult(BaseModel):
+    """Result of checking for available updates.
+
+    Attributes:
+        current_version: Currently installed version string.
+        latest_version: Newest available version (None if no versions found).
+        annotated_versions: List of (version, annotation) tuples for display.
+        update_available: True if a newer version exists.
+        source: Git remote URL from user config.
+    """
+
+    current_version: str
+    latest_version: str | None
+    annotated_versions: list[tuple[str, str]]
+    update_available: bool
+    source: str
+
+
+class UpdateResult(BaseModel):
+    """Result of executing a version update.
+
+    Attributes:
+        success: Whether the update completed successfully.
+        version: The version that was installed (or attempted).
+        previous_version: The version before the update.
+        error: Error message if update failed.
+    """
+
+    success: bool
+    version: str
+    previous_version: str
+    error: str | None = None
+
+
+class AgentMigrationCheckResult(BaseModel):
+    """Result of checking whether agent template needs migration.
+
+    Attributes:
+        migration_needed: True if local agent file differs from current template.
+        agent_file_missing: True if agent file doesn't exist at all.
+        skipped: True if check was skipped (e.g., not a Nest project).
+        message: Human-readable status description.
+    """
+
+    migration_needed: bool
+    agent_file_missing: bool = False
+    skipped: bool = False
+    message: str
+
+
+class AgentMigrationResult(BaseModel):
+    """Result of executing agent template migration.
+
+    Attributes:
+        success: Whether the migration completed successfully.
+        backed_up: Whether the old file was backed up before replacement.
+        error: Error message if migration failed.
+    """
+
+    success: bool
+    backed_up: bool = False
+    error: str | None = None

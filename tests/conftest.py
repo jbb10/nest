@@ -49,6 +49,7 @@ class MockManifest:
 
     def __init__(self, *, manifest_exists: bool = False) -> None:
         self._exists = manifest_exists
+        self._manifest: Manifest | None = None
         self.created_manifests: list[tuple[Path, str]] = []
         self.saved_manifests: list[tuple[Path, Manifest]] = []
 
@@ -60,6 +61,8 @@ class MockManifest:
         return Manifest(nest_version="1.0.0", project_name=project_name)
 
     def load(self, project_dir: Path) -> Manifest:
+        if self._manifest is not None:
+            return self._manifest
         raise FileNotFoundError("No manifest")
 
     def save(self, project_dir: Path, manifest: Manifest) -> None:
@@ -90,8 +93,12 @@ class MockAgentWriter:
     Implements AgentWriterProtocol for unit tests without real I/O.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, template_content: str = "rendered-template-{project_name}") -> None:
+        self.template_content = template_content
         self.generated_agents: list[tuple[str, Path]] = []
+
+    def render(self, project_name: str) -> str:
+        return self.template_content.replace("{project_name}", project_name)
 
     def generate(self, project_name: str, output_path: Path) -> None:
         self.generated_agents.append((project_name, output_path))
@@ -101,6 +108,14 @@ class MockAgentWriter:
 def mock_agent_writer() -> MockAgentWriter:
     """Provide a fresh MockAgentWriter instance."""
     return MockAgentWriter()
+
+
+@pytest.fixture
+def mock_manifest_with_project() -> MockManifest:
+    """Provide a MockManifest that exists and returns a manifest with project_name."""
+    mock = MockManifest(manifest_exists=True)
+    mock._manifest = Manifest(nest_version="1.0.0", project_name="TestProject")
+    return mock
 
 
 class MockModelDownloader:

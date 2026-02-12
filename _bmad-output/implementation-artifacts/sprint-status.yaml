@@ -86,10 +86,10 @@ development_status:
   # Epic 4: Tool Updates & Maintenance
   # FR15-FR17 - nest update command
   # ============================================================
-  epic-4: backlog
-  4-1-user-config-management: backlog
-  4-2-version-discovery-and-comparison: backlog
-  4-3-interactive-version-selection: backlog
-  4-4-agent-template-migration-check: backlog
-  4-5-update-command-cli-integration: backlog
+  epic-4: done
+  4-1-user-config-management: done
+  4-2-version-discovery-and-comparison: done
+  4-3-interactive-version-selection: done
+  4-4-agent-template-migration-check: done
+  4-5-update-command-cli-integration: done
   epic-4-retrospective: optional
