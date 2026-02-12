@@ -4,10 +4,11 @@ These protocols define the contracts that adapters must implement.
 Services depend on these protocols, not concrete implementations.
 """
 
+import subprocess
 from pathlib import Path
 from typing import Literal, Protocol, runtime_checkable
 
-from nest.core.models import Manifest, ProcessingResult
+from nest.core.models import Manifest, ProcessingResult, UserConfig
 
 
 @runtime_checkable
@@ -232,6 +233,17 @@ class AgentWriterProtocol(Protocol):
     (VS Code, Cursor, generic Markdown, etc.).
     """
 
+    def render(self, project_name: str) -> str:
+        """Render the agent template to a string without writing to disk.
+
+        Args:
+            project_name: Name of the project for interpolation.
+
+        Returns:
+            Rendered agent file content as string.
+        """
+        ...
+
     def generate(self, project_name: str, output_path: Path) -> None:
         """Generate agent file at specified path.
 
@@ -423,5 +435,96 @@ class ProjectCheckerProtocol(Protocol):
 
         Returns:
             True if _nest_context/ directory exists, False otherwise.
+        """
+        ...
+
+
+@runtime_checkable
+class UserConfigProtocol(Protocol):
+    """Protocol for user configuration operations.
+
+    Implementations handle reading, writing, and locating user config files
+    stored at ~/.config/nest/config.toml.
+    """
+
+    def load(self) -> UserConfig | None:
+        """Load user configuration from disk.
+
+        Returns:
+            UserConfig if file exists and is valid, None if file doesn't exist.
+
+        Raises:
+            ConfigError: If config file exists but is corrupt or invalid TOML.
+        """
+        ...
+
+    def save(self, config: UserConfig) -> None:
+        """Save user configuration to disk.
+
+        Creates parent directories if they don't exist.
+
+        Args:
+            config: The UserConfig instance to persist.
+        """
+        ...
+
+    def config_path(self) -> Path:
+        """Return the full path to the config file.
+
+        Returns:
+            Path to ~/.config/nest/config.toml (with ~ expanded).
+        """
+        ...
+
+
+@runtime_checkable
+class GitClientProtocol(Protocol):
+    """Protocol for querying git remote tags.
+
+    Implementations wrap ``git ls-remote --tags`` to discover available
+    version tags from a remote repository.
+    """
+
+    def list_tags(self, remote_url: str) -> list[str]:
+        """Query remote repository for version tags.
+
+        Args:
+            remote_url: Git remote URL (may include ``git+`` prefix).
+
+        Returns:
+            List of tag name strings (e.g., ``["v1.0.0", "v1.2.1"]``).
+
+        Raises:
+            ConfigError: If git command fails or network is unavailable.
+        """
+        ...
+
+
+@runtime_checkable
+class SubprocessRunnerProtocol(Protocol):
+    """Protocol for executing subprocess commands.
+
+    Implementations wrap ``subprocess.run`` for testable command execution.
+    Used by ``UpdateService`` to run ``uv tool install`` commands.
+    """
+
+    def run(
+        self,
+        args: list[str],
+        *,
+        timeout: int | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        """Execute a command via subprocess.
+
+        Args:
+            args: Command and arguments list.
+            timeout: Timeout in seconds. Uses implementation default if None.
+
+        Returns:
+            CompletedProcess result with captured stdout/stderr.
+
+        Raises:
+            subprocess.CalledProcessError: If command returns non-zero exit code.
+            subprocess.TimeoutExpired: If command exceeds timeout.
         """
         ...

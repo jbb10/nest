@@ -22,6 +22,18 @@ class VSCodeAgentWriter:
             autoescape=select_autoescape(),
         )
 
+    def render(self, project_name: str) -> str:
+        """Render agent template to string without writing to disk.
+
+        Args:
+            project_name: Project name to interpolate into template.
+
+        Returns:
+            Rendered template content as string.
+        """
+        template = self._jinja_env.get_template("vscode.md.jinja")
+        return template.render(project_name=project_name)
+
     def generate(self, project_name: str, output_path: Path) -> None:
         """Generate VS Code agent file.
 
@@ -38,9 +50,5 @@ class VSCodeAgentWriter:
         if not self._filesystem.exists(output_dir):
             self._filesystem.create_directory(output_dir)
 
-        # Render template
-        template = self._jinja_env.get_template("vscode.md.jinja")
-        content = template.render(project_name=project_name)
-
-        # Write file
+        content = self.render(project_name)
         self._filesystem.write_text(output_path, content)
