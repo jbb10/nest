@@ -221,35 +221,6 @@
     </check>
   </step>
 
-  <step n="4b" goal="Create feature branch for story work">
-    <critical>NEVER commit directly to main branch - all work must be on a feature branch</critical>
-    
-    <action>Check current git branch: git branch --show-current</action>
-    
-    <check if="already on a feature branch matching story_key">
-      <output>🌿 Already on branch: {{current_branch}}
-        Continuing work on existing branch.
-      </output>
-      <action>Ensure branch is up to date: git pull origin main --rebase (if clean working directory)</action>
-    </check>
-    
-    <check if="on main or different branch">
-      <action>Stash any uncommitted changes if present: git stash</action>
-      <action>Switch to main: git checkout main</action>
-      <action>Pull latest: git pull origin main</action>
-      <action>Create feature branch: git checkout -b feat/{{story_key}}</action>
-      <action>Pop stash if stashed: git stash pop (if applicable)</action>
-      
-      <output>🌿 Created branch: feat/{{story_key}}
-        All commits for this story will be on this branch.
-        Branch will be merged to main after story completion and review.
-      </output>
-    </check>
-    
-    <action if="branch creation fails">HALT: "Git branch creation failed - resolve git state before continuing"</action>
-    <action if="merge conflicts during rebase">HALT: "Merge conflicts detected - resolve before continuing"</action>
-  </step>
-
   <step n="5" goal="Implement task following red-green-refactor cycle">
     <critical>FOLLOW THE STORY FILE TASKS/SUBTASKS SEQUENCE EXACTLY AS WRITTEN - NO DEVIATION</critical>
 
@@ -426,7 +397,7 @@
       - Verify all acceptance criteria are met
       - Ensure deployment readiness if applicable
       - Run `code-review` workflow for peer review
-      - Optional: Run TEA `*automate` to expand guardrail tests
+      - Optional: If Test Architect module installed, run `/bmad:tea:automate` to expand guardrail tests
     </action>
 
     <output>💡 **Tip:** For best results, run `code-review` using a **different** LLM than the one that implemented this story.</output>
