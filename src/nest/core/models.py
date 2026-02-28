@@ -200,7 +200,7 @@ class GlossaryHints(BaseModel):
         terms: List of candidate terms extracted from project documents.
     """
 
-    terms: list[CandidateTerm] = Field(default_factory=list)
+    terms: list[CandidateTerm] = Field(default_factory=lambda: list[CandidateTerm]())
 
 
 class InstallConfig(BaseModel):
@@ -332,6 +332,6 @@ class FileMetadata(BaseModel):
     path: str
     content_hash: str
     lines: int
-    headings: list[HeadingInfo] = Field(default_factory=list)
+    headings: list[HeadingInfo] = Field(default_factory=lambda: list[HeadingInfo]())
     first_paragraph: str = ""
     table_columns: list[str] = Field(default_factory=list)

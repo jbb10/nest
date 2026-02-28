@@ -7,6 +7,7 @@ and repeated domain terms. Produces hints for the glossary agent.
 import logging
 import re
 from pathlib import Path
+from typing import Any, Literal, cast
 
 import yaml
 
@@ -161,7 +162,7 @@ class GlossaryHintsService:
         # Note: domain_term category threshold (< 3) is reserved for future use;
         # currently only abbreviation and proper_noun categories are produced.
         # The glossary agent performs deeper domain-term analysis via LLM.
-        filtered = []
+        filtered: list[CandidateTerm] = []
         for ct in term_map.values():
             if ct.category == "abbreviation" and ct.occurrences < 2:
                 continue
@@ -190,17 +191,23 @@ class GlossaryHintsService:
                 logger.warning("Invalid glossary hints structure at %s", hints_path)
                 return None
 
-            terms = []
-            for entry in data["terms"]:
-                if not isinstance(entry, dict) or "term" not in entry:
+            terms: list[CandidateTerm] = []
+            raw_terms = cast(list[dict[str, Any]], data["terms"])
+            for entry in raw_terms:
+                if "term" not in entry:
                     continue
+                raw_cat = entry.get("category", "abbreviation")
+                category = cast(
+                    Literal["abbreviation", "proper_noun", "domain_term"],
+                    raw_cat,
+                )
                 terms.append(
                     CandidateTerm(
-                        term=entry["term"],
-                        category=entry.get("category", "abbreviation"),
-                        occurrences=entry.get("occurrences", 0),
-                        source_files=entry.get("source_files", []),
-                        context_snippets=entry.get("context_snippets", []),
+                        term=str(entry["term"]),
+                        category=category,
+                        occurrences=int(entry.get("occurrences", 0)),
+                        source_files=cast(list[str], entry.get("source_files", [])),
+                        context_snippets=cast(list[str], entry.get("context_snippets", [])),
                     )
                 )
             return GlossaryHints(terms=terms)

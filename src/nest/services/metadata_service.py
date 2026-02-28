@@ -9,6 +9,7 @@ import json
 import logging
 import re
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -211,8 +212,9 @@ class MetadataExtractorService:
                 logger.warning("Invalid hints file structure at %s", hints_path)
                 return {}
             result: dict[str, str] = {}
-            for entry in data["files"]:
-                if isinstance(entry, dict) and "path" in entry and "content_hash" in entry:
+            raw_files = cast(list[dict[str, str]], data["files"])
+            for entry in raw_files:
+                if "path" in entry and "content_hash" in entry:
                     result[entry["path"]] = entry["content_hash"]
             return result
         except (OSError, yaml.YAMLError) as e:
