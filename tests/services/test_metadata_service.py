@@ -3,7 +3,6 @@
 from pathlib import Path
 from unittest.mock import Mock
 
-import pytest
 import yaml
 
 from nest.adapters.protocols import FileSystemProtocol

@@ -12,12 +12,10 @@ from nest.core.models import (
     DiscoveredFile,
     DiscoveryResult,
     DryRunResult,
+    GlossaryHints,
     OrphanCleanupResult,
     ProcessingResult,
 )
-from nest.core.models import GlossaryHints
-from nest.services.glossary_hints_service import GlossaryHintsService
-from nest.core.models import GlossaryHints
 from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.sync_service import SyncService
 

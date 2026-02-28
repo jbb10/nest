@@ -5,7 +5,6 @@ description preservation/clearing, and enricher agent creation.
 These tests use passthrough text files (no Docling needed).
 """
 
-import json
 from pathlib import Path
 
 import pytest
@@ -165,7 +164,8 @@ class TestEnrichmentE2E:
         index_path.write_text("\n".join(new_lines))
 
         # Modify the source file (content changes → hash changes)
-        (sources_dir / "notes.txt").write_text("Completely different content now\nWith more lines\n")
+        new_content = "Completely different content now\nWith more lines\n"
+        (sources_dir / "notes.txt").write_text(new_content)
 
         # Re-sync
         result2 = run_cli(["sync"], cwd=project_dir)

@@ -1,6 +1,5 @@
 """Tests for SyncService orchestration logic."""
 
-from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -10,7 +9,6 @@ from nest.core.models import (
     DiscoveredFile,
     DiscoveryResult,
     DryRunResult,
-    FileEntry,
     Manifest,
     OrphanCleanupResult,
     ProcessingResult,

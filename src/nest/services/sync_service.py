@@ -5,7 +5,14 @@ from typing import Literal
 
 from nest.core.exceptions import ProcessingError
 from nest.core.models import DiscoveredFile, DiscoveryResult, DryRunResult, SyncResult
-from nest.core.paths import CONTEXT_DIR, GLOSSARY_HINTS_FILE, INDEX_HINTS_FILE, NEST_META_DIR, SOURCES_DIR, is_passthrough_extension
+from nest.core.paths import (
+    CONTEXT_DIR,
+    GLOSSARY_HINTS_FILE,
+    INDEX_HINTS_FILE,
+    NEST_META_DIR,
+    SOURCES_DIR,
+    is_passthrough_extension,
+)
 from nest.services.discovery_service import DiscoveryService
 from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.index_service import IndexService, parse_index_descriptions
@@ -243,7 +250,8 @@ class SyncService:
             changed_context_files = set()
             for file_meta in new_metadata:
                 # Check if this file changed vs old index hints
-                if file_meta.path not in old_hints or old_hints[file_meta.path] != file_meta.content_hash:
+                old_hash = old_hints.get(file_meta.path)
+                if old_hash is None or old_hash != file_meta.content_hash:
                     changed_context_files.add(file_meta.path)
 
         # 11. Extract candidate glossary terms from changed/new files

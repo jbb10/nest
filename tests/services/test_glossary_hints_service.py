@@ -3,7 +3,6 @@
 from pathlib import Path
 from unittest.mock import Mock
 
-import pytest
 import yaml
 
 from conftest import MockFileSystem
@@ -13,7 +12,6 @@ from nest.services.glossary_hints_service import (
     GENERIC_TERM_FILTER,
     GlossaryHintsService,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
