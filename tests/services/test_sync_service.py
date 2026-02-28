@@ -17,8 +17,10 @@ from nest.core.models import (
     SyncResult,
 )
 from nest.services.discovery_service import DiscoveryService
+from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
+from nest.services.metadata_service import MetadataExtractorService
 from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
 from nest.services.sync_service import SyncService
@@ -35,12 +37,36 @@ def mock_deps():
     )
     orphan_mock.count_user_curated_files.return_value = 0
 
+    metadata_mock = Mock(spec=MetadataExtractorService)
+    metadata_mock.load_previous_hints.return_value = {}
+    metadata_mock.extract_all.return_value = []
+    metadata_mock.write_hints.return_value = None
+
+    index_mock = Mock(spec=IndexService)
+    index_mock.read_index_content.return_value = ""
+    index_mock.generate_content.return_value = (
+        "<!-- nest:index-table-start -->\n"
+        "| File | Lines | Description |\n"
+        "|------|------:|-------------|\n"
+        "<!-- nest:index-table-end -->\n"
+    )
+
+    from nest.core.models import GlossaryHints
+
+    glossary_mock = Mock(spec=GlossaryHintsService)
+    glossary_mock.load_previous_hints.return_value = None
+    glossary_mock.extract_all.return_value = GlossaryHints(terms=[])
+    glossary_mock.merge_with_previous.return_value = GlossaryHints(terms=[])
+    glossary_mock.write_hints.return_value = None
+
     return {
         "discovery": Mock(spec=DiscoveryService),
         "output": Mock(spec=OutputMirrorService),
         "manifest": Mock(spec=ManifestService),
         "orphan": orphan_mock,
-        "index": Mock(spec=IndexService),
+        "index": index_mock,
+        "metadata": metadata_mock,
+        "glossary": glossary_mock,
         "project_root": Path("/app"),
     }
 
@@ -53,6 +79,8 @@ def _create_sync_service(deps: dict) -> SyncService:
         manifest=deps["manifest"],
         orphan=deps["orphan"],
         index=deps["index"],
+        metadata=deps["metadata"],
+        glossary=deps["glossary"],
         project_root=deps["project_root"],
     )
 
@@ -124,8 +152,8 @@ class TestSyncDiscovery:
 class TestSyncIndexIntegration:
     """Tests for index generation during sync."""
 
-    def test_sync_calls_index_update_with_success_files(self, mock_deps):
-        """Index should receive only successful file paths."""
+    def test_sync_generates_index_with_metadata(self, mock_deps):
+        """Index should be generated using metadata extraction pipeline."""
         service = _create_sync_service(mock_deps)
 
         mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
@@ -141,38 +169,114 @@ class TestSyncIndexIntegration:
             error=None,
         )
 
-        final_manifest = Manifest(
-            nest_version="1.0",
-            project_name="Nest",
-            files={
-                "key_a": FileEntry(
-                    sha256="123",
-                    processed_at=datetime.now(),
-                    output="idx/a.md",
-                    status="success",
-                    error=None,
-                ),
-                "key_b": FileEntry(
-                    sha256="456",
-                    processed_at=datetime.now(),
-                    output="",
-                    status="failed",
-                    error="boom",
-                ),
-            },
+        service.sync()
+
+        # Metadata extraction should be called
+        mock_deps["metadata"].extract_all.assert_called_once()
+        mock_deps["metadata"].write_hints.assert_called_once()
+        # Index should be generated and written
+        mock_deps["index"].generate_content.assert_called_once()
+        mock_deps["index"].write_index.assert_called_once()
+
+    def test_enrichment_needed_counts_empty_descriptions(self, mock_deps):
+        """enrichment_needed should count rows with empty descriptions in generated index."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        # Index with 2 files: one with description, one without
+        mock_deps["index"].generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "| doc.md | 10 | Has a description |\n"
+            "| empty.md | 5 |  |\n"
+            "<!-- nest:index-table-end -->\n"
         )
 
-        mock_deps["manifest"].commit.return_value = None
-        mock_deps["manifest"].load_current_manifest.return_value = final_manifest
+        result = service.sync()
+
+        assert result.enrichment_needed == 1
+
+    def test_glossary_terms_discovered_in_sync_result(self, mock_deps):
+        """glossary_terms_discovered should reflect merged glossary term count."""
+        from nest.core.models import CandidateTerm, GlossaryHints
+
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        mock_deps["glossary"].merge_with_previous.return_value = GlossaryHints(
+            terms=[
+                CandidateTerm(
+                    term="PDC",
+                    category="abbreviation",
+                    occurrences=5,
+                    source_files=["doc.md"],
+                    context_snippets=["The PDC board"],
+                ),
+                CandidateTerm(
+                    term="SME",
+                    category="abbreviation",
+                    occurrences=3,
+                    source_files=["doc.md"],
+                    context_snippets=["SME review"],
+                ),
+            ]
+        )
+
+        result = service.sync()
+
+        assert result.glossary_terms_discovered == 2
+
+    def test_glossary_service_called_during_sync(self, mock_deps):
+        """GlossaryHintsService should be called during normal sync."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
 
         service.sync()
 
-        mock_deps["index"].update_index.assert_called_once()
-        # update_index now only takes project_name
-        assert len(mock_deps["index"].update_index.call_args[0]) == 1
-        project_name = mock_deps["index"].update_index.call_args[0][0]
+        mock_deps["glossary"].load_previous_hints.assert_called_once()
+        mock_deps["glossary"].extract_all.assert_called_once()
+        mock_deps["glossary"].merge_with_previous.assert_called_once()
+        mock_deps["glossary"].write_hints.assert_called_once()
 
-        assert project_name == mock_deps["project_root"].name
+    def test_glossary_skipped_during_dry_run(self, mock_deps):
+        """Glossary hints should NOT be processed during dry-run."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["orphan"].detect_orphans.return_value = []
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service.sync(dry_run=True)
+
+        mock_deps["glossary"].load_previous_hints.assert_not_called()
+        mock_deps["glossary"].extract_all.assert_not_called()
+        mock_deps["glossary"].write_hints.assert_not_called()
+
+    def test_enrichment_needed_zero_when_all_described(self, mock_deps):
+        """enrichment_needed should be 0 when all files have descriptions."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        mock_deps["index"].generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "| doc.md | 10 | Has a description |\n"
+            "| other.md | 5 | Also described |\n"
+            "<!-- nest:index-table-end -->\n"
+        )
+
+        result = service.sync()
+
+        assert result.enrichment_needed == 0
 
 
 class TestSyncEmptyDiscovery:
@@ -189,10 +293,9 @@ class TestSyncEmptyDiscovery:
 
         # Commit should still be called
         mock_deps["manifest"].commit.assert_called_once()
-        # Index should still be updated
-        mock_deps["index"].update_index.assert_called_once()
-        args = mock_deps["index"].update_index.call_args[0]
-        assert args[0] == mock_deps["project_root"].name
+        # Index should still be generated
+        mock_deps["index"].generate_content.assert_called_once()
+        mock_deps["index"].write_index.assert_called_once()
 
 
 class TestSyncFailureHandling:
@@ -324,7 +427,7 @@ class TestSyncManifestCommit:
     """Tests for manifest commit behavior."""
 
     def test_sync_commits_manifest_before_orphan_cleanup(self, mock_deps):
-        """Manifest commit, then orphan cleanup, then index update."""
+        """Manifest commit, then orphan cleanup, then index generation."""
         service = _create_sync_service(mock_deps)
         call_order = []
 
@@ -338,7 +441,7 @@ class TestSyncManifestCommit:
             call_order.append("load"),
             _empty_manifest(),
         )[1]
-        mock_deps["index"].update_index.side_effect = lambda *_: call_order.append("index")
+        mock_deps["index"].write_index.side_effect = lambda *_: call_order.append("index")
 
         service.sync()
 
@@ -553,7 +656,7 @@ class TestSyncDryRunMode:
         mock_deps["orphan"].detect_orphans.assert_called_once()
 
     def test_dry_run_does_not_update_index(self, mock_deps):
-        """dry_run=True should NOT update the master index."""
+        """dry_run=True should NOT generate the master index."""
         service = _create_sync_service(mock_deps)
 
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
@@ -561,7 +664,8 @@ class TestSyncDryRunMode:
 
         service.sync(dry_run=True)
 
-        mock_deps["index"].update_index.assert_not_called()
+        mock_deps["index"].generate_content.assert_not_called()
+        mock_deps["index"].write_index.assert_not_called()
 
 
 class TestSyncForceMode:
@@ -882,3 +986,81 @@ class TestSyncResultCounts:
         assert isinstance(result, SyncResult)
         assert result.failed_count == 1
         assert result.processed_count == 0
+
+
+class TestSyncCollisionDetection:
+    """Tests for name collision detection (AC7)."""
+
+    def test_passthrough_wins_over_docling_collision(self, mock_deps):
+        """AC7: Passthrough file wins when output paths collide."""
+        mock_deps["project_root"] = Path("/app")
+        service = _create_sync_service(mock_deps)
+
+        # report.md (passthrough) and report.pdf (Docling → report.md) collide
+        changes = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(
+                    path=Path("/app/_nest_sources/report.pdf"),
+                    checksum="aaa",
+                    status="new",
+                ),
+                DiscoveredFile(
+                    path=Path("/app/_nest_sources/report.md"),
+                    checksum="bbb",
+                    status="new",
+                ),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/_nest_sources/report.md"),
+            status="success",
+            output_path=Path("/app/_nest_context/report.md"),
+        )
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        result = service.sync(changes=changes)
+
+        assert isinstance(result, SyncResult)
+        # Only 1 file should be processed (the passthrough .md)
+        assert result.processed_count == 1
+        # The .pdf should have been skipped (manifest.record_skipped called)
+        mock_deps["manifest"].record_skipped.assert_called_once()
+
+    def test_no_collision_when_output_paths_differ(self, mock_deps):
+        """No collision when files produce different output paths."""
+        mock_deps["project_root"] = Path("/app")
+        service = _create_sync_service(mock_deps)
+
+        changes = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(
+                    path=Path("/app/_nest_sources/report.pdf"),
+                    checksum="aaa",
+                    status="new",
+                ),
+                DiscoveredFile(
+                    path=Path("/app/_nest_sources/notes.txt"),
+                    checksum="bbb",
+                    status="new",
+                ),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/_nest_sources/report.pdf"),
+            status="success",
+            output_path=Path("/app/_nest_context/report.md"),
+        )
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        result = service.sync(changes=changes)
+
+        assert isinstance(result, SyncResult)
+        # Both files should be processed
+        assert result.processed_count == 2
+        mock_deps["manifest"].record_skipped.assert_not_called()

@@ -69,7 +69,7 @@ This is the **FIFTH and FINAL** story in Epic 4 (Tool Updates & Maintenance). It
 **When** `uv tool install` runs
 **Then** Rich spinner shows: `"Installing version X.Y.Z..."`
 **And** on success: `"✓ Updated to version X.Y.Z"`
-**And** shows changelog link: `"What's new: https://github.com/jbjornsson/nest/blob/main/CHANGELOG.md"`
+**And** shows changelog link: `"What's new: https://github.com/jbb10/nest/blob/main/CHANGELOG.md"`
 
 ### AC4: Update Failure Error Display
 
@@ -336,7 +336,7 @@ with console.status(f"Installing version {version}..."):
 success(f"Updated to version {result.version}")
 console.print()
 console.print(
-    "  [dim]What's new: https://github.com/jbjornsson/nest/blob/main/CHANGELOG.md[/dim]"
+    "  [dim]What's new: https://github.com/jbb10/nest/blob/main/CHANGELOG.md[/dim]"
 )
 ```
 
@@ -420,7 +420,7 @@ def test_update_check_flag_up_to_date(mock_migration, mock_update):
         latest_version="1.0.0",
         annotated_versions=[("1.0.0", "(installed) (latest)")],
         update_available=False,
-        source="git+https://github.com/jbjornsson/nest",
+        source="git+https://github.com/jbb10/nest",
     )
     mock_update.return_value = (mock_service, mock_config)
     # ... invoke and assert

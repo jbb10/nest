@@ -39,15 +39,20 @@ Nest operates as a global CLI that manages local files. It does not run a backgr
 my-project/
 ├── .github/
 │   └── agents/
-│       └── nest.agent.md       <-- The "Persona" (VS Code picks this up automatically)
-├── _nest_sources/              <-- User Input (PDFs, XLSX, etc. for processing)
-└── _nest_context/              <-- AI Knowledge Base (Generated + User-Curated)
+│       ├── nest.agent.md           <-- The "Persona" (VS Code picks this up automatically)
+│       ├── nest-enricher.agent.md  <-- Index enrichment agent
+│       └── nest-glossary.agent.md  <-- Glossary generation agent
+├── _nest_sources/              <-- User Input (ALL documents: PDFs, XLSX, text files, etc.)
+├── _nest_context/              <-- AI Knowledge Base (Converted Markdown + passthrough copies)
+│   ├── policy_v1.md            <-- Generated from sources
+│   ├── developer-guide.md      <-- Passthrough from _nest_sources/ (.md)
+│   └── financial_data.md       <-- Generated from sources
+└── .nest/                      <-- Metadata Directory (git-ignored)
+    ├── manifest.json           <-- Sync state tracking
+    ├── errors.log              <-- Error diagnostics
     ├── 00_MASTER_INDEX.md      <-- The Map
-    ├── policy_v1.md            <-- Generated from sources
-    ├── developer-guide.md      <-- User-added (.md, no processing needed)
-    ├── api-reference.yaml      <-- User-added (.yaml, included in index)
-    ├── meeting-notes.txt       <-- User-added (.txt, included in index)
-    └── financial_data.md       <-- Generated from sources
+    ├── 00_INDEX_HINTS.yaml     <-- Index enrichment hints
+    └── 00_GLOSSARY_HINTS.yaml  <-- Glossary hints
 ```
 
 ### 3.2 The Technology Stack
@@ -63,7 +68,7 @@ my-project/
 
 **Distribution Channel:**
 * Primary: Public GitHub repository.
-* Installation command: `uv tool install git+https://github.com/jbjornsson/nest`
+* Installation command: `uv tool install git+https://github.com/jbb10/nest`
 
 **First-Run Model Download:**
 * Docling requires ML models (~1.5-2GB) for document processing.
@@ -88,9 +93,9 @@ my-project/
 | `--dir`, `-d` | Current directory | Target directory for project initialization |
 
 **Behavior:**
-1.  Creates directories: `_nest_sources/`, `_nest_context/`.
+1.  Creates directories: `_nest_sources/`, `_nest_context/`, `.nest/`.
 2.  Creates `.github/agents/nest.agent.md`.
-3.  Creates `.nest_manifest.json` (empty manifest).
+3.  Creates `.nest/manifest.json` (empty manifest).
 4.  Downloads Docling ML models if not already cached (first-time only, ~1.5-2GB).
 5.  **Crucial:** The agent file must use the specific **VS Code Custom Agent** format (Frontmatter + Instructions).
 
@@ -119,10 +124,10 @@ You are an expert document analyst specialized in the [Project Name] project. Yo
 
 ## Core Responsibilities
 
-1. **Start with the Index:** Always begin by reading `_nest_context/00_MASTER_INDEX.md` to understand available documents
+1. **Start with the Index:** Always begin by reading `.nest/00_MASTER_INDEX.md` to understand available documents
 2. **Cite Sources:** When answering, always cite the specific filename(s) used
-3. **Navigate Structure:** Documents mirror the structure in `_nest_sources/` — use this to find related files
-4. **Stay Focused:** Never read `_nest_sources/` (raw documents) or system files (`.nest_manifest.json`, `.nest_errors.log`)
+3. **Navigate Structure:** Documents mirror the structure in `_nest_sources/` — use this to find related files. All files (PDFs, Word docs, AND plain text files) can be placed in `_nest_sources/` for processing.
+4. **Stay Focused:** Never read `_nest_sources/` (raw documents) or `.nest/` (system metadata)
 
 ## Response Guidelines
 
@@ -133,11 +138,12 @@ You are an expert document analyst specialized in the [Project Name] project. Yo
 
 ## Technical Context
 
-- All files in `_nest_context/` are Markdown conversions of original documents or user-curated content
+- All files in `_nest_context/` are either Markdown conversions of original documents or passthrough copies of text files from `_nest_sources/`
+- Users can place ALL files in `_nest_sources/` — text files (`.md`, `.txt`, `.yaml`, etc.) are copied as-is, while documents (`.pdf`, `.docx`, etc.) are converted to Markdown
+- Supported context file types include: `.md`, `.txt`, `.text`, `.rst`, `.csv`, `.json`, `.yaml`, `.yml`, `.toml`, `.xml`
 - Tables from PDFs/Excel are converted to Markdown table format
 - File paths are relative to `_nest_context/` directory
 - The index is regenerated after each `nest sync` command
-- User-curated files may be any supported text format: `.md`, `.txt`, `.text`, `.rst`, `.csv`, `.json`, `.yaml`, `.yml`, `.toml`, `.xml`
 
 ## Example Interactions
 
@@ -171,8 +177,8 @@ You are an expert document analyst specialized in the [Project Name] project. Yo
 | `--dir`, `-d` | Current directory | Target directory for sync operation |
 
 **Behavior:**
-1.  **Scan:** Recursively scans `_nest_sources/` for supported files (`.pdf`, `.docx`, `.pptx`, `.xlsx`, `.html`).
-2.  **Checksum Comparison:** For each file, compute SHA-256 hash and compare against `.nest_manifest.json`:
+1.  **Scan:** Recursively scans `_nest_sources/` for supported files (`.pdf`, `.docx`, `.pptx`, `.xlsx`, `.html`) and passthrough text files (`.md`, `.txt`, `.yaml`, etc.).
+2.  **Checksum Comparison:** For each file, compute SHA-256 hash and compare against `.nest/manifest.json`:
     * **New file** (not in manifest) → Process and save.
     * **Modified file** (hash differs) → Re-process and overwrite.
     * **Unchanged file** (hash matches) → Skip (saves time).
@@ -181,8 +187,8 @@ You are an expert document analyst specialized in the [Project Name] project. Yo
     * Saves plain Markdown to `_nest_context/` **mirroring the source folder hierarchy**.
     * (No YAML header in output — metadata lives only in manifest.)
 4.  **Orphan Cleanup:** By default, removes files from `_nest_context/` **that are tracked in the manifest** whose source no longer exists in `_nest_sources/`. Files not in the manifest (user-curated) are never touched. Disable with `--no-clean`.
-5.  **Index Generation:** Regenerates `00_MASTER_INDEX.md` with file listing from entire `_nest_context/` directory. Includes both Docling-generated files and user-curated plain text files. Supported context text extensions: `.md`, `.txt`, `.text`, `.rst`, `.csv`, `.json`, `.yaml`, `.yml`, `.toml`, `.xml`. Binary or unsupported file types placed in `_nest_context/` are excluded from the index.
-6.  **Manifest Update:** Updates `.nest_manifest.json` with processed file metadata.
+5.  **Index Generation:** Regenerates `00_MASTER_INDEX.md` (stored in `.nest/`) with file listing from entire `_nest_context/` directory. Includes both Docling-generated files and passthrough text files. Supported context text extensions: `.md`, `.txt`, `.text`, `.rst`, `.csv`, `.json`, `.yaml`, `.yml`, `.toml`, `.xml`. Binary or unsupported file types placed in `_nest_context/` are excluded from the index.
+6.  **Manifest Update:** Updates `.nest/manifest.json` with processed file metadata.
 
 **Directory Mirroring Example:**
 ```
@@ -194,12 +200,13 @@ _nest_sources/                  _nest_context/
 │       └── beta.pdf      →     │       └── beta.md
 ├── reports/                    ├── reports/
 │   └── Q3_summary.xlsx   →     │   └── Q3_summary.md
-└── (manual text files go       └── developer-guide.md  <-- User-curated (.md)
-    directly in _nest_context/)    onboarding.txt      <-- User-curated (.txt)
-                                   api-spec.yaml       <-- User-curated (.yaml)
+├── guides/                     └── guides/
+│   ├── developer-guide.md  →       ├── developer-guide.md  <-- Passthrough (.md)
+│   ├── onboarding.txt     →       ├── onboarding.txt      <-- Passthrough (.txt)
+│   └── api-spec.yaml      →       └── api-spec.yaml       <-- Passthrough (.yaml)
 ```
 
-**Manifest Schema (`.nest_manifest.json`):**
+**Manifest Schema (`.nest/manifest.json`):**
 ```json
 {
   "nest_version": "1.0.0",
@@ -306,8 +313,10 @@ nest init "Nike"
 * **Gitignore:** The `init` command should check if a `.gitignore` exists. If so, it should append:
     ```text
     _nest_sources/
+    .nest/
     # We commit _nest_context/ so the team shares the brain
     # We DO NOT commit _nest_sources/ (often too large/sensitive)
+    # We DO NOT commit .nest/ (internal metadata)
     ```
 
 ### 6.4 Error Handling
@@ -323,8 +332,8 @@ nest init "Nike"
 | Network timeout (model download) | Retry 3x, then fail with instructions | Same |
 
 **Error Logging:**
-* All errors are logged to `.nest_errors.log` in the project root.
-* Summary shown at end of sync: `Processed 45/47 files. 2 errors (see .nest_errors.log)`
+* All errors are logged to `.nest/errors.log`.
+* Summary shown at end of sync: `Processed 45/47 files. 2 errors (see .nest/errors.log)`
 
 ### 6.5 E2E Testing Requirements
 
@@ -351,13 +360,13 @@ Nest requires E2E tests that validate full CLI command flows with real file I/O 
 ### 6.6 Team Usage Guidance
 
 **Recommended Workflow:**
-1. **Commit `processed_context/`** — This is the shared "brain" for the team.
-2. **Do NOT commit `raw_inbox/`** — Often contains large/sensitive source files.
+1. **Commit `_nest_context/`** — This is the shared "brain" for the team.
+2. **Do NOT commit `_nest_sources/`** — Often contains large/sensitive source files.
 3. **One sync at a time** — Avoid running `nest sync` simultaneously from multiple machines on the same repo.
 4. **Pull before sync** — When teammates have added new processed files, `git pull` first to avoid conflicts.
 
 **Conflict Resolution:**
-* If two teammates process the same new file, Git will show a merge conflict in `processed_context/`.
+* If two teammates process the same new file, Git will show a merge conflict in `_nest_context/`.
 * Resolution: Keep either version (content should be identical) or re-run `nest sync --clean`.
 
 ### 6.6 Agent Context Management

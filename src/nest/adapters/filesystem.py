@@ -30,7 +30,7 @@ class FileSystemAdapter:
             path: Path to the file to write.
             content: Text content to write.
         """
-        path.write_text(content)
+        path.write_text(content, encoding="utf-8")
 
     def read_text(self, path: Path) -> str:
         """Read text content from a file.
@@ -44,7 +44,7 @@ class FileSystemAdapter:
         Raises:
             FileNotFoundError: If file doesn't exist.
         """
-        return path.read_text()
+        return path.read_text(encoding="utf-8")
 
     def exists(self, path: Path) -> bool:
         """Check if a path exists.
@@ -64,7 +64,7 @@ class FileSystemAdapter:
             path: Path to the file to append to.
             content: Text content to append.
         """
-        with path.open("a") as f:
+        with path.open("a", encoding="utf-8") as f:
             f.write(content)
 
     def get_relative_path(self, source: Path, base: Path) -> Path:

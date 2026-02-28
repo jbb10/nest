@@ -6,6 +6,7 @@ from unittest.mock import Mock
 
 from nest.adapters.protocols import FileDiscoveryProtocol, ManifestProtocol
 from nest.core.models import DiscoveryResult, FileEntry, Manifest
+from nest.core.paths import ALL_SOURCE_EXTENSIONS
 from nest.services.discovery_service import DiscoveryService
 
 
@@ -331,3 +332,87 @@ class TestDiscoveryService:
 
         # Assert
         assert result.total_count == 0
+
+
+class TestDiscoveryServiceTextFiles:
+    """Tests for discovery of passthrough text files (Story 2.12)."""
+
+    def test_discovers_txt_files_in_sources(self, tmp_path: Path) -> None:
+        """AC1: .txt files in sources are discovered."""
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
+        txt_file = sources / "notes.txt"
+        txt_file.write_text("meeting notes")
+
+        mock_discovery = Mock(spec=FileDiscoveryProtocol)
+        mock_discovery.discover.return_value = [txt_file]
+
+        mock_manifest = Mock(spec=ManifestProtocol)
+        mock_manifest.load.side_effect = FileNotFoundError
+
+        service = DiscoveryService(mock_discovery, mock_manifest)
+        result = service.discover_changes(tmp_path)
+
+        assert len(result.new_files) == 1
+        assert result.new_files[0].path == txt_file
+
+    def test_discovers_yaml_files_in_sources(self, tmp_path: Path) -> None:
+        """AC1: .yaml files in sources are discovered."""
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
+        yaml_file = sources / "config.yaml"
+        yaml_file.write_text("key: value")
+
+        mock_discovery = Mock(spec=FileDiscoveryProtocol)
+        mock_discovery.discover.return_value = [yaml_file]
+
+        mock_manifest = Mock(spec=ManifestProtocol)
+        mock_manifest.load.side_effect = FileNotFoundError
+
+        service = DiscoveryService(mock_discovery, mock_manifest)
+        result = service.discover_changes(tmp_path)
+
+        assert len(result.new_files) == 1
+
+    def test_discovers_md_files_in_sources(self, tmp_path: Path) -> None:
+        """AC1: .md files in sources are discovered."""
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
+        md_file = sources / "readme.md"
+        md_file.write_text("# README")
+
+        mock_discovery = Mock(spec=FileDiscoveryProtocol)
+        mock_discovery.discover.return_value = [md_file]
+
+        mock_manifest = Mock(spec=ManifestProtocol)
+        mock_manifest.load.side_effect = FileNotFoundError
+
+        service = DiscoveryService(mock_discovery, mock_manifest)
+        result = service.discover_changes(tmp_path)
+
+        assert len(result.new_files) == 1
+
+    def test_uses_all_source_extensions(self, tmp_path: Path) -> None:
+        """AC1: Discovery uses ALL_SOURCE_EXTENSIONS (both Docling + text)."""
+        sources = tmp_path / "_nest_sources"
+        sources.mkdir()
+
+        mock_discovery = Mock(spec=FileDiscoveryProtocol)
+        mock_discovery.discover.return_value = []
+
+        mock_manifest = Mock(spec=ManifestProtocol)
+        mock_manifest.load.return_value = Manifest(
+            nest_version="0.1.0", project_name="test", files={}
+        )
+
+        service = DiscoveryService(mock_discovery, mock_manifest)
+        service.discover_changes(tmp_path)
+
+        call_args = mock_discovery.discover.call_args
+        extensions = call_args[0][1]
+        # Must include both Docling and text extensions
+        assert ".pdf" in extensions
+        assert ".txt" in extensions
+        assert ".yaml" in extensions
+        assert ".md" in extensions
+        assert extensions == set(ALL_SOURCE_EXTENSIONS)

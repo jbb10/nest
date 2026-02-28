@@ -102,11 +102,11 @@ tests/e2e/fixtures/*.xlsx binary
 | # | Criterion | Verification |
 |---|-----------|--------------|
 | AC1 | Command exits successfully | `exit_code == 0` |
-| AC2 | Input folder created | `raw_inbox/` directory exists |
-| AC3 | Input folder is empty | `raw_inbox/` contains no files |
-| AC4 | Output folder created | `processed_context/` directory exists |
-| AC5 | Output folder is empty | `processed_context/` contains no files |
-| AC6 | Config/manifest initialized | `.nest_manifest.json` exists with valid JSON |
+| AC2 | Input folder created | `_nest_sources/` directory exists |
+| AC3 | Input folder is empty | `_nest_sources/` contains no files |
+| AC4 | Output folder created | `_nest_context/` directory exists |
+| AC5 | Output folder is empty | `_nest_context/` contains no files |
+| AC6 | Config/manifest initialized | `.nest/manifest.json` exists with valid JSON |
 
 #### Test Pseudocode
 ```python
@@ -121,19 +121,19 @@ class TestInitE2E:
         assert result.exit_code == 0
         
         # Assert - Input folder
-        raw_inbox = temp_project / "raw_inbox"
-        assert raw_inbox.exists()
-        assert raw_inbox.is_dir()
-        assert list(raw_inbox.iterdir()) == []  # Empty
+        sources = temp_project / "_nest_sources"
+        assert sources.exists()
+        assert sources.is_dir()
+        assert list(sources.iterdir()) == []  # Empty
         
         # Assert - Output folder
-        processed = temp_project / "processed_context"
-        assert processed.exists()
-        assert processed.is_dir()
-        assert list(processed.iterdir()) == []  # Empty
+        context = temp_project / "_nest_context"
+        assert context.exists()
+        assert context.is_dir()
+        assert list(context.iterdir()) == []  # Empty
         
         # Assert - Nest manifest
-        manifest = temp_project / ".nest_manifest.json"
+        manifest = temp_project / ".nest" / "manifest.json"
         assert manifest.exists()
         manifest_data = json.loads(manifest.read_text())
         assert manifest_data["project_name"] == "TestProject"
@@ -150,7 +150,7 @@ class TestInitE2E:
 Place 4 test documents in a **nested folder structure**:
 
 ```
-raw_inbox/
+_nest_sources/
 ├── reports/
 │   ├── quarterly.pdf
 │   └── summary.docx
@@ -164,7 +164,7 @@ raw_inbox/
 | # | Criterion | Verification |
 |---|-----------|--------------|
 | AC1 | Command exits successfully | `exit_code == 0` |
-| AC2 | Output mirrors input structure | Same folder hierarchy in `processed_context/` |
+| AC2 | Output mirrors input structure | Same folder hierarchy in `_nest_context/` |
 | AC3 | All outputs are markdown | Files end in `.md` extension |
 | AC4 | All outputs non-empty | Each `.md` file has content |
 | AC5 | Manifest is updated | Manifest contains entries for all 4 files |
@@ -172,7 +172,7 @@ raw_inbox/
 
 #### Expected Output Structure
 ```
-processed_context/
+_nest_context/
 ├── reports/
 │   ├── quarterly.md
 │   └── summary.md
@@ -191,10 +191,10 @@ class TestSyncE2E:
         cli_runner(["init", "TestProject"], cwd=temp_project)
         
         # Arrange - sample_documents fixture copies files to:
-        # raw_inbox/reports/quarterly.pdf
-        # raw_inbox/reports/summary.docx
-        # raw_inbox/presentations/deck.pptx
-        # raw_inbox/presentations/data.xlsx
+        # _nest_sources/reports/quarterly.pdf
+        # _nest_sources/reports/summary.docx
+        # _nest_sources/presentations/deck.pptx
+        # _nest_sources/presentations/data.xlsx
         
         # Act
         result = cli_runner(["sync"], cwd=temp_project)
@@ -203,13 +203,13 @@ class TestSyncE2E:
         assert result.exit_code == 0
         
         # Assert - Output structure mirrors input
-        processed = temp_project / "processed_context"
+        context = temp_project / "_nest_context"
         
         expected_outputs = [
-            processed / "reports" / "quarterly.md",
-            processed / "reports" / "summary.md",
-            processed / "presentations" / "deck.md",
-            processed / "presentations" / "data.md",
+            context / "reports" / "quarterly.md",
+            context / "reports" / "summary.md",
+            context / "presentations" / "deck.md",
+            context / "presentations" / "data.md",
         ]
         
         for output_path in expected_outputs:
@@ -222,7 +222,7 @@ class TestSyncE2E:
             assert content.strip(), f"Empty file: {output_path}"
         
         # Assert - Manifest updated
-        manifest = temp_project / ".nest_manifest.json"
+        manifest = temp_project / ".nest" / "manifest.json"
         assert manifest.exists()
         manifest_data = json.loads(manifest.read_text())
         assert len(manifest_data["files"]) == 4
@@ -245,7 +245,7 @@ class TestSyncE2E:
 | N4 | `test_sync_skips_corrupt_file` | Corrupt PDF + `sync` | Skip file, log error, process others, exit 0 |
 | N5 | `test_sync_fail_mode_aborts` | Corrupt PDF + `--on-error=fail` | Exit code 1, abort immediately |
 | N6 | `test_sync_ignores_unsupported` | `.txt` file in inbox | File ignored, no error |
-| N7 | `test_sync_empty_inbox` | No files in `raw_inbox/` | Exit code 0, "No files to process" |
+| N7 | `test_sync_empty_inbox` | No files in `_nest_sources/` | Exit code 0, "No files to process" |
 
 #### Test Pseudocode for Key Negative Tests
 ```python
@@ -280,7 +280,7 @@ class TestNegativeE2E:
         # Should succeed overall (skip mode is default)
         assert result.exit_code == 0
         # Error should be logged
-        error_log = temp_project / ".nest_errors.log"
+        error_log = temp_project / ".nest" / "errors.log"
         assert error_log.exists()
 ```
 

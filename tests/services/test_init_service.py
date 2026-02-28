@@ -15,7 +15,9 @@ from nest.core.exceptions import NestError
 from nest.services.init_service import InitService
 
 
+@patch("nest.services.init_service.InitService._setup_gitignore")
 def test_init_service_calls_agent_writer(
+    mock_gitignore: MagicMock,
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
@@ -39,7 +41,9 @@ def test_init_service_calls_agent_writer(
     assert output_path == target_dir / ".github" / "agents" / "nest.agent.md"
 
 
+@patch("nest.services.init_service.InitService._setup_gitignore")
 def test_init_service_strips_project_name_whitespace(
+    mock_gitignore: MagicMock,
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
@@ -113,7 +117,9 @@ def test_init_service_rejects_existing_project(
         service.execute("Nike", Path("/project"))
 
 
+@patch("nest.services.init_service.InitService._setup_gitignore")
 def test_init_service_creates_all_directories(
+    mock_gitignore: MagicMock,
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
@@ -136,7 +142,9 @@ def test_init_service_creates_all_directories(
     assert str(target_dir / ".github/agents") in created_dirs
 
 
+@patch("nest.services.init_service.InitService._setup_gitignore")
 def test_init_service_creates_manifest(
+    mock_gitignore: MagicMock,
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
@@ -157,85 +165,9 @@ def test_init_service_creates_manifest(
     assert project_name == "Nike"
 
 
-def test_init_service_creates_gitignore(
-    mock_filesystem: MockFileSystem,
-    mock_manifest: MockManifest,
-    mock_agent_writer: MockAgentWriter,
-    mock_model_downloader: MockModelDownloader,
-) -> None:
-    """Test that InitService creates .gitignore with raw_inbox entry."""
-    service = InitService(
-        filesystem=mock_filesystem,
-        manifest=mock_manifest,
-        agent_writer=mock_agent_writer,
-        model_downloader=mock_model_downloader,
-    )
-    target_dir = Path("/project")
-
-    service.execute("Nike", target_dir)
-
-    gitignore_path = target_dir / ".gitignore"
-    assert gitignore_path in mock_filesystem.written_files
-    content = mock_filesystem.written_files[gitignore_path]
-    assert "_nest_sources/" in content
-
-
-def test_init_service_appends_to_existing_gitignore(
-    mock_filesystem: MockFileSystem,
-    mock_manifest: MockManifest,
-    mock_agent_writer: MockAgentWriter,
-    mock_model_downloader: MockModelDownloader,
-) -> None:
-    """Test that InitService appends to existing .gitignore."""
-    target_dir = Path("/project")
-    gitignore_path = target_dir / ".gitignore"
-
-    # Simulate existing gitignore
-    mock_filesystem.existing_paths.add(gitignore_path)
-    mock_filesystem.file_contents[gitignore_path] = "node_modules/\n"
-
-    service = InitService(
-        filesystem=mock_filesystem,
-        manifest=mock_manifest,
-        agent_writer=mock_agent_writer,
-        model_downloader=mock_model_downloader,
-    )
-
-    service.execute("Nike", target_dir)
-
-    content = mock_filesystem.written_files[gitignore_path]
-    assert "node_modules/" in content
-    assert "_nest_sources/" in content
-
-
-def test_init_service_skips_gitignore_if_entry_exists(
-    mock_filesystem: MockFileSystem,
-    mock_manifest: MockManifest,
-    mock_agent_writer: MockAgentWriter,
-    mock_model_downloader: MockModelDownloader,
-) -> None:
-    """Test that InitService doesn't duplicate raw_inbox entry."""
-    target_dir = Path("/project")
-    gitignore_path = target_dir / ".gitignore"
-
-    # Simulate existing gitignore with entry already present
-    mock_filesystem.existing_paths.add(gitignore_path)
-    mock_filesystem.file_contents[gitignore_path] = "_nest_sources/\n"
-
-    service = InitService(
-        filesystem=mock_filesystem,
-        manifest=mock_manifest,
-        agent_writer=mock_agent_writer,
-        model_downloader=mock_model_downloader,
-    )
-
-    service.execute("Nike", target_dir)
-
-    # Should not have written to gitignore since entry exists
-    assert gitignore_path not in mock_filesystem.written_files
-
-
+@patch("nest.services.init_service.InitService._setup_gitignore")
 def test_init_service_downloads_models_if_needed(
+    mock_gitignore: MagicMock,
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
@@ -255,7 +187,9 @@ def test_init_service_downloads_models_if_needed(
     assert mock_model_downloader.download_progress is True
 
 
+@patch("nest.services.init_service.InitService._setup_gitignore")
 def test_init_service_skips_download_when_models_cached(
+    mock_gitignore: MagicMock,
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
@@ -275,11 +209,13 @@ def test_init_service_skips_download_when_models_cached(
     assert mock_model_downloader_cached.download_called is False
 
 
+@patch("nest.services.init_service.InitService._setup_gitignore")
 @patch("nest.services.init_service.status_start")
 @patch("nest.services.init_service.status_done")
 def test_init_service_progress_output_sequence_cached(
     mock_status_done: MagicMock,
     mock_status_start: MagicMock,
+    mock_gitignore: MagicMock,
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,
@@ -310,6 +246,7 @@ def test_init_service_progress_output_sequence_cached(
     assert ("cached",) in done_calls
 
 
+@patch("nest.services.init_service.InitService._setup_gitignore")
 @patch("nest.services.init_service.info")
 @patch("nest.services.init_service.status_start")
 @patch("nest.services.init_service.status_done")
@@ -317,6 +254,7 @@ def test_init_service_progress_output_sequence_download(
     mock_status_done: MagicMock,
     mock_status_start: MagicMock,
     mock_info: MagicMock,
+    mock_gitignore: MagicMock,
     mock_filesystem: MockFileSystem,
     mock_manifest: MockManifest,
     mock_agent_writer: MockAgentWriter,

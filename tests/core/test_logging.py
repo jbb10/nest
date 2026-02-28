@@ -16,7 +16,7 @@ class TestSetupErrorLogger:
         logger = logging.getLogger("nest.errors")
         logger.handlers.clear()
 
-        log_file = tmp_path / "nested" / "deep" / ".nest_errors.log"
+        log_file = tmp_path / "nested" / "deep" / "errors.log"
 
         logger = setup_error_logger(log_file)
 
@@ -26,7 +26,7 @@ class TestSetupErrorLogger:
         """Test that setup returns a logger."""
         import logging
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
 
         logger = setup_error_logger(log_file)
 
@@ -37,7 +37,7 @@ class TestSetupErrorLogger:
         """Test that logger is configured with file handler."""
         import logging
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
 
         # Clear any existing handlers first
         logger = logging.getLogger("nest.errors")
@@ -60,7 +60,7 @@ class TestLogProcessingError:
         logger = logging.getLogger("nest.errors")
         logger.handlers.clear()
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
         file_path = Path("/some/path/document.pdf")
 
         log_processing_error(
@@ -90,7 +90,7 @@ class TestLogProcessingError:
         logger = logging.getLogger("nest.errors")
         logger.handlers.clear()
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
 
         log_processing_error(
             log_file=log_file,
@@ -115,7 +115,7 @@ class TestLogProcessingError:
         logger = logging.getLogger("nest.errors")
         logger.handlers.clear()
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
 
         log_processing_error(
             log_file=log_file,

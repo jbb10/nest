@@ -236,7 +236,10 @@ class TestDoclingProcessorBase64Exclusion:
         # Create HTML with a base64 embedded image
         source = tmp_path / "with_image.html"
         # Small 1x1 red pixel PNG encoded as base64
-        base64_img = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+        base64_img = (
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA"
+            "DUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=="
+        )
         source.write_text(
             f"""<!DOCTYPE html>
 <html>
@@ -283,7 +286,7 @@ class TestDoclingProcessorErrorLogging:
     """Tests for error logging integration (AC6, AC7)."""
 
     def test_failed_processing_logs_to_error_file(self, tmp_path: Path) -> None:
-        """Test that failed processing writes to .nest_errors.log."""
+        """Test that failed processing writes to .nest/errors.log."""
         import logging
 
         from nest.adapters.docling_processor import DoclingProcessor
@@ -292,7 +295,8 @@ class TestDoclingProcessorErrorLogging:
         logger = logging.getLogger("nest.errors")
         logger.handlers.clear()
 
-        error_log = tmp_path / ".nest_errors.log"
+        error_log = tmp_path / ".nest" / "errors.log"
+        error_log.parent.mkdir(parents=True, exist_ok=True)
         processor = DoclingProcessor(error_log=error_log)
 
         # Process a nonexistent file to trigger an error

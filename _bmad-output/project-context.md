@@ -165,7 +165,7 @@ from nest.ui.messages import success, error, warning, info
 success("Processed 10 files")      # ✓ green
 error("Failed to process doc.pdf") # ✗ red
 warning("Model checksum mismatch") # ⚠ yellow
-info("Scanning raw_inbox/")        # • blue
+info("Scanning _nest_sources/")        # • blue
 ```
 
 **Message Formatting:**
@@ -181,7 +181,7 @@ console.print("  Reason: File is password protected")
 console.print("  Action: Remove password and run `nest sync` again")
 ```
 
-**Error Log Format (`.nest_errors.log`):**
+**Error Log Format (`.nest/errors.log`):**
 ```
 2026-01-12T10:30:00 ERROR [sync] contracts/alpha.pdf: Password protected
 2026-01-12T10:30:01 ERROR [sync] reports/q3.xlsx: Encoding error (UTF-8)
@@ -262,7 +262,7 @@ def test_sync_skips_unchanged_files():
     service = SyncService(mock_fs, MockProcessor(), mock_manifest)
     
     # Act
-    result = service.execute(Path("raw_inbox"))
+    result = service.execute(Path("_nest_sources"))
     
     # Assert
     assert result.skip_count == 1
@@ -274,7 +274,7 @@ def test_sync_skips_unchanged_files():
 **🚨 DEV AGENT TESTING PROTOCOL (CRITICAL):**
 ```
 NEVER run nest init|sync|status commands directly in the repository
-✗ FORBIDDEN: nest init "TestProject"  (pollutes repo with .nest_manifest.json)
+✗ FORBIDDEN: nest init "TestProject"  (pollutes repo with .nest/ artifacts)
 ✗ FORBIDDEN: nest sync                (creates _nest_context/ artifacts in repo)
 
 ✓ CORRECT: pytest tests/e2e/test_init_e2e.py   (runs in isolated temp workspace)
@@ -381,12 +381,18 @@ path = os.path.join(dir1, dir2, file)
 **User-created project structure:**
 ```
 {project}/
-├── .nest_manifest.json      # Sync state tracking
-├── .nest_errors.log         # Error diagnostics
-├── raw_inbox/               # Source documents (PDF, XLSX, PPTX)
-├── processed_context/       # Converted markdown (mirrors raw_inbox/)
-│   └── 00_MASTER_INDEX.md   # Auto-generated index
-└── .github/copilot-instructions.md  # VS Code agent file
+├── .nest/                        # Metadata directory
+│   ├── manifest.json             # Sync state tracking
+│   ├── errors.log                # Error diagnostics
+│   ├── 00_MASTER_INDEX.md        # Auto-generated index
+│   ├── 00_INDEX_HINTS.yaml       # Index enrichment hints
+│   └── 00_GLOSSARY_HINTS.yaml    # Glossary generation hints
+├── _nest_sources/                # Source documents (PDFs, XLSX, PPTX, text files)
+├── _nest_context/                # Converted markdown + passthrough copies
+└── .github/agents/
+    ├── nest.agent.md             # VS Code Copilot agent file
+    ├── nest-enricher.agent.md    # Index enrichment agent
+    └── nest-glossary.agent.md    # Glossary generation agent
 ```
 
 **Global paths:**

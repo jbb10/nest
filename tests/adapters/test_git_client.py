@@ -51,7 +51,7 @@ class TestListTags:
         mock_run.return_value = MagicMock(stdout=SAMPLE_LS_REMOTE, returncode=0)
         adapter = GitClientAdapter()
 
-        tags = adapter.list_tags("git+https://github.com/jbjornsson/nest")
+        tags = adapter.list_tags("git+https://github.com/jbb10/nest")
 
         assert "v0.1.0" in tags
         assert "v0.1.1" in tags
@@ -64,7 +64,7 @@ class TestListTags:
         mock_run.return_value = MagicMock(stdout=SAMPLE_LS_REMOTE, returncode=0)
         adapter = GitClientAdapter()
 
-        tags = adapter.list_tags("https://github.com/jbjornsson/nest")
+        tags = adapter.list_tags("https://github.com/jbb10/nest")
 
         assert not any(t.endswith("^{}") for t in tags)
 
@@ -74,13 +74,13 @@ class TestListTags:
         mock_run.return_value = MagicMock(stdout="", returncode=0)
         adapter = GitClientAdapter()
 
-        adapter.list_tags("git+https://github.com/jbjornsson/nest")
+        adapter.list_tags("git+https://github.com/jbb10/nest")
 
         mock_run.assert_called_once()
         call_args = mock_run.call_args
         cmd = call_args[0][0] if call_args[0] else call_args[1].get("args", [])
-        assert "https://github.com/jbjornsson/nest" in cmd
-        assert "git+https://github.com/jbjornsson/nest" not in cmd
+        assert "https://github.com/jbb10/nest" in cmd
+        assert "git+https://github.com/jbb10/nest" not in cmd
 
     @patch("nest.adapters.git_client.subprocess.run")
     def test_passes_url_without_git_prefix_unchanged(
@@ -90,11 +90,11 @@ class TestListTags:
         mock_run.return_value = MagicMock(stdout="", returncode=0)
         adapter = GitClientAdapter()
 
-        adapter.list_tags("https://github.com/jbjornsson/nest")
+        adapter.list_tags("https://github.com/jbb10/nest")
 
         call_args = mock_run.call_args
         cmd = call_args[0][0] if call_args[0] else call_args[1].get("args", [])
-        assert "https://github.com/jbjornsson/nest" in cmd
+        assert "https://github.com/jbb10/nest" in cmd
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ class TestNoTags:
         mock_run.return_value = MagicMock(stdout="", returncode=0)
         adapter = GitClientAdapter()
 
-        tags = adapter.list_tags("https://github.com/jbjornsson/nest")
+        tags = adapter.list_tags("https://github.com/jbb10/nest")
 
         assert tags == []
 
@@ -123,7 +123,7 @@ class TestNoTags:
         mock_run.return_value = MagicMock(stdout="  \n  \n", returncode=0)
         adapter = GitClientAdapter()
 
-        tags = adapter.list_tags("https://github.com/jbjornsson/nest")
+        tags = adapter.list_tags("https://github.com/jbb10/nest")
 
         assert tags == []
 
@@ -145,7 +145,7 @@ class TestErrorHandling:
         adapter = GitClientAdapter()
 
         with pytest.raises(ConfigError, match="Cannot reach update server"):
-            adapter.list_tags("https://github.com/jbjornsson/nest")
+            adapter.list_tags("https://github.com/jbb10/nest")
 
     @patch("nest.adapters.git_client.subprocess.run")
     def test_raises_config_error_on_timeout(self, mock_run: MagicMock) -> None:
@@ -154,7 +154,7 @@ class TestErrorHandling:
         adapter = GitClientAdapter()
 
         with pytest.raises(ConfigError, match="Cannot reach update server"):
-            adapter.list_tags("https://github.com/jbjornsson/nest")
+            adapter.list_tags("https://github.com/jbb10/nest")
 
     @patch("nest.adapters.git_client.subprocess.run")
     def test_raises_config_error_on_os_error(self, mock_run: MagicMock) -> None:
@@ -163,7 +163,7 @@ class TestErrorHandling:
         adapter = GitClientAdapter()
 
         with pytest.raises(ConfigError, match="Cannot reach update server"):
-            adapter.list_tags("https://github.com/jbjornsson/nest")
+            adapter.list_tags("https://github.com/jbb10/nest")
 
     def test_custom_timeout_parameter(self) -> None:
         """Constructor accepts custom timeout."""
@@ -181,14 +181,14 @@ class TestCleanUrl:
 
     def test_strips_git_plus(self) -> None:
         """Strips git+ prefix."""
-        assert _clean_url("git+https://github.com/jbjornsson/nest") == (
-            "https://github.com/jbjornsson/nest"
+        assert _clean_url("git+https://github.com/jbb10/nest") == (
+            "https://github.com/jbb10/nest"
         )
 
     def test_no_prefix_unchanged(self) -> None:
         """URLs without git+ prefix are unchanged."""
-        assert _clean_url("https://github.com/jbjornsson/nest") == (
-            "https://github.com/jbjornsson/nest"
+        assert _clean_url("https://github.com/jbb10/nest") == (
+            "https://github.com/jbb10/nest"
         )
 
 

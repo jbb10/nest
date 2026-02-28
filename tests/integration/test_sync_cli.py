@@ -25,7 +25,8 @@ class TestSyncCLIIntegration:
             "project_name": "Test",
             "files": {},
         }
-        manifest_path = tmp_path / ".nest_manifest.json"
+        manifest_path = tmp_path / ".nest" / "manifest.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(manifest))
 
         # Create raw_inbox and processed_context
@@ -50,7 +51,8 @@ class TestSyncCLIIntegration:
             "project_name": "Test",
             "files": {},
         }
-        manifest_path = tmp_path / ".nest_manifest.json"
+        manifest_path = tmp_path / ".nest" / "manifest.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(manifest))
 
         (tmp_path / "raw_inbox").mkdir()
@@ -73,7 +75,8 @@ class TestSyncCLIIntegration:
             "project_name": "Test",
             "files": {},
         }
-        manifest_path = tmp_path / ".nest_manifest.json"
+        manifest_path = tmp_path / ".nest" / "manifest.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(manifest))
 
         (tmp_path / "raw_inbox").mkdir()
@@ -107,7 +110,8 @@ class TestSyncProgressIntegration:
             "project_name": "Test",
             "files": {},
         }
-        manifest_path = tmp_path / ".nest_manifest.json"
+        manifest_path = tmp_path / ".nest" / "manifest.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(manifest))
 
         (tmp_path / "raw_inbox").mkdir()

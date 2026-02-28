@@ -152,6 +152,22 @@ def display_project_report(report: ProjectReport, tree: Tree) -> None:
 
     folders_node = project.add(folders_line)
 
+    # .nest/ metadata directory status
+    if status.meta_folder_present:
+        meta_line = "Metadata dir: .nest/ [green]✓[/green]"
+    else:
+        meta_line = "Metadata dir: .nest/ missing [red]✗[/red]"
+
+    meta_node = project.add(meta_line)
+
+    # Legacy layout warning
+    if status.legacy_layout_detected:
+        legacy_node = project.add(
+            "Layout: legacy detected [yellow]⚠[/yellow] [dim](run nest update to migrate)[/dim]"
+        )
+    else:
+        legacy_node = None
+
     # Add suggestions to appropriate nodes
     for suggestion in status.suggestions:
         suggestion_lower = suggestion.lower()
@@ -159,6 +175,13 @@ def display_project_report(report: ProjectReport, tree: Tree) -> None:
             agent_node.add(f"→ {suggestion}")
         elif "folder" in suggestion_lower or "_nest_" in suggestion_lower:
             folders_node.add(f"→ {suggestion}")
+        elif "legacy" in suggestion_lower:
+            if legacy_node:
+                legacy_node.add(f"→ {suggestion}")
+            else:
+                meta_node.add(f"→ {suggestion}")
+        elif ".nest/" in suggestion_lower or "metadata" in suggestion_lower:
+            meta_node.add(f"→ {suggestion}")
         else:
             manifest_node.add(f"→ {suggestion}")
 

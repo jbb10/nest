@@ -39,7 +39,7 @@ def test_init_creates_agent_file(tmp_path: Path) -> None:
     content = agent_path.read_text()
     assert content.startswith("---\nname: nest\n")
     assert "Nike" in content
-    assert "_nest_context/00_MASTER_INDEX.md" in content
+    assert ".nest/00_MASTER_INDEX.md" in content
     assert "_nest_sources/" in content
 
     # Verify downloader methods were called appropriately
@@ -89,5 +89,5 @@ def test_init_creates_manifest(tmp_path: Path) -> None:
 
     service.execute("Nike", tmp_path)
 
-    manifest_path = tmp_path / ".nest_manifest.json"
+    manifest_path = tmp_path / ".nest" / "manifest.json"
     assert manifest_path.exists()

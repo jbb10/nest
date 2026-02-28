@@ -9,7 +9,7 @@ from pathlib import Path
 from nest.adapters.protocols import FileSystemProtocol, ManifestProtocol
 from nest.core.models import OrphanCleanupResult
 from nest.core.orphan_detector import OrphanDetector
-from nest.core.paths import CONTEXT_DIR, CONTEXT_TEXT_EXTENSIONS, MASTER_INDEX_FILE, SOURCES_DIR
+from nest.core.paths import CONTEXT_DIR, CONTEXT_TEXT_EXTENSIONS, SOURCES_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -151,13 +151,10 @@ class OrphanService:
         output_files = self._filesystem.list_files(output_dir)
         supported_text = {ext.lower() for ext in CONTEXT_TEXT_EXTENSIONS}
 
-        # Count files NOT in manifest (excluding system files and unsupported types)
+        # Count files NOT in manifest (excluding unsupported types)
         user_curated = 0
         for file_path in output_files:
             relative = file_path.relative_to(output_dir).as_posix()
-            # Skip system files
-            if relative == MASTER_INDEX_FILE:
-                continue
             # Skip unsupported file types
             if file_path.suffix.lower() not in supported_text:
                 continue

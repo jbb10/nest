@@ -10,7 +10,7 @@ from nest.adapters.protocols import FileDiscoveryProtocol, ManifestProtocol
 from nest.core.change_detector import FileChangeDetector
 from nest.core.checksum import compute_sha256
 from nest.core.models import DiscoveredFile, DiscoveryResult
-from nest.core.paths import SOURCES_DIR, SUPPORTED_EXTENSIONS
+from nest.core.paths import ALL_SOURCE_EXTENSIONS, SOURCES_DIR
 
 
 class DiscoveryService:
@@ -37,6 +37,9 @@ class DiscoveryService:
     def discover_changes(self, project_dir: Path, force: bool = False) -> DiscoveryResult:
         """Discover files in sources directory and classify by change status.
 
+        Discovers both Docling-convertible files and passthrough text files
+        using ALL_SOURCE_EXTENSIONS.
+
         Args:
             project_dir: Path to the project root directory.
             force: If True, mark all files as 'modified' regardless of checksum.
@@ -62,7 +65,7 @@ class DiscoveryService:
 
         # Discover files in sources directory
         sources_dir = project_dir / SOURCES_DIR
-        discovered_paths = self._file_discovery.discover(sources_dir, set(SUPPORTED_EXTENSIONS))
+        discovered_paths = self._file_discovery.discover(sources_dir, set(ALL_SOURCE_EXTENSIONS))
 
         # Classify each discovered file
         result = DiscoveryResult()

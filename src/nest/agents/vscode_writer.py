@@ -52,3 +52,63 @@ class VSCodeAgentWriter:
 
         content = self.render(project_name)
         self._filesystem.write_text(output_path, content)
+
+    def render_enricher(self, project_name: str) -> str:
+        """Render enricher agent template to string.
+
+        Args:
+            project_name: Project name to interpolate into template.
+
+        Returns:
+            Rendered enricher template content as string.
+        """
+        template = self._jinja_env.get_template("enricher.md.jinja")
+        return template.render(project_name=project_name)
+
+    def generate_enricher(self, project_name: str, output_path: Path) -> None:
+        """Generate the enricher agent file.
+
+        Args:
+            project_name: Project name to interpolate into template.
+            output_path: Path to write the enricher agent file
+                (e.g., .github/agents/nest-enricher.agent.md).
+
+        Raises:
+            IOError: If directory cannot be created or file cannot be written.
+        """
+        output_dir = output_path.parent
+        if not self._filesystem.exists(output_dir):
+            self._filesystem.create_directory(output_dir)
+
+        content = self.render_enricher(project_name)
+        self._filesystem.write_text(output_path, content)
+
+    def render_glossary(self, project_name: str) -> str:
+        """Render glossary agent template to string.
+
+        Args:
+            project_name: Project name to interpolate into template.
+
+        Returns:
+            Rendered glossary template content as string.
+        """
+        template = self._jinja_env.get_template("glossary.md.jinja")
+        return template.render(project_name=project_name)
+
+    def generate_glossary(self, project_name: str, output_path: Path) -> None:
+        """Generate the glossary agent file.
+
+        Args:
+            project_name: Project name to interpolate into template.
+            output_path: Path to write the glossary agent file
+                (e.g., .github/agents/nest-glossary.agent.md).
+
+        Raises:
+            IOError: If directory cannot be created or file cannot be written.
+        """
+        output_dir = output_path.parent
+        if not self._filesystem.exists(output_dir):
+            self._filesystem.create_directory(output_dir)
+
+        content = self.render_glossary(project_name)
+        self._filesystem.write_text(output_path, content)

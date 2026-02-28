@@ -1,7 +1,7 @@
 """Error logging configuration for Nest.
 
 Provides logging utilities for file processing errors that are written
-to .nest_errors.log for diagnostics. User-facing messages should use
+to .nest/errors.log for diagnostics. User-facing messages should use
 Rich console output (nest.ui.messages), not this logger.
 """
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 def setup_error_logger(log_file: Path) -> logging.Logger:
-    """Configure error logger for .nest_errors.log.
+    """Configure error logger for .nest/errors.log.
 
     Creates or retrieves a logger that writes processing errors to a file.
     Uses a custom format including context and file path.

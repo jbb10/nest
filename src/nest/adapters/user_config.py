@@ -25,7 +25,7 @@ else:
             "Python <3.11 requires 'tomli'. Install with: pip install tomli>=2.0.0"
         ) from _err
 
-DEFAULT_INSTALL_SOURCE = "git+https://github.com/jbjornsson/nest"
+DEFAULT_INSTALL_SOURCE = "git+https://github.com/jbb10/nest"
 CONFIG_DIR = Path.home() / ".config" / "nest"
 CONFIG_FILE = "config.toml"
 

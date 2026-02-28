@@ -393,7 +393,7 @@ class SubprocessRunnerAdapter:
 
 The `uv tool install` command requires the full source URL with the version tag:
 ```
-uv tool install --force git+https://github.com/jbjornsson/nest@v1.4.0
+uv tool install --force git+https://github.com/jbb10/nest@v1.4.0
 ```
 
 **Key details:**

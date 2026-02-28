@@ -15,6 +15,10 @@ from nest.core.models import (
     OrphanCleanupResult,
     ProcessingResult,
 )
+from nest.core.models import GlossaryHints
+from nest.services.glossary_hints_service import GlossaryHintsService
+from nest.core.models import GlossaryHints
+from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.sync_service import SyncService
 
 
@@ -29,6 +33,27 @@ class TestSyncDryRunIntegration:
         mock_manifest = Mock()
         mock_orphan = Mock()
         mock_index = Mock()
+        mock_index.read_index_content.return_value = ""
+        mock_metadata = Mock()
+        mock_metadata.load_previous_hints.return_value = {}
+        mock_metadata.extract_all.return_value = []
+        mock_metadata.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_index.generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "<!-- nest:index-table-end -->\n"
+        )
 
         mock_discovery.discover_changes.return_value = DiscoveryResult(
             new_files=[
@@ -61,6 +86,8 @@ class TestSyncDryRunIntegration:
             manifest=mock_manifest,
             orphan=mock_orphan,
             index=mock_index,
+            metadata=mock_metadata,
+            glossary=mock_glossary,
             project_root=tmp_path,
         )
 
@@ -79,7 +106,7 @@ class TestSyncDryRunIntegration:
         mock_manifest.record_failure.assert_not_called()
         mock_manifest.commit.assert_not_called()
         mock_orphan.cleanup.assert_not_called()
-        mock_index.update_index.assert_not_called()
+        mock_index.generate_content.assert_not_called()
 
 
 class TestSyncForceIntegration:
@@ -92,6 +119,27 @@ class TestSyncForceIntegration:
         mock_manifest = Mock()
         mock_orphan = Mock()
         mock_index = Mock()
+        mock_index.read_index_content.return_value = ""
+        mock_metadata = Mock()
+        mock_metadata.load_previous_hints.return_value = {}
+        mock_metadata.extract_all.return_value = []
+        mock_metadata.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_index.generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "<!-- nest:index-table-end -->\n"
+        )
 
         # Force mode returns all as modified
         mock_discovery.discover_changes.return_value = DiscoveryResult(
@@ -120,6 +168,8 @@ class TestSyncForceIntegration:
             manifest=mock_manifest,
             orphan=mock_orphan,
             index=mock_index,
+            metadata=mock_metadata,
+            glossary=mock_glossary,
             project_root=tmp_path,
         )
 
@@ -144,6 +194,27 @@ class TestSyncOnErrorIntegration:
         mock_manifest = Mock()
         mock_orphan = Mock()
         mock_index = Mock()
+        mock_index.read_index_content.return_value = ""
+        mock_metadata = Mock()
+        mock_metadata.load_previous_hints.return_value = {}
+        mock_metadata.extract_all.return_value = []
+        mock_metadata.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_index.generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "<!-- nest:index-table-end -->\n"
+        )
 
         mock_discovery.discover_changes.return_value = DiscoveryResult(
             new_files=[
@@ -185,6 +256,8 @@ class TestSyncOnErrorIntegration:
             manifest=mock_manifest,
             orphan=mock_orphan,
             index=mock_index,
+            metadata=mock_metadata,
+            glossary=mock_glossary,
             project_root=tmp_path,
         )
 
@@ -206,6 +279,27 @@ class TestSyncOnErrorIntegration:
         mock_manifest = Mock()
         mock_orphan = Mock()
         mock_index = Mock()
+        mock_index.read_index_content.return_value = ""
+        mock_metadata = Mock()
+        mock_metadata.load_previous_hints.return_value = {}
+        mock_metadata.extract_all.return_value = []
+        mock_metadata.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_index.generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "<!-- nest:index-table-end -->\n"
+        )
 
         mock_discovery.discover_changes.return_value = DiscoveryResult(
             new_files=[
@@ -236,6 +330,8 @@ class TestSyncOnErrorIntegration:
             manifest=mock_manifest,
             orphan=mock_orphan,
             index=mock_index,
+            metadata=mock_metadata,
+            glossary=mock_glossary,
             project_root=tmp_path,
         )
 
@@ -247,10 +343,10 @@ class TestSyncOnErrorIntegration:
 
 
 class TestErrorLoggingIntegration:
-    """Integration tests for AC5 error logging to .nest_errors.log."""
+    """Integration tests for AC5 error logging to .nest/errors.log."""
 
     def test_errors_written_to_log_file_in_skip_mode(self, tmp_path: Path) -> None:
-        """Errors should be written to .nest_errors.log when on_error=skip."""
+        """Errors should be written to .nest/errors.log when on_error=skip."""
         from nest.ui.logger import setup_error_logger
 
         mock_discovery = Mock()
@@ -258,6 +354,27 @@ class TestErrorLoggingIntegration:
         mock_manifest = Mock()
         mock_orphan = Mock()
         mock_index = Mock()
+        mock_index.read_index_content.return_value = ""
+        mock_metadata = Mock()
+        mock_metadata.load_previous_hints.return_value = {}
+        mock_metadata.extract_all.return_value = []
+        mock_metadata.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_index.generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "<!-- nest:index-table-end -->\n"
+        )
 
         mock_discovery.discover_changes.return_value = DiscoveryResult(
             new_files=[
@@ -281,7 +398,8 @@ class TestErrorLoggingIntegration:
         mock_orphan.count_user_curated_files.return_value = 0
 
         # Setup error logger
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         error_logger = setup_error_logger(log_file, service_name="sync")
 
         service = SyncService(
@@ -290,6 +408,8 @@ class TestErrorLoggingIntegration:
             manifest=mock_manifest,
             orphan=mock_orphan,
             index=mock_index,
+            metadata=mock_metadata,
+            glossary=mock_glossary,
             project_root=tmp_path,
             error_logger=error_logger,
         )
@@ -304,7 +424,7 @@ class TestErrorLoggingIntegration:
         assert "[sync]" in content
 
     def test_exception_errors_written_to_log_file(self, tmp_path: Path) -> None:
-        """Unexpected exceptions should also be logged to .nest_errors.log."""
+        """Unexpected exceptions should also be logged to .nest/errors.log."""
         from nest.ui.logger import setup_error_logger
 
         mock_discovery = Mock()
@@ -312,6 +432,27 @@ class TestErrorLoggingIntegration:
         mock_manifest = Mock()
         mock_orphan = Mock()
         mock_index = Mock()
+        mock_index.read_index_content.return_value = ""
+        mock_metadata = Mock()
+        mock_metadata.load_previous_hints.return_value = {}
+        mock_metadata.extract_all.return_value = []
+        mock_metadata.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_index.generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "<!-- nest:index-table-end -->\n"
+        )
 
         mock_discovery.discover_changes.return_value = DiscoveryResult(
             new_files=[
@@ -330,7 +471,8 @@ class TestErrorLoggingIntegration:
         mock_orphan.cleanup.return_value = OrphanCleanupResult()
         mock_orphan.count_user_curated_files.return_value = 0
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         error_logger = setup_error_logger(log_file, service_name="sync")
 
         service = SyncService(
@@ -339,6 +481,8 @@ class TestErrorLoggingIntegration:
             manifest=mock_manifest,
             orphan=mock_orphan,
             index=mock_index,
+            metadata=mock_metadata,
+            glossary=mock_glossary,
             project_root=tmp_path,
             error_logger=error_logger,
         )
@@ -362,6 +506,27 @@ class TestSyncFlagCombinations:
         mock_manifest = Mock()
         mock_orphan = Mock()
         mock_index = Mock()
+        mock_index.read_index_content.return_value = ""
+        mock_metadata = Mock()
+        mock_metadata.load_previous_hints.return_value = {}
+        mock_metadata.extract_all.return_value = []
+        mock_metadata.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_index.generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "<!-- nest:index-table-end -->\n"
+        )
 
         # Force returns everything as modified
         mock_discovery.discover_changes.return_value = DiscoveryResult(
@@ -388,6 +553,8 @@ class TestSyncFlagCombinations:
             manifest=mock_manifest,
             orphan=mock_orphan,
             index=mock_index,
+            metadata=mock_metadata,
+            glossary=mock_glossary,
             project_root=tmp_path,
         )
 
@@ -408,6 +575,27 @@ class TestSyncFlagCombinations:
         mock_manifest = Mock()
         mock_orphan = Mock()
         mock_index = Mock()
+        mock_index.read_index_content.return_value = ""
+        mock_metadata = Mock()
+        mock_metadata.load_previous_hints.return_value = {}
+        mock_metadata.extract_all.return_value = []
+        mock_metadata.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_glossary = Mock(spec=GlossaryHintsService)
+        mock_glossary.load_previous_hints.return_value = None
+        mock_glossary.extract_all.return_value = GlossaryHints(terms=[])
+        mock_glossary.merge_with_previous.return_value = GlossaryHints(terms=[])
+        mock_glossary.write_hints.return_value = None
+        mock_index.generate_content.return_value = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "<!-- nest:index-table-end -->\n"
+        )
 
         mock_discovery.discover_changes.return_value = DiscoveryResult(
             new_files=[],
@@ -422,6 +610,8 @@ class TestSyncFlagCombinations:
             manifest=mock_manifest,
             orphan=mock_orphan,
             index=mock_index,
+            metadata=mock_metadata,
+            glossary=mock_glossary,
             project_root=tmp_path,
         )
 

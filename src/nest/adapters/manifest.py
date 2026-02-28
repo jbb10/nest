@@ -1,6 +1,6 @@
 """Manifest file adapter implementation.
 
-Handles reading and writing .nest_manifest.json files.
+Handles reading and writing .nest/manifest.json files.
 """
 
 import json
@@ -11,14 +11,13 @@ from pydantic import ValidationError
 from nest import __version__
 from nest.core.exceptions import ManifestError
 from nest.core.models import Manifest
-
-MANIFEST_FILENAME = ".nest_manifest.json"
+from nest.core.paths import MANIFEST_FILENAME, NEST_META_DIR
 
 
 class ManifestAdapter:
     """Adapter for manifest file operations.
 
-    Implements ManifestProtocol for reading/writing .nest_manifest.json files.
+    Implements ManifestProtocol for reading/writing .nest/manifest.json files.
     """
 
     def exists(self, project_dir: Path) -> bool:
@@ -28,9 +27,9 @@ class ManifestAdapter:
             project_dir: Path to the project root directory.
 
         Returns:
-            True if .nest_manifest.json exists, False otherwise.
+            True if .nest/manifest.json exists, False otherwise.
         """
-        manifest_path = project_dir / MANIFEST_FILENAME
+        manifest_path = project_dir / NEST_META_DIR / MANIFEST_FILENAME
         return manifest_path.exists()
 
     def create(self, project_dir: Path, project_name: str) -> Manifest:
@@ -65,11 +64,11 @@ class ManifestAdapter:
             FileNotFoundError: If manifest file doesn't exist.
             ManifestError: If manifest file is invalid JSON or has invalid structure.
         """
-        manifest_path = project_dir / MANIFEST_FILENAME
+        manifest_path = project_dir / NEST_META_DIR / MANIFEST_FILENAME
         if not manifest_path.exists():
             raise FileNotFoundError(f"Manifest not found: {manifest_path}")
 
-        content = manifest_path.read_text()
+        content = manifest_path.read_text(encoding="utf-8")
 
         try:
             data = json.loads(content)
@@ -94,6 +93,8 @@ class ManifestAdapter:
             project_dir: Path to the project root directory.
             manifest: The Manifest instance to save.
         """
-        manifest_path = project_dir / MANIFEST_FILENAME
+        meta_dir = project_dir / NEST_META_DIR
+        meta_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = meta_dir / MANIFEST_FILENAME
         json_str = manifest.model_dump_json(indent=2)
-        manifest_path.write_text(json_str)
+        manifest_path.write_text(json_str, encoding="utf-8")

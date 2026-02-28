@@ -1,7 +1,13 @@
 # Story 4.1: [CLI] Auto-Generated Project Glossary Integration
 
-Status: ready-for-dev
+Status: superseded
+Superseded-By: 5-2-glossary-agent-integration.md
 Branch: feat/4-1-glossary-integration
+
+> **⚠️ SUPERSEDED:** This story has been replaced by Story 5.2 (Glossary Agent Integration) in Epic 5.
+> The approach was changed from Azure OpenAI calls inside `nest sync` to a two-phase agent-based pattern
+> (deterministic hints extraction + shipped VS Code agent), consistent with the enricher agent architecture
+> established in Story 5.1. See `5-2-glossary-agent-integration.md` for the active story.
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 

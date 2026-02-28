@@ -12,20 +12,21 @@ from nest.adapters.protocols import (
     ModelDownloaderProtocol,
 )
 from nest.core.exceptions import NestError
-from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
+from nest.core.paths import CONTEXT_DIR, NEST_META_DIR, SOURCES_DIR
 from nest.ui.messages import info, status_done, status_start
-
-# Gitignore content
-GITIGNORE_COMMENT = (
-    f"# Raw documents excluded from version control (processed versions in {CONTEXT_DIR}/)"
-)
-GITIGNORE_ENTRY = f"{SOURCES_DIR}/"
 
 # Directories to create during init
 INIT_DIRECTORIES = [
     SOURCES_DIR,
     CONTEXT_DIR,
+    NEST_META_DIR,
     ".github/agents",
+]
+
+# Entries for .gitignore
+_GITIGNORE_ENTRIES = [
+    ("# Nest - source documents (private/confidential)", "_nest_sources/"),
+    ("# Nest - internal metadata", ".nest/"),
 ]
 
 
@@ -61,8 +62,8 @@ class InitService:
     def execute(self, project_name: str, target_dir: Path) -> None:
         """Execute project initialization.
 
-        Creates the project structure including directories,
-        manifest file, and gitignore configuration.
+        Creates the project structure including directories
+        and manifest file.
 
         Args:
             project_name: Human-readable project name (e.g., "Nike").
@@ -87,10 +88,10 @@ class InitService:
 
         # Create manifest
         self._manifest.create(target_dir, project_name.strip())
-
-        # Handle gitignore
-        self._update_gitignore(target_dir)
         status_done()
+
+        # Create/update .gitignore
+        self._setup_gitignore(target_dir)
 
         # Generate agent file with progress
         status_start("Generating agent file")
@@ -108,28 +109,36 @@ class InitService:
             cache_path = self._model_downloader.get_cache_path()
             info(f"Models cached at {cache_path}")
 
-    def _update_gitignore(self, target_dir: Path) -> None:
-        """Update or create .gitignore with sources directory entry.
+    @staticmethod
+    def _setup_gitignore(target_dir: Path) -> None:
+        """Create or update .gitignore with Nest entries.
+
+        If .gitignore exists, appends missing entries.
+        If it doesn't exist, creates one with all Nest entries.
 
         Args:
             target_dir: Path to the project root directory.
         """
-        gitignore_path = target_dir / ".gitignore"
+        gitignore = target_dir / ".gitignore"
 
-        if self._filesystem.exists(gitignore_path):
-            # Check if entry already exists
-            content = self._filesystem.read_text(gitignore_path)
-            if GITIGNORE_ENTRY in content:
-                return  # Already present, skip
-
-            # Append entry
-            self._filesystem.write_text(
-                gitignore_path,
-                content + f"\n{GITIGNORE_COMMENT}\n{GITIGNORE_ENTRY}\n",
-            )
+        if gitignore.exists():
+            content = gitignore.read_text(encoding="utf-8")
+            existing = {line.strip() for line in content.splitlines()}
+            additions: list[str] = []
+            for comment, entry in _GITIGNORE_ENTRIES:
+                if entry not in existing:
+                    additions.append(comment)
+                    additions.append(entry)
+            if additions:
+                # Ensure existing content ends with newline
+                if content and not content.endswith("\n"):
+                    content += "\n"
+                content += "\n".join(additions) + "\n"
+                gitignore.write_text(content, encoding="utf-8")
         else:
-            # Create new gitignore
-            self._filesystem.write_text(
-                gitignore_path,
-                f"{GITIGNORE_COMMENT}\n{GITIGNORE_ENTRY}\n",
-            )
+            lines: list[str] = []
+            for comment, entry in _GITIGNORE_ENTRIES:
+                lines.append(comment)
+                lines.append(entry)
+            gitignore.write_text("\n".join(lines) + "\n", encoding="utf-8")
+

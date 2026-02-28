@@ -56,7 +56,7 @@ class FileEntry(BaseModel):
 
 
 class Manifest(BaseModel):
-    """Represents the .nest_manifest.json file structure.
+    """Represents the .nest/manifest.json file structure.
 
     Attributes:
         nest_version: Version of nest that created/updated this manifest.
@@ -78,6 +78,7 @@ class DiscoveredFile(BaseModel):
         path: Absolute path to the discovered file.
         status: Change status compared to manifest (new/modified/unchanged).
         checksum: SHA-256 hash of the file content.
+        collision_reason: If set, reason this file was skipped due to output path collision.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -85,6 +86,7 @@ class DiscoveredFile(BaseModel):
     path: Path
     status: FileStatus
     checksum: str
+    collision_reason: str | None = None
 
 
 class DiscoveryResult(BaseModel):
@@ -169,13 +171,43 @@ class SyncResult(BaseModel):
     orphans_detected: int = 0
     skipped_orphan_cleanup: bool = False
     user_curated_count: int = 0
+    enrichment_needed: int = 0
+    glossary_terms_discovered: int = 0
+
+
+class CandidateTerm(BaseModel):
+    """A candidate glossary term extracted from project documents.
+
+    Attributes:
+        term: The term or phrase detected.
+        category: Classification of the term type.
+        occurrences: Total count across all source files.
+        source_files: Relative paths of files where the term appears.
+        context_snippets: Surrounding text snippets for context (up to 3, max 100 chars each).
+    """
+
+    term: str
+    category: Literal["abbreviation", "proper_noun", "domain_term"]
+    occurrences: int
+    source_files: list[str]
+    context_snippets: list[str]
+
+
+class GlossaryHints(BaseModel):
+    """Collection of candidate glossary terms for the glossary agent.
+
+    Attributes:
+        terms: List of candidate terms extracted from project documents.
+    """
+
+    terms: list[CandidateTerm] = Field(default_factory=list)
 
 
 class InstallConfig(BaseModel):
     """Installation source and version tracking.
 
     Attributes:
-        source: Git URL for `uv tool install` (e.g., "git+https://github.com/jbjornsson/nest").
+        source: Git URL for `uv tool install` (e.g., "git+https://github.com/jbb10/nest").
         installed_version: Currently installed Nest version string.
         installed_at: Timestamp when this version was installed/updated.
     """
@@ -257,3 +289,49 @@ class AgentMigrationResult(BaseModel):
     success: bool
     backed_up: bool = False
     error: str | None = None
+
+
+class MigrationResult(BaseModel):
+    """Result of metadata directory migration.
+
+    Attributes:
+        migrated: Whether any files were moved.
+        files_moved: Human-readable list of what moved.
+        errors: Any failures during migration.
+    """
+
+    migrated: bool = False
+    files_moved: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
+class HeadingInfo(BaseModel):
+    """Represents a heading extracted from a Markdown file.
+
+    Attributes:
+        level: Heading level (1-6).
+        text: Heading text content.
+    """
+
+    level: int
+    text: str
+
+
+class FileMetadata(BaseModel):
+    """Metadata extracted from a context file for index enrichment.
+
+    Attributes:
+        path: Relative path to the file within _nest_context/.
+        content_hash: SHA-256 hash (16 hex chars) of extracted metadata for change detection.
+        lines: Number of lines in the file.
+        headings: List of headings extracted from the file (Markdown only).
+        first_paragraph: First non-empty paragraph text (up to 200 chars).
+        table_columns: Column headers from CSV files.
+    """
+
+    path: str
+    content_hash: str
+    lines: int
+    headings: list[HeadingInfo] = Field(default_factory=list)
+    first_paragraph: str = ""
+    table_columns: list[str] = Field(default_factory=list)

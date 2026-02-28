@@ -55,7 +55,7 @@ class ManifestProtocol(Protocol):
             project_dir: Path to the project root directory.
 
         Returns:
-            True if .nest_manifest.json exists, False otherwise.
+            True if .nest/manifest.json exists, False otherwise.
         """
         ...
 
@@ -387,7 +387,7 @@ class ProjectCheckerProtocol(Protocol):
             project_dir: Path to the project root directory.
 
         Returns:
-            True if .nest_manifest.json exists, False otherwise.
+            True if .nest/manifest.json exists, False otherwise.
         """
         ...
 
@@ -435,6 +435,28 @@ class ProjectCheckerProtocol(Protocol):
 
         Returns:
             True if _nest_context/ directory exists, False otherwise.
+        """
+        ...
+
+    def meta_folder_exists(self, project_dir: Path) -> bool:
+        """Check if .nest/ metadata directory exists.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            True if .nest/ directory exists, False otherwise.
+        """
+        ...
+
+    def has_legacy_layout(self, project_dir: Path) -> bool:
+        """Check if project uses the legacy metadata layout.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            True if legacy layout detected, False otherwise.
         """
         ...
 

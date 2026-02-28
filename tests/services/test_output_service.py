@@ -1,7 +1,7 @@
 """Tests for output mirror service.
 
 Tests the OutputMirrorService which orchestrates directory-preserving
-document processing.
+document processing, routing files by extension.
 """
 
 from pathlib import Path
@@ -179,3 +179,140 @@ class TestOutputMirrorService:
         # Assert - processor was called (would overwrite existing file)
         mock_processor.process.assert_called_once()
         assert result.status == "success"
+
+
+class TestOutputMirrorServicePassthrough:
+    """Tests for passthrough routing in OutputMirrorService."""
+
+    def test_routes_txt_to_passthrough_processor(self) -> None:
+        """AC2: .txt files are routed to passthrough processor."""
+        mock_fs = Mock(spec=FileSystemProtocol)
+        mock_docling = Mock(spec=DocumentProcessorProtocol)
+        mock_passthrough = Mock(spec=DocumentProcessorProtocol)
+        mock_passthrough.process.return_value = ProcessingResult(
+            source_path=Path("/in/notes.txt"),
+            status="success",
+            output_path=Path("/out/notes.txt"),
+        )
+
+        service = OutputMirrorService(mock_fs, mock_docling, mock_passthrough)
+
+        result = service.process_file(
+            source=Path("/in/notes.txt"),
+            raw_dir=Path("/in"),
+            output_dir=Path("/out"),
+        )
+
+        assert result.status == "success"
+        assert result.output_path == Path("/out/notes.txt")
+        mock_passthrough.process.assert_called_once()
+        mock_docling.process.assert_not_called()
+        mock_fs.compute_output_path.assert_not_called()
+
+    def test_routes_yaml_to_passthrough_processor(self) -> None:
+        """AC2: .yaml files are routed to passthrough processor."""
+        mock_fs = Mock(spec=FileSystemProtocol)
+        mock_docling = Mock(spec=DocumentProcessorProtocol)
+        mock_passthrough = Mock(spec=DocumentProcessorProtocol)
+        mock_passthrough.process.return_value = ProcessingResult(
+            source_path=Path("/in/config.yaml"),
+            status="success",
+            output_path=Path("/in/config.yaml"),
+        )
+
+        service = OutputMirrorService(mock_fs, mock_docling, mock_passthrough)
+
+        service.process_file(
+            source=Path("/in/config.yaml"),
+            raw_dir=Path("/in"),
+            output_dir=Path("/out"),
+        )
+
+        mock_passthrough.process.assert_called_once()
+        mock_docling.process.assert_not_called()
+
+    def test_routes_md_to_passthrough_processor(self) -> None:
+        """AC2: .md files are routed to passthrough processor."""
+        mock_fs = Mock(spec=FileSystemProtocol)
+        mock_docling = Mock(spec=DocumentProcessorProtocol)
+        mock_passthrough = Mock(spec=DocumentProcessorProtocol)
+        mock_passthrough.process.return_value = ProcessingResult(
+            source_path=Path("/in/readme.md"),
+            status="success",
+            output_path=Path("/out/readme.md"),
+        )
+
+        service = OutputMirrorService(mock_fs, mock_docling, mock_passthrough)
+
+        service.process_file(
+            source=Path("/in/readme.md"),
+            raw_dir=Path("/in"),
+            output_dir=Path("/out"),
+        )
+
+        mock_passthrough.process.assert_called_once()
+        mock_docling.process.assert_not_called()
+
+    def test_routes_pdf_to_docling_processor(self) -> None:
+        """AC2: .pdf files are routed to Docling processor."""
+        mock_fs = Mock(spec=FileSystemProtocol)
+        mock_fs.compute_output_path.return_value = Path("/out/report.md")
+        mock_docling = Mock(spec=DocumentProcessorProtocol)
+        mock_docling.process.return_value = ProcessingResult(
+            source_path=Path("/in/report.pdf"),
+            status="success",
+            output_path=Path("/out/report.md"),
+        )
+        mock_passthrough = Mock(spec=DocumentProcessorProtocol)
+
+        service = OutputMirrorService(mock_fs, mock_docling, mock_passthrough)
+
+        result = service.process_file(
+            source=Path("/in/report.pdf"),
+            raw_dir=Path("/in"),
+            output_dir=Path("/out"),
+        )
+
+        assert result.status == "success"
+        mock_docling.process.assert_called_once()
+        mock_passthrough.process.assert_not_called()
+        mock_fs.compute_output_path.assert_called_once()
+
+    def test_passthrough_preserves_subdirectory(self) -> None:
+        """AC3: Passthrough preserves subdirectory structure."""
+        mock_fs = Mock(spec=FileSystemProtocol)
+        mock_docling = Mock(spec=DocumentProcessorProtocol)
+        mock_passthrough = Mock(spec=DocumentProcessorProtocol)
+        mock_passthrough.process.return_value = ProcessingResult(
+            source_path=Path("/in/team/notes.txt"),
+            status="success",
+            output_path=Path("/out/team/notes.txt"),
+        )
+
+        service = OutputMirrorService(mock_fs, mock_docling, mock_passthrough)
+
+        service.process_file(
+            source=Path("/in/team/notes.txt"),
+            raw_dir=Path("/in"),
+            output_dir=Path("/out"),
+        )
+
+        # Verify passthrough was called with correct output path
+        call_args = mock_passthrough.process.call_args
+        assert call_args[0][1] == Path("/out/team/notes.txt")
+
+    def test_no_passthrough_processor_returns_failure(self) -> None:
+        """Missing passthrough processor returns failure for text files."""
+        mock_fs = Mock(spec=FileSystemProtocol)
+        mock_docling = Mock(spec=DocumentProcessorProtocol)
+
+        service = OutputMirrorService(mock_fs, mock_docling, passthrough_processor=None)
+
+        result = service.process_file(
+            source=Path("/in/notes.txt"),
+            raw_dir=Path("/in"),
+            output_dir=Path("/out"),
+        )
+
+        assert result.status == "failed"
+        assert "not configured" in result.error

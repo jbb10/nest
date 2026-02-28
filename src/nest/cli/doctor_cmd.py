@@ -103,6 +103,10 @@ def _count_issues(
                 "both_missing": "Project folders missing",
             }
             issues.append(folder_map.get(status.folders_status, "Folders issue"))
+        if not status.meta_folder_present:
+            issues.append(".nest/ metadata directory missing")
+        if status.legacy_layout_detected:
+            issues.append("Legacy layout detected \u2014 run `nest update` to migrate")
 
     return issues
 
@@ -119,6 +123,7 @@ def _is_nest_project(project_dir: Path, project_checker: ProjectChecker) -> bool
     """
     return (
         project_checker.manifest_exists(project_dir)
+        or project_checker.has_legacy_layout(project_dir)
         or project_checker.agent_file_exists(project_dir)
         or project_checker.source_folder_exists(project_dir)
         or project_checker.context_folder_exists(project_dir)

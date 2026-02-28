@@ -33,7 +33,7 @@ This is the **SECOND** story in Epic 4 (Tool Updates & Maintenance). It builds d
 
 ### AC1: Git Remote Tag Query
 
-**Given** a valid git remote URL (e.g., `git+https://github.com/jbjornsson/nest`)
+**Given** a valid git remote URL (e.g., `git+https://github.com/jbb10/nest`)
 **When** `GitClientAdapter.list_tags(remote_url)` is called
 **Then** it executes `git ls-remote --tags <clean_url>` (strips `git+` prefix)
 **And** returns a list of tag name strings (e.g., `["v0.1.0", "v0.1.1", "v0.1.2", "v0.1.3"]`)
@@ -292,7 +292,7 @@ mno901pqr234	refs/tags/latest
 
 ### URL Cleaning
 
-The user config stores source URLs with `git+` prefix (e.g., `git+https://github.com/jbjornsson/nest`) because `uv tool install` uses that format. The `git ls-remote` command does NOT accept the `git+` prefix, so it must be stripped:
+The user config stores source URLs with `git+` prefix (e.g., `git+https://github.com/jbb10/nest`) because `uv tool install` uses that format. The `git ls-remote` command does NOT accept the `git+` prefix, so it must be stripped:
 
 ```python
 def _clean_url(remote_url: str) -> str:
@@ -359,7 +359,7 @@ SAMPLE_LS_REMOTE = (
 def test_list_tags_parses_output(mock_run: MagicMock) -> None:
     mock_run.return_value = MagicMock(stdout=SAMPLE_LS_REMOTE, returncode=0)
     adapter = GitClientAdapter()
-    tags = adapter.list_tags("git+https://github.com/jbjornsson/nest")
+    tags = adapter.list_tags("git+https://github.com/jbb10/nest")
     assert "v0.1.0" in tags
     assert "v0.1.1" in tags
     assert "latest" in tags  # Filtering is done in core/version.py

@@ -50,6 +50,8 @@ def _make_project_report(
     manifest: str = "valid",
     agent: bool = True,
     folders: str = "intact",
+    meta_folder: bool = True,
+    legacy_layout: bool = False,
 ) -> ProjectReport:
     return ProjectReport(
         status=ProjectStatus(
@@ -58,6 +60,8 @@ def _make_project_report(
             current_version="1.0.0",
             agent_file_present=agent,
             folders_status=folders,
+            meta_folder_present=meta_folder,
+            legacy_layout_detected=legacy_layout,
             suggestions=[],
         ),
     )

@@ -4,52 +4,103 @@ from pathlib import Path
 from unittest.mock import Mock
 
 from nest.adapters.protocols import FileSystemProtocol
-from nest.services.index_service import IndexService
+from nest.core.models import FileMetadata
+from nest.services.index_service import IndexService, parse_index_descriptions
+
+
+def _make_metadata(path: str, lines: int = 10, content_hash: str = "abc123") -> FileMetadata:
+    """Helper to create FileMetadata with defaults."""
+    return FileMetadata(
+        path=path,
+        content_hash=content_hash,
+        lines=lines,
+        headings=[],
+        first_paragraph="",
+        table_columns=[],
+    )
 
 
 class TestGenerateContent:
-    """Tests for IndexService.generate_content()."""
+    """Tests for IndexService.generate_content() with table format."""
 
-    def test_structure_includes_header_and_file_listing(self):
-        """Generated content should include project header and file listing."""
+    def test_structure_includes_header_and_table(self):
+        """Generated content should include project header and table format."""
         fs = Mock(spec=FileSystemProtocol)
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        files = ["contracts/beta.md", "reports/q3.md", "contracts/alpha.md"]
+        files = [
+            _make_metadata("contracts/beta.md", lines=50),
+            _make_metadata("reports/q3.md", lines=200),
+            _make_metadata("contracts/alpha.md", lines=100),
+        ]
 
-        content = service.generate_content(files, project_name="Test Project")
+        content = service.generate_content(
+            files, old_descriptions={}, old_hints={}, project_name="Test Project"
+        )
 
         assert "# Nest Project Index: Test Project" in content
         assert "Generated:" in content
         assert "Files: 3" in content
         assert "## File Listing" in content
+        assert "| File | Lines | Description |" in content
+        assert "|------|------:|-------------|" in content
         assert "contracts/alpha.md" in content
         assert "contracts/beta.md" in content
         assert "reports/q3.md" in content
+
+    def test_table_start_end_markers_present(self):
+        """Table should have nest:index-table-start/end markers."""
+        fs = Mock(spec=FileSystemProtocol)
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        files = [_make_metadata("doc.md")]
+        content = service.generate_content(
+            files, old_descriptions={}, old_hints={}, project_name="Test"
+        )
+
+        assert "<!-- nest:index-table-start -->" in content
+        assert "<!-- nest:index-table-end -->" in content
+
+    def test_lines_column_populated_with_correct_counts(self):
+        """Lines column should show accurate line counts."""
+        fs = Mock(spec=FileSystemProtocol)
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        files = [_make_metadata("doc.md", lines=284)]
+        content = service.generate_content(
+            files, old_descriptions={}, old_hints={}, project_name="Test"
+        )
+
+        assert "| doc.md | 284 |" in content
 
     def test_files_sorted_alphabetically(self):
         """File listing should be sorted alphabetically."""
         fs = Mock(spec=FileSystemProtocol)
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        files = ["z.md", "a.md", "m.md"]
+        files = [
+            _make_metadata("z.md"),
+            _make_metadata("a.md"),
+            _make_metadata("m.md"),
+        ]
 
-        content = service.generate_content(files, project_name="Sort Test")
+        content = service.generate_content(
+            files, old_descriptions={}, old_hints={}, project_name="Sort Test"
+        )
 
-        parts = content.split("## File Listing")
-        listing = parts[1].strip().splitlines()
-        file_lines = [line for line in listing if line.strip()]
-
-        assert file_lines[0] == "a.md"
-        assert file_lines[1] == "m.md"
-        assert file_lines[2] == "z.md"
+        idx_a = content.index("a.md")
+        idx_m = content.index("m.md")
+        idx_z = content.index("z.md")
+        assert idx_a < idx_m < idx_z
 
     def test_empty_list_produces_zero_count(self):
         """Empty file list should show Files: 0."""
         fs = Mock(spec=FileSystemProtocol)
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        content = service.generate_content([], project_name="Empty")
+        content = service.generate_content(
+            [], old_descriptions={}, old_hints={}, project_name="Empty"
+        )
 
         assert "Files: 0" in content
 
@@ -58,48 +109,112 @@ class TestGenerateContent:
         fs = Mock(spec=FileSystemProtocol)
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        content = service.generate_content(["file.md"], project_name="Test")
+        content = service.generate_content(
+            [_make_metadata("file.md")],
+            old_descriptions={},
+            old_hints={},
+            project_name="Test",
+        )
 
         assert content.endswith("\n")
 
     def test_timestamp_is_iso_format(self):
         """Generated timestamp should be ISO 8601 format with seconds precision."""
+        import re
+
         fs = Mock(spec=FileSystemProtocol)
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        content = service.generate_content(["file.md"], project_name="Test")
-
-        # ISO format includes T and timezone info
-        # Example: 2026-01-15T10:30:00+00:00
-        import re
+        content = service.generate_content(
+            [_make_metadata("file.md")],
+            old_descriptions={},
+            old_hints={},
+            project_name="Test",
+        )
 
         iso_pattern = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"
         assert re.search(iso_pattern, content), f"No ISO timestamp in: {content}"
+
+    def test_description_empty_for_new_files(self):
+        """New files (not in old_hints) should have empty Description."""
+        fs = Mock(spec=FileSystemProtocol)
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        files = [_make_metadata("new.md", content_hash="newhash")]
+        content = service.generate_content(
+            files, old_descriptions={}, old_hints={}, project_name="Test"
+        )
+
+        assert "| new.md | 10 |  |" in content
+
+    def test_description_preserved_when_content_hash_unchanged(self):
+        """Description should be preserved when content_hash matches old hints."""
+        fs = Mock(spec=FileSystemProtocol)
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        files = [_make_metadata("doc.md", lines=50, content_hash="samehash")]
+        content = service.generate_content(
+            files,
+            old_descriptions={"doc.md": "An important document"},
+            old_hints={"doc.md": "samehash"},
+            project_name="Test",
+        )
+
+        assert "| doc.md | 50 | An important document |" in content
+
+    def test_description_cleared_when_content_hash_changed(self):
+        """Description should be cleared when content_hash differs from old hints."""
+        fs = Mock(spec=FileSystemProtocol)
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        files = [_make_metadata("doc.md", lines=60, content_hash="newhash")]
+        content = service.generate_content(
+            files,
+            old_descriptions={"doc.md": "Old description"},
+            old_hints={"doc.md": "oldhash"},
+            project_name="Test",
+        )
+
+        assert "| doc.md | 60 |  |" in content
+
+    def test_index_only_contains_provided_files(self):
+        """Index should only contain files passed to generate_content."""
+        fs = Mock(spec=FileSystemProtocol)
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        current_files = [_make_metadata("file_b.md")]
+        content = service.generate_content(
+            current_files, old_descriptions={}, old_hints={}, project_name="Test"
+        )
+
+        assert "file_b.md" in content
+        assert "file_a.md" not in content
+        assert "file_c.md" not in content
 
 
 class TestWriteIndex:
     """Tests for IndexService.write_index()."""
 
-    def test_writes_to_processed_context_directory(self):
-        """Index should be written to _nest_context/00_MASTER_INDEX.md."""
+    def test_writes_to_meta_directory(self):
+        """Index should be written to .nest/00_MASTER_INDEX.md."""
         fs = Mock(spec=FileSystemProtocol)
         fs.exists.return_value = True
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
         service.write_index("test content")
 
-        expected_path = Path("/app/_nest_context/00_MASTER_INDEX.md")
+        expected_path = Path("/app/.nest/00_MASTER_INDEX.md")
         fs.write_text.assert_called_once_with(expected_path, "test content")
 
     def test_creates_directory_if_not_exists(self):
-        """Should create context directory if it doesn't exist."""
+        """Should create .nest/ directory if it doesn't exist."""
         fs = Mock(spec=FileSystemProtocol)
         fs.exists.return_value = False
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
         service.write_index("test content")
 
-        fs.create_directory.assert_called_once_with(Path("/app/_nest_context"))
+        fs.create_directory.assert_called_once_with(Path("/app/.nest"))
         fs.write_text.assert_called_once()
 
     def test_skips_directory_creation_if_exists(self):
@@ -113,155 +228,110 @@ class TestWriteIndex:
         fs.create_directory.assert_not_called()
 
 
-class TestUpdateIndex:
-    """Tests for IndexService.update_index() end-to-end."""
+class TestReadIndexContent:
+    """Tests for IndexService.read_index_content()."""
 
-    def test_writes_to_correct_file(self):
-        """update_index should write formatted content to correct path."""
+    def test_returns_content_when_file_exists(self):
+        """Should return file content when index exists."""
         fs = Mock(spec=FileSystemProtocol)
         fs.exists.return_value = True
-        fs.list_files.return_value = [Path("/app/_nest_context/doc.md")]
+        fs.read_text.return_value = "# Index content"
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        service.update_index(project_name="TestNested")
+        result = service.read_index_content()
 
-        expected_path = Path("/app/_nest_context/00_MASTER_INDEX.md")
-        fs.write_text.assert_called_once()
-        args, _ = fs.write_text.call_args
-        assert args[0] == expected_path
-        assert "# Nest Project Index: TestNested" in args[1]
-        assert "doc.md" in args[1]
+        assert result == "# Index content"
+        fs.read_text.assert_called_once_with(Path("/app/.nest/00_MASTER_INDEX.md"))
 
-    def test_handles_empty_list(self):
-        """update_index with no .md files should write index with zero files."""
+    def test_returns_empty_string_when_file_missing(self):
+        """Should return empty string when index doesn't exist."""
+        fs = Mock(spec=FileSystemProtocol)
+        fs.exists.return_value = False
+        service = IndexService(filesystem=fs, project_root=Path("/app"))
+
+        result = service.read_index_content()
+
+        assert result == ""
+        fs.read_text.assert_not_called()
+
+    def test_returns_empty_string_on_os_error(self):
+        """Should return empty string when read fails."""
         fs = Mock(spec=FileSystemProtocol)
         fs.exists.return_value = True
-        fs.list_files.return_value = []  # No files in directory
+        fs.read_text.side_effect = OSError("Permission denied")
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        service.update_index(project_name="Empty Project")
+        result = service.read_index_content()
 
-        fs.write_text.assert_called_once()
-        args, _ = fs.write_text.call_args
-        assert "Files: 0" in args[1]
+        assert result == ""
 
 
-class TestIndexAccuracy:
-    """Tests for AC3: Index accuracy when files are removed."""
+class TestParseIndexDescriptions:
+    """Tests for parse_index_descriptions()."""
 
-    def test_index_only_contains_provided_files(self):
-        """Index should only contain files passed to generate_content."""
+    def test_parses_valid_table(self):
+        """Should extract file→description from a valid table."""
+        content = (
+            "# Index\n\n"
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "| doc.md | 100 | An important doc |\n"
+            "| notes.txt | 42 |  |\n"
+            "<!-- nest:index-table-end -->\n"
+        )
+        result = parse_index_descriptions(content)
+        assert result == {"doc.md": "An important doc", "notes.txt": ""}
+
+    def test_returns_empty_with_missing_markers(self):
+        """Should return empty dict if markers are missing (first run)."""
+        content = "# Index\n\nSome content\n"
+        result = parse_index_descriptions(content)
+        assert result == {}
+
+    def test_returns_empty_with_empty_table(self):
+        """Should return empty dict for table with no data rows."""
+        content = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "<!-- nest:index-table-end -->\n"
+        )
+        result = parse_index_descriptions(content)
+        assert result == {}
+
+    def test_handles_pipe_characters_in_descriptions(self):
+        """Should handle descriptions containing pipe characters."""
+        content = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "| doc.md | 100 | Input | output mapping |\n"
+            "<!-- nest:index-table-end -->\n"
+        )
+        result = parse_index_descriptions(content)
+        assert result["doc.md"] == "Input | output mapping"
+
+    def test_handles_malformed_rows(self):
+        """Should skip rows with insufficient parts."""
+        content = (
+            "<!-- nest:index-table-start -->\n"
+            "| File | Lines | Description |\n"
+            "|------|------:|-------------|\n"
+            "bad row\n"
+            "| doc.md | 100 | Good |\n"
+            "<!-- nest:index-table-end -->\n"
+        )
+        result = parse_index_descriptions(content)
+        assert result == {"doc.md": "Good"}
+
+    def test_hints_file_excluded_from_index(self):
+        """00_INDEX_HINTS.yaml should not appear in generated index content."""
         fs = Mock(spec=FileSystemProtocol)
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        # Simulate files after removal - only file_b remains
-        current_files = ["file_b.md"]
-
-        content = service.generate_content(current_files, project_name="Test")
-
-        assert "file_b.md" in content
-        assert "file_a.md" not in content
-        assert "file_c.md" not in content
-
-    def test_regenerate_excludes_removed_files(self):
-        """When a file is removed from manifest, index should not contain it."""
-        fs = Mock(spec=FileSystemProtocol)
-        fs.exists.return_value = True
-        service = IndexService(filesystem=fs, project_root=Path("/app"))
-
-        # First generation with 3 files
-        files_v1 = ["a.md", "b.md", "c.md"]
-        content_v1 = service.generate_content(files_v1, project_name="Test")
-        assert "a.md" in content_v1
-        assert "b.md" in content_v1
-        assert "c.md" in content_v1
-        assert "Files: 3" in content_v1
-
-        # Second generation with b.md removed
-        files_v2 = ["a.md", "c.md"]
-        content_v2 = service.generate_content(files_v2, project_name="Test")
-        assert "a.md" in content_v2
-        assert "b.md" not in content_v2
-        assert "c.md" in content_v2
-        assert "Files: 2" in content_v2
-
-
-class TestUpdateIndexTextExtensions:
-    """Tests for AC2/AC3/AC4: update_index includes all supported text types."""
-
-    def test_txt_file_included_in_index(self):
-        """AC3: A .txt file in context directory is included in the index."""
-        fs = Mock(spec=FileSystemProtocol)
-        fs.exists.return_value = True
-        fs.list_files.return_value = [Path("/app/_nest_context/notes.txt")]
-        service = IndexService(filesystem=fs, project_root=Path("/app"))
-
-        service.update_index(project_name="Test")
-
-        args, _ = fs.write_text.call_args
-        assert "notes.txt" in args[1]
-
-    def test_yaml_file_included_in_index(self):
-        """AC4: A .yaml file in context directory is included in the index."""
-        fs = Mock(spec=FileSystemProtocol)
-        fs.exists.return_value = True
-        fs.list_files.return_value = [Path("/app/_nest_context/api-spec.yaml")]
-        service = IndexService(filesystem=fs, project_root=Path("/app"))
-
-        service.update_index(project_name="Test")
-
-        args, _ = fs.write_text.call_args
-        assert "api-spec.yaml" in args[1]
-
-    def test_png_file_excluded_from_index(self):
-        """AC2: A .png file in context directory is NOT included in the index."""
-        fs = Mock(spec=FileSystemProtocol)
-        fs.exists.return_value = True
-        fs.list_files.return_value = [Path("/app/_nest_context/diagram.png")]
-        service = IndexService(filesystem=fs, project_root=Path("/app"))
-
-        service.update_index(project_name="Test")
-
-        args, _ = fs.write_text.call_args
-        assert "diagram.png" not in args[1]
-        assert "Files: 0" in args[1]
-
-    def test_mixed_extensions_filters_correctly(self):
-        """AC2: Only supported text extensions are indexed, unsupported excluded."""
-        fs = Mock(spec=FileSystemProtocol)
-        fs.exists.return_value = True
-        fs.list_files.return_value = [
-            Path("/app/_nest_context/doc.md"),
-            Path("/app/_nest_context/notes.txt"),
-            Path("/app/_nest_context/config.yaml"),
-            Path("/app/_nest_context/data.csv"),
-            Path("/app/_nest_context/image.png"),
-            Path("/app/_nest_context/archive.zip"),
-            Path("/app/_nest_context/00_MASTER_INDEX.md"),
-        ]
-        service = IndexService(filesystem=fs, project_root=Path("/app"))
-
-        service.update_index(project_name="Test")
-
-        args, _ = fs.write_text.call_args
-        content = args[1]
-        assert "doc.md" in content
-        assert "notes.txt" in content
-        assert "config.yaml" in content
-        assert "data.csv" in content
-        assert "image.png" not in content
-        assert "archive.zip" not in content
-        assert "00_MASTER_INDEX.md" not in content
-        assert "Files: 4" in content
-
-    def test_case_insensitive_extension_matching(self):
-        """Edge case: uppercase extensions like .TXT are included."""
-        fs = Mock(spec=FileSystemProtocol)
-        fs.exists.return_value = True
-        fs.list_files.return_value = [Path("/app/_nest_context/NOTES.TXT")]
-        service = IndexService(filesystem=fs, project_root=Path("/app"))
-
-        service.update_index(project_name="Test")
-
-        args, _ = fs.write_text.call_args
-        assert "NOTES.TXT" in args[1]
+        files = [_make_metadata("doc.md")]
+        content = service.generate_content(
+            files, old_descriptions={}, old_hints={}, project_name="Test"
+        )
+        assert "00_INDEX_HINTS.yaml" not in content

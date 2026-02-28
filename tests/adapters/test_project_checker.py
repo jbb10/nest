@@ -13,7 +13,9 @@ class TestManifestChecks:
 
     def test_manifest_exists_returns_true_when_file_exists(self, tmp_path: Path) -> None:
         """manifest_exists() should return True when manifest file exists."""
-        manifest_path = tmp_path / ".nest_manifest.json"
+        meta_dir = tmp_path / ".nest"
+        meta_dir.mkdir()
+        manifest_path = meta_dir / "manifest.json"
         manifest_path.write_text('{"nest_version": "1.0.0", "project_name": "test"}')
 
         checker = ProjectChecker()
@@ -26,7 +28,9 @@ class TestManifestChecks:
 
     def test_load_manifest_raises_error_when_invalid_json(self, tmp_path: Path) -> None:
         """load_manifest() should raise ManifestError for invalid JSON."""
-        manifest_path = tmp_path / ".nest_manifest.json"
+        meta_dir = tmp_path / ".nest"
+        meta_dir.mkdir()
+        manifest_path = meta_dir / "manifest.json"
         manifest_path.write_text("{invalid json")
 
         checker = ProjectChecker()

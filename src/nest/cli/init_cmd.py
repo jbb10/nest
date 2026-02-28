@@ -3,6 +3,7 @@
 Handles the `nest init "Project Name"` command.
 """
 
+import logging
 from pathlib import Path
 from typing import Annotated
 
@@ -15,6 +16,8 @@ from nest.core.exceptions import ModelError, NestError
 from nest.core.paths import SOURCES_DIR
 from nest.services.init_service import InitService
 from nest.ui.messages import error, get_console, success
+
+logger = logging.getLogger(__name__)
 
 
 class NoOpModelDownloader:
@@ -82,6 +85,18 @@ def init_command(
         service = create_init_service()
         service.execute(project_name, resolved_dir)
 
+        # Generate additional agent files (composition root approach — concrete type known here)
+        agent_writer = VSCodeAgentWriter(filesystem=FileSystemAdapter())
+        agents_dir = resolved_dir / ".github" / "agents"
+        for gen_method, filename in [
+            (agent_writer.generate_enricher, "nest-enricher.agent.md"),
+            (agent_writer.generate_glossary, "nest-glossary.agent.md"),
+        ]:
+            try:
+                gen_method(project_name.strip(), agents_dir / filename)
+            except OSError as e:
+                logger.warning("Could not generate %s: %s", filename, e)
+
         success(f'Project "{project_name}" initialized!')
         console.print()
         console.print("[bold]Next steps:[/bold]")
@@ -107,7 +122,7 @@ def init_command(
 
         # Provide context-specific guidance (What → Why → Action)
         if "already exists" in error_msg:
-            console.print("  [dim]Reason: .nest_manifest.json found in this directory[/dim]")
+            console.print("  [dim]Reason: .nest/manifest.json found in this directory[/dim]")
             console.print(
                 "  [dim]Action: Use [cyan]nest sync[/cyan] to process documents instead[/dim]"
             )

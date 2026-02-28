@@ -31,7 +31,7 @@ This is the **FIRST** story in Epic 4 (Tool Updates & Maintenance). It establish
 **Then** the file is created with:
 ```toml
 [install]
-source = "git+https://github.com/jbjornsson/nest"
+source = "git+https://github.com/jbb10/nest"
 installed_version = "0.1.3"
 installed_at = "2026-02-12T10:30:00Z"
 ```
@@ -94,7 +94,7 @@ installed_at = "2026-02-12T10:30:00Z"
   - [x] 3.6 Handle `None` return when file doesn't exist
 - [x] **Task 4: Add Default Config Factory** (AC: #1)
   - [x] 4.1 Add `create_default_config()` function that builds `UserConfig` with current Nest version
-  - [x] 4.2 Default source: `"git+https://github.com/jbjornsson/nest"`
+  - [x] 4.2 Default source: `"git+https://github.com/jbb10/nest"`
   - [x] 4.3 Current version from `nest.__version__`
 - [x] **Task 5: Add TOML Compatibility Dependency** (AC: #1–#7)
   - [x] 5.1 Add `tomli>=2.0.0; python_version < "3.11"` to `pyproject.toml` dependencies
@@ -141,7 +141,7 @@ class InstallConfig(BaseModel):
     """Installation source and version tracking.
 
     Attributes:
-        source: Git URL for `uv tool install` (e.g., "git+https://github.com/jbjornsson/nest").
+        source: Git URL for `uv tool install` (e.g., "git+https://github.com/jbb10/nest").
         installed_version: Currently installed Nest version string.
         installed_at: Timestamp when this version was installed/updated.
     """
@@ -203,7 +203,7 @@ CONFIG_FILE = "config.toml"
 ```python
 from nest import __version__
 
-DEFAULT_INSTALL_SOURCE = "git+https://github.com/jbjornsson/nest"
+DEFAULT_INSTALL_SOURCE = "git+https://github.com/jbb10/nest"
 
 def create_default_config() -> UserConfig:
     return UserConfig(

@@ -22,7 +22,7 @@ class TestInitE2E:
         Then exit code is 0
         And _nest_sources/ exists and is empty
         And processed_context/ exists and is empty
-        And .nest_manifest.json exists with valid JSON containing project name
+        And .nest/manifest.json exists with valid JSON containing project name
         """
         # Act
         result = run_cli(["init", "TestProject"], cwd=fresh_temp_dir)
@@ -43,8 +43,8 @@ class TestInitE2E:
         assert list(processed_context.iterdir()) == [], "_nest_context should be empty"
 
         # Assert manifest exists with valid JSON
-        manifest_path = fresh_temp_dir / ".nest_manifest.json"
-        assert manifest_path.exists(), ".nest_manifest.json should exist"
+        manifest_path = fresh_temp_dir / ".nest" / "manifest.json"
+        assert manifest_path.exists(), ".nest/manifest.json should exist"
 
         # Parse and validate manifest content
         manifest_content = manifest_path.read_text()

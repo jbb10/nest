@@ -54,6 +54,7 @@ development_status:
   # ============================================================
   # Epic 2: Document Processing & Sync
   # FR5-FR14, NFR11 - nest sync command + E2E testing
+  # Additional: Cross-platform encoding fixes
   # ============================================================
   epic-2: done
   2-1-file-discovery-and-checksum-engine: done
@@ -67,6 +68,9 @@ development_status:
   2-9-e2e-testing-framework: done
   2-10-folder-naming-refactor: done
   2-11-context-text-file-support: done
+  2-12-unified-source-folder: done
+  2-13-metadata-directory-consolidation: done
+  2-14-cross-platform-utf8-encoding: done
   epic-2-retrospective: optional
 
   # ============================================================
@@ -93,3 +97,13 @@ development_status:
   4-4-agent-template-migration-check: done
   4-5-update-command-cli-integration: done
   epic-4-retrospective: optional
+
+  # ============================================================
+  # Epic 5: Index Intelligence & Agent Enrichment
+  # Index metadata extraction, table format, enricher agent,
+  # glossary agent integration
+  # FR24, FR25, FR26
+  # ============================================================
+  epic-5: done
+  5-1-index-enrichment-pipeline: done
+  5-2-glossary-agent-integration: done

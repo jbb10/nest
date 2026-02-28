@@ -18,7 +18,7 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 
 **FR1:** `nest init "Project Name"` creates project structure with `_nest_sources/`, `_nest_context/` directories
 **FR2:** `nest init` creates `.github/agents/nest.agent.md` in VS Code Custom Agent format (frontmatter + instructions)
-**FR3:** `nest init` creates empty `.nest_manifest.json` manifest file
+**FR3:** `nest init` creates empty `.nest/manifest.json` manifest file
 **FR4:** `nest init` downloads Docling ML models (~1.5-2GB) if not already cached, with progress display
 **FR5:** `nest sync` recursively scans `_nest_sources/` for supported files (.pdf, .docx, .pptx, .xlsx, .html)
 **FR6:** `nest sync` computes SHA-256 checksums and compares against manifest to detect new/modified/unchanged files
@@ -26,7 +26,7 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 **FR8:** `nest sync` mirrors source folder hierarchy in `_nest_context/` output
 **FR9:** `nest sync` removes orphaned files from `_nest_context/` **that are tracked in the manifest** when source is deleted (default behavior, disable with `--no-clean`)
 **FR10:** `nest sync` regenerates `00_MASTER_INDEX.md` with file listing from entire `_nest_context/` directory
-**FR11:** `nest sync` updates `.nest_manifest.json` with processed file metadata
+**FR11:** `nest sync` updates `.nest/manifest.json` with processed file metadata
 **FR12:** `nest sync` supports `--on-error` flag (skip | fail) for error handling behavior
 **FR13:** `nest sync` supports `--dry-run` flag to preview changes without executing
 **FR14:** `nest sync` supports `--force` flag to re-process all files ignoring checksums
@@ -39,12 +39,15 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 **FR21:** `nest doctor` validates project state (manifest integrity, agent file presence, folder structure)
 **FR22:** `nest doctor` offers remediation for detected issues (download models, rebuild manifest, regenerate agent file)
 **FR23:** `nest sync` index generation and status counting recognize all supported context text extensions (`.md`, `.txt`, `.text`, `.rst`, `.csv`, `.json`, `.yaml`, `.yml`, `.toml`, `.xml`) for user-curated files in `_nest_context/`
+**FR24:** `nest sync` generates `00_INDEX_HINTS.yaml` with deterministic metadata (headings, first paragraph, line count, content hash) for each context file, and uses content hashes to preserve existing index descriptions across syncs when file content is unchanged
+**FR25:** `nest sync` produces `00_MASTER_INDEX.md` in Markdown table format (File | Lines | Description) and prompts user to run the `@nest-enricher` agent when files lack descriptions
+**FR26:** `nest init` ships a `@nest-glossary` VS Code agent that generates and maintains a `glossary.md` in `_nest_context/` containing project-specific terms, abbreviations, stakeholder names, and domain jargon extracted from project documents; `nest sync` provides deterministic candidate-term hints to support the agent
 
 ### Non-Functional Requirements
 
 **NFR1:** Privacy — All document processing runs locally via Docling (no cloud APIs)
 **NFR2:** Performance — Incremental sync via SHA-256 checksums; skip unchanged files
-**NFR3:** Reliability — Error logging to `.nest_errors.log` with configurable fail modes
+**NFR3:** Reliability — Error logging to `.nest/errors.log` with configurable fail modes
 **NFR4:** Portability — Cross-platform support (macOS/Linux/Windows) via Python 3.10+
 **NFR5:** Maintainability — DRY principle: shared components across commands (download_models, build_manifest, generate_agent_file, compute_checksum, generate_index)
 **NFR6:** Testability — Dependency injection pattern; all external dependencies injectable via protocols
@@ -75,13 +78,13 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 
 **From Architecture — Configuration:**
 - User config at `~/.config/nest/config.toml` (install source, version)
-- Project manifest as `.nest_manifest.json` (files, checksums, timestamps)
+- Project manifest as `.nest/manifest.json` (files, checksums, timestamps)
 - Pydantic models for both config and manifest
 
 **From Architecture — Error Handling:**
 - Custom exception hierarchy: `NestError`, `ProcessingError`, `ManifestError`, `ConfigError`, `ModelError`
 - Result types for batch operations: `ProcessingResult`, `SyncResult`
-- Two output streams: Rich console (user-facing) + logging (`.nest_errors.log`)
+- Two output streams: Rich console (user-facing) + logging (`.nest/errors.log`)
 
 **From Architecture — Agent Generation:**
 - AgentWriter protocol for extensibility
@@ -92,11 +95,11 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 
 | FR | Epic | Description |
 |----|------|-------------|
-| FR1 | Epic 1 | Create directories (raw_inbox/, processed_context/) |
+| FR1 | Epic 1 | Create directories (_nest_sources/, _nest_context/) |
 | FR2 | Epic 1 | Create VS Code agent file |
 | FR3 | Epic 1 | Create empty manifest |
 | FR4 | Epic 1 | Download Docling ML models |
-| FR5 | Epic 2 | Scan raw_inbox/ for supported files |
+| FR5 | Epic 2 | Scan _nest_sources/ for supported files |
 | FR6 | Epic 2 | SHA-256 checksum comparison |
 | FR7 | Epic 2 | Docling conversion to Markdown |
 | FR8 | Epic 2 | Mirror folder hierarchy in output |
@@ -115,6 +118,9 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 | FR21 | Epic 3 | Doctor: project state validation |
 | FR22 | Epic 3 | Doctor: issue remediation |
 | FR23 | Epic 2 | Context text extension support for index/status |
+| FR24 | Epic 5 | Metadata extraction and content hash tracking for index enrichment |
+| FR25 | Epic 5 | Table-format index with descriptions and enricher agent prompt |
+| FR26 | Epic 5 | Glossary agent for project-specific term extraction and curation |
 
 ## Epic List
 
@@ -126,7 +132,7 @@ As a user starting a new project, I can run a single command to create a smart, 
 **Scope:**
 - Creates `_nest_sources/`, `_nest_context/` directories
 - Creates VS Code agent file (`.github/agents/nest.agent.md`)
-- Creates empty manifest (`.nest_manifest.json`)
+- Creates empty manifest (`.nest/manifest.json`)
 - Downloads ML models on first run with progress display
 - Supports both auto-generated and user-curated context files
 
@@ -176,6 +182,25 @@ As a user, I can keep my Nest installation up-to-date and ensure my agent templa
 
 ---
 
+### Epic 5: Index Intelligence & Agent Enrichment
+As a user who has synced documents, I want the master index to contain short, LLM-generated descriptions per file and a project-specific glossary, so the @nest agent can quickly identify relevant documents and understand project terminology.
+
+**FRs covered:** FR24, FR25, FR26
+
+**Scope:**
+- Deterministic metadata extraction (headings, first paragraph, line count) per context file
+- Content hash-based incremental tracking via `00_INDEX_HINTS.yaml`
+- Index format upgrade to Markdown table with File / Lines / Description columns
+- Description carry-forward across syncs when content unchanged
+- Enricher agent template shipped with `nest init` for LLM-driven description population
+- Sync-time prompt informing user about files needing enrichment
+- Glossary hints extraction during `nest sync` (candidate terms: abbreviations, proper nouns, repeated domain terms)
+- Glossary agent template (`nest-glossary.agent.md`) shipped with `nest init` for LLM-driven glossary generation
+- `glossary.md` output in `_nest_context/` with human-curation-safe merge semantics
+- Glossary referenced in master index and available to the `@nest` agent
+
+---
+
 ## Epic 1: Project Initialization
 
 As a user starting a new project, I can run a single command to create a smart, AI-ready folder structure so I'm immediately set up to start adding documents.
@@ -194,7 +219,7 @@ As a user starting a new project, I can run a single command to create a smart, 
 - `_nest_sources/`
 - `_nest_context/`
 - `.github/agents/`
-**And** a `.nest_manifest.json` file is created with:
+**And** a `.nest/manifest.json` file is created with:
 ```json
 {
   "nest_version": "1.0.0",
@@ -218,7 +243,7 @@ As a user starting a new project, I can run a single command to create a smart, 
 **When** the command executes
 **Then** an error is displayed: "Project name required. Usage: nest init 'Project Name'"
 
-**Given** I run `nest init` in a directory that already has `.nest_manifest.json`
+**Given** I run `nest init` in a directory that already has `.nest/manifest.json`
 **When** the command executes
 **Then** an error is displayed: "Nest project already exists. Use `nest sync` to process documents."
 
@@ -244,7 +269,7 @@ icon: book
 ---
 ```
 **And** the file includes instructions for:
-- Reading `_nest_context/00_MASTER_INDEX.md` first
+- Reading `.nest/00_MASTER_INDEX.md` first
 - Citing sources with filenames
 - Never reading `_nest_sources/` or system files
 - Honest "I cannot find that" responses
@@ -311,7 +336,7 @@ icon: book
 ✓ Project "Nike" initialized!
 
 Next steps:
-  1. Drop your documents into raw_inbox/
+  1. Drop your documents into _nest_sources/
   2. Run `nest sync` to process them
   3. Open VS Code and use @nest in Copilot Chat
 
@@ -343,26 +368,26 @@ As a user with project documents, I can drop them into a folder and have them au
 
 ### Story 2.1: File Discovery & Checksum Engine
 
-**As a** user with documents in `raw_inbox/`,
+**As a** user with documents in `_nest_sources/`,
 **I want** the system to detect which files are new, modified, or unchanged,
 **So that** only necessary files are processed, saving time.
 
 **Acceptance Criteria:**
 
-**Given** `raw_inbox/` contains files (.pdf, .docx, .pptx, .xlsx, .html)
+**Given** `_nest_sources/` contains files (.pdf, .docx, .pptx, .xlsx, .html)
 **When** sync runs file discovery
 **Then** all supported files are found recursively (including subdirectories)
 **And** unsupported file types are ignored
 
-**Given** a file exists in `raw_inbox/` but NOT in manifest
+**Given** a file exists in `_nest_sources/` but NOT in manifest
 **When** checksum comparison runs
 **Then** the file is marked as "new" for processing
 
-**Given** a file exists in both `raw_inbox/` and manifest
+**Given** a file exists in both `_nest_sources/` and manifest
 **When** the SHA-256 checksum differs from manifest
 **Then** the file is marked as "modified" for processing
 
-**Given** a file exists in both `raw_inbox/` and manifest
+**Given** a file exists in both `_nest_sources/` and manifest
 **When** the SHA-256 checksum matches manifest
 **Then** the file is marked as "unchanged" and skipped
 
@@ -405,7 +430,7 @@ As a user with project documents, I can drop them into a folder and have them au
 **Given** a password-protected PDF
 **When** processing is attempted
 **Then** a `ProcessingError` is raised with clear message
-**And** the file is logged to `.nest_errors.log`
+**And** the file is logged to `.nest/errors.log`
 
 **Given** a corrupt or unparseable file
 **When** processing fails
@@ -422,12 +447,12 @@ As a user with project documents, I can drop them into a folder and have them au
 
 **Acceptance Criteria:**
 
-**Given** source file at `raw_inbox/contracts/2024/alpha.pdf`
+**Given** source file at `_nest_sources/contracts/2024/alpha.pdf`
 **When** processing completes
-**Then** output is written to `processed_context/contracts/2024/alpha.md`
+**Then** output is written to `_nest_context/contracts/2024/alpha.md`
 
-**Given** nested directory structure in `raw_inbox/`
-**When** output directories don't exist in `processed_context/`
+**Given** nested directory structure in `_nest_sources/`
+**When** output directories don't exist in `_nest_context/`
 **Then** they are created automatically
 
 **Given** a file was previously processed and source is modified
@@ -483,7 +508,7 @@ As a user with project documents, I can drop them into a folder and have them au
 
 **Given** sync completes processing
 **When** index generation runs
-**Then** `_nest_context/00_MASTER_INDEX.md` is created/updated
+**Then** `.nest/00_MASTER_INDEX.md` is created/updated
 
 **Given** 47 files are processed (both generated and user-curated)
 **When** index is generated
@@ -571,7 +596,7 @@ reports/Q3_summary.md
 
 **Given** any errors occur during sync
 **When** error logging runs
-**Then** errors are appended to `.nest_errors.log` with format:
+**Then** errors are appended to `.nest/errors.log` with format:
 `2026-01-12T10:30:00 ERROR [sync] file.pdf: Error description`
 
 ---
@@ -601,7 +626,7 @@ reports/Q3_summary.md
 
   Processed: 15 files
   Skipped:   32 unchanged
-  Failed:    2 (see .nest_errors.log)
+  Failed:    2 (see .nest/errors.log)
   Orphans:   3 removed
 
   Index updated: 00_MASTER_INDEX.md
@@ -652,7 +677,7 @@ This story was added after v0.1.0 release revealed a bug that would have been ca
 **Then** exit code is 0
 **And** `_nest_sources/` directory exists and is empty
 **And** `_nest_context/` directory exists and is empty
-**And** `.nest_manifest.json` exists with valid JSON containing project name
+**And** `.nest/manifest.json` exists with valid JSON containing project name
 
 **Sync Command E2E:**
 
@@ -676,7 +701,7 @@ This story was added after v0.1.0 release revealed a bug that would have been ca
 
 **Negative Path Tests:**
 
-**Given** `nest sync` is run in a directory without `.nest_manifest.json`
+**Given** `nest sync` is run in a directory without `.nest/manifest.json`
 **When** the command executes
 **Then** exit code is 1
 **And** error message contains "No Nest project found" or "nest init"
@@ -691,26 +716,26 @@ This story was added after v0.1.0 release revealed a bug that would have been ca
 **Then** exit code is 1
 **And** error message indicates project name is required
 
-**Given** a corrupt/truncated PDF is placed in `raw_inbox/`
+**Given** a corrupt/truncated PDF is placed in `_nest_sources/`
 **And** `nest sync` is run with default flags
 **When** processing encounters the corrupt file
 **Then** the corrupt file is skipped
-**And** error is logged to `.nest_errors.log`
+**And** error is logged to `.nest/errors.log`
 **And** other valid files are still processed
 **And** exit code is 0 (skip mode)
 
-**Given** a corrupt PDF is placed in `raw_inbox/`
+**Given** a corrupt PDF is placed in `_nest_sources/`
 **And** `nest sync --on-error=fail` is run
 **When** processing encounters the corrupt file
 **Then** exit code is 1
 **And** sync aborts immediately
 
-**Given** an unsupported file type (e.g., `.txt`) is placed in `raw_inbox/`
+**Given** an unsupported file type (e.g., `.txt`) is placed in `_nest_sources/`
 **When** `nest sync` is run
 **Then** the unsupported file is ignored (not in output)
 **And** no error is logged for it
 
-**Given** `raw_inbox/` contains no supported files
+**Given** `_nest_sources/` contains no supported files
 **When** `nest sync` is run
 **Then** exit code is 0
 **And** output indicates no files to process
@@ -749,7 +774,7 @@ This story was added after v0.1.0 release revealed a bug that would have been ca
 **When** the command completes
 **Then** `_nest_sources/` directory is created (not `raw_inbox/`)
 **And** `_nest_context/` directory is created (not `processed_context/`)
-**And** `.nest_manifest.json` is created with correct paths
+**And** `.nest/manifest.json` is created with correct paths
 **And** `_nest_sources/` is added to `.gitignore`
 
 **Given** I run `nest sync`
@@ -988,7 +1013,7 @@ As a user managing my knowledge base, I can quickly see the state of my project 
 **Given** model files exist but checksums don't match expected
 **When** validation runs
 **Then** warning shows: `TableFormer: checksum mismatch ⚠`
-**And** logged to `.nest_errors.log`
+**And** logged to `.nest/errors.log`
 
 **Given** cache directory doesn't exist
 **When** validation runs
@@ -1014,7 +1039,7 @@ As a user managing my knowledge base, I can quickly see the state of my project 
    └─ Folders:        intact ✓
 ```
 
-**Given** `.nest_manifest.json` is missing
+**Given** `.nest/manifest.json` is missing
 **When** validation runs
 **Then** error shows: `Manifest: missing ✗`
 
@@ -1026,9 +1051,9 @@ As a user managing my knowledge base, I can quickly see the state of my project 
 **When** validation runs
 **Then** warning shows: `Agent file: missing ✗`
 
-**Given** `raw_inbox/` or `processed_context/` directories are missing
+**Given** `_nest_sources/` or `_nest_context/` directories are missing
 **When** validation runs
-**Then** warning shows: `Folders: raw_inbox/ missing ✗`
+**Then** warning shows: `Folders: _nest_sources/ missing ✗`
 
 **Given** manifest version doesn't match current Nest version
 **When** validation runs
@@ -1052,7 +1077,7 @@ As a user managing my knowledge base, I can quickly see the state of my project 
 **Given** manifest is missing or corrupt
 **When** doctor completes validation
 **Then** prompt offers: "Rebuild manifest from processed files? [y/N]"
-**And** if Y: scans `processed_context/` and rebuilds manifest
+**And** if Y: scans `_nest_context/` and rebuilds manifest
 
 **Given** agent file is missing
 **When** doctor completes validation
@@ -1125,7 +1150,7 @@ As a user, I can keep my Nest installation up-to-date and ensure my agent templa
 **Then** `~/.config/nest/config.toml` is created with:
 ```toml
 [install]
-source = "git+https://github.com/jbjornsson/nest"
+source = "git+https://github.com/jbb10/nest"
 installed_version = "1.0.0"
 installed_at = "2026-01-12T10:30:00Z"
 ```
@@ -1234,7 +1259,7 @@ $ nest update
 ```
 ✓ Updated to version 1.4.0
 
-  What's new: https://github.com/jbjornsson/nest/blob/main/CHANGELOG.md
+  What's new: https://github.com/jbb10/nest/blob/main/CHANGELOG.md
 ```
 
 ---
@@ -1309,4 +1334,114 @@ $ nest update
 **When** update runs
 **Then** only version check is performed (no actual update)
 **And** output shows current vs latest with exit code 0 if up-to-date, 1 if outdated
+
+---
+
+## Epic 5: Index Intelligence & Agent Enrichment
+
+As a user who has synced documents, I want the master index to contain short, LLM-generated descriptions per file and a project-specific glossary, so the @nest agent can quickly identify relevant documents and understand project terminology.
+
+### Story 5.1: Index Enrichment Pipeline
+
+**As a** user who has synced project documents,
+**I want** the master index to contain a short description per file,
+**So that** the @nest agent (and I) can quickly identify which file to read without opening every document.
+
+*(Full acceptance criteria in implementation artifact: `5-1-index-enrichment-pipeline.md`)*
+
+---
+
+### Story 5.2: Glossary Agent Integration
+
+**As a** user starting work on a new project,
+**I want** an AI-powered glossary agent that extracts and maintains a glossary of project-specific terms, abbreviations, stakeholder names, and domain jargon from my project documents,
+**So that** I (and the @nest agent) can quickly understand project-specific language without manually compiling a dictionary.
+
+**Acceptance Criteria:**
+
+**Given** `nest sync` processes documents
+**When** sync completes and glossary hints extraction runs
+**Then** `_nest_context/00_GLOSSARY_HINTS.yaml` is created/updated with candidate terms:
+```yaml
+# Auto-generated by nest sync — do not edit manually
+terms:
+  - term: "PDC"
+    category: "abbreviation"
+    occurrences: 12
+    source_files:
+      - "contracts/alpha.md"
+      - "reports/q3.md"
+    context_snippets:
+      - "The PDC review board meets weekly..."
+  - term: "Sarah Mitchell"
+    category: "proper_noun"
+    occurrences: 8
+    source_files:
+      - "stakeholder-map.md"
+    context_snippets:
+      - "Sarah Mitchell, VP of Engineering..."
+```
+
+**Given** `nest init` creates the project
+**When** agent files are generated
+**Then** `.github/agents/nest-glossary.agent.md` is created alongside the existing `nest.agent.md`
+**And** the glossary agent instructions tell it to:
+1. Read `_nest_context/00_GLOSSARY_HINTS.yaml` for candidate terms with context
+2. Read `_nest_context/glossary.md` if it already exists (to preserve human edits)
+3. For each candidate term, determine if it is project-specific (not generic industry/tech terms)
+4. Write a definition (1-2 sentences) for each qualifying term
+5. Categorize terms (Abbreviation, Stakeholder, Domain Term, Project Name, etc.)
+6. Never modify or delete definitions that already exist in `glossary.md` (human curation is sacred)
+7. Sort the final glossary alphabetically by Term
+8. Write the updated `glossary.md`
+
+**Given** the glossary agent produces output
+**When** `glossary.md` is written to `_nest_context/`
+**Then** the file has this format:
+```markdown
+# Project Glossary
+
+<!-- nest:glossary-start -->
+| Term | Category | Definition | Source(s) |
+|------|----------|------------|-----------|
+| PDC | Abbreviation | Project Delivery Committee — the governance board responsible for... | contracts/alpha.md, reports/q3.md |
+| Sarah Mitchell | Stakeholder | VP of Engineering, primary technical decision-maker for... | stakeholder-map.md |
+<!-- nest:glossary-end -->
+```
+
+**Given** a `glossary.md` already exists with human-edited definitions
+**When** the glossary agent is re-invoked after a new sync
+**Then** existing definitions are preserved verbatim
+**And** only new terms (not already in the table) are added
+**And** no terms are ever deleted automatically
+
+**Given** sync completes and `00_GLOSSARY_HINTS.yaml` contains candidate terms
+**When** the sync summary is displayed
+**Then** an informational message is shown:
+```
+ℹ {N} candidate glossary term(s) discovered.
+  Run the @nest-glossary agent in VS Code chat to generate/update the glossary.
+```
+**And** if no new candidate terms were found, no glossary message is shown
+
+**Given** `glossary.md` exists in `_nest_context/`
+**When** the master index is generated
+**Then** `glossary.md` is listed in the index like any other context file
+**And** the @nest agent can reference it for terminology lookups
+
+**Given** `00_GLOSSARY_HINTS.yaml` exists in `_nest_context/`
+**When** index generation scans the context directory
+**Then** `00_GLOSSARY_HINTS.yaml` is excluded from the master index (like `00_INDEX_HINTS.yaml`)
+
+**Given** sync runs with `--dry-run`
+**When** glossary hints would be generated
+**Then** no hints file is written (consistent with dry-run behavior)
+
+**Given** all unit, integration, and E2E tests
+**When** the changes are complete
+**Then** all tests pass with no regressions
+
+**Dependencies:** Story 5.1 (establishes hints file pattern, metadata extraction, agent template shipping)
+
+---
 

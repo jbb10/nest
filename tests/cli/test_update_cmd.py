@@ -40,7 +40,7 @@ def _make_config() -> UserConfig:
 
     return UserConfig(
         install=InstallConfig(
-            source="git+https://github.com/jbjornsson/nest",
+            source="git+https://github.com/jbb10/nest",
             installed_version="1.0.0",
             installed_at=datetime.now(tz=timezone.utc),
         )
@@ -65,7 +65,7 @@ def _make_check_result(
         latest_version=latest,
         annotated_versions=versions,
         update_available=update_available,
-        source="git+https://github.com/jbjornsson/nest",
+        source="git+https://github.com/jbb10/nest",
     )
 
 
@@ -658,7 +658,7 @@ class TestRunUpdate:
         mock_service.execute_update.assert_called_once_with(
             "2.0.0",
             ["2.0.0", "1.0.0", "0.9.0"],
-            "git+https://github.com/jbjornsson/nest",
+            "git+https://github.com/jbb10/nest",
         )
 
 

@@ -309,6 +309,8 @@ class TestProjectStatusDataclass:
             current_version="1.0.0",
             agent_file_present=True,
             folders_status="intact",
+            meta_folder_present=True,
+            legacy_layout_detected=False,
             suggestions=[],
         )
 
@@ -327,6 +329,8 @@ class TestProjectStatusDataclass:
             current_version="1.0.0",
             agent_file_present=False,
             folders_status="sources_missing",
+            meta_folder_present=True,
+            legacy_layout_detected=False,
             suggestions=["Run `nest init` to create project"],
         )
 
@@ -348,6 +352,8 @@ class TestProjectReportDataclass:
             current_version="1.0.0",
             agent_file_present=True,
             folders_status="intact",
+            meta_folder_present=True,
+            legacy_layout_detected=False,
             suggestions=[],
         )
         report = ProjectReport(status=status)
@@ -362,6 +368,8 @@ class TestProjectReportDataclass:
             current_version="1.0.0",
             agent_file_present=True,
             folders_status="intact",
+            meta_folder_present=True,
+            legacy_layout_detected=False,
             suggestions=[],
         )
         report = ProjectReport(status=status)
@@ -376,6 +384,8 @@ class TestProjectReportDataclass:
             current_version="1.0.0",
             agent_file_present=False,
             folders_status="intact",
+            meta_folder_present=True,
+            legacy_layout_detected=False,
             suggestions=[],
         )
         report = ProjectReport(status=status)
@@ -390,6 +400,8 @@ class TestProjectReportDataclass:
             current_version="1.0.0",
             agent_file_present=True,
             folders_status="sources_missing",
+            meta_folder_present=True,
+            legacy_layout_detected=False,
             suggestions=[],
         )
         report = ProjectReport(status=status)
@@ -408,6 +420,8 @@ class MockProjectChecker:
         agent_exists: bool = True,
         sources_exist: bool = True,
         context_exist: bool = True,
+        meta_folder_exists: bool = True,
+        has_legacy_layout: bool = False,
     ) -> None:
         """Initialize mock with desired states."""
         self._manifest_exists = manifest_exists
@@ -416,6 +430,8 @@ class MockProjectChecker:
         self._agent_exists = agent_exists
         self._sources_exist = sources_exist
         self._context_exist = context_exist
+        self._meta_folder_exists = meta_folder_exists
+        self._has_legacy_layout = has_legacy_layout
 
     def manifest_exists(self, project_dir: Path) -> bool:
         """Check if manifest exists."""
@@ -443,6 +459,14 @@ class MockProjectChecker:
     def context_folder_exists(self, project_dir: Path) -> bool:
         """Check if context folder exists."""
         return self._context_exist
+
+    def meta_folder_exists(self, project_dir: Path) -> bool:
+        """Check if .nest/ metadata folder exists."""
+        return self._meta_folder_exists
+
+    def has_legacy_layout(self, project_dir: Path) -> bool:
+        """Check if legacy layout detected."""
+        return self._has_legacy_layout
 
 
 class TestCheckProject:
@@ -913,7 +937,9 @@ class TestRemediateIssuesAuto:
                 current_version="1.0.0",
                 agent_file_present=False,
                 folders_status="both_missing",
-                suggestions=[],
+                meta_folder_present=True,
+            legacy_layout_detected=False,
+            suggestions=[],
             )
         )
 
@@ -943,7 +969,9 @@ class TestRemediateIssuesAuto:
                 current_version="1.0.0",
                 agent_file_present=True,
                 folders_status="intact",
-                suggestions=[],
+                meta_folder_present=True,
+            legacy_layout_detected=False,
+            suggestions=[],
             )
         )
 
@@ -990,7 +1018,9 @@ class TestRemediateIssuesInteractive:
                 current_version="1.0.0",
                 agent_file_present=False,
                 folders_status="both_missing",
-                suggestions=[],
+                meta_folder_present=True,
+            legacy_layout_detected=False,
+            suggestions=[],
             )
         )
 
@@ -1026,7 +1056,9 @@ class TestRemediateIssuesInteractive:
                 current_version="1.0.0",
                 agent_file_present=False,
                 folders_status="both_missing",
-                suggestions=[],
+                meta_folder_present=True,
+            legacy_layout_detected=False,
+            suggestions=[],
             )
         )
 
@@ -1074,7 +1106,9 @@ class TestRemediateIssuesInteractive:
                 current_version="1.0.0",
                 agent_file_present=False,
                 folders_status="intact",
-                suggestions=[],
+                meta_folder_present=True,
+            legacy_layout_detected=False,
+            suggestions=[],
             )
         )
 

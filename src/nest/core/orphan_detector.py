@@ -41,10 +41,6 @@ class OrphanDetector:
         for file_path in output_files:
             relative = file_path.relative_to(output_dir).as_posix()
 
-            # Exclude system files
-            if relative == "00_MASTER_INDEX.md":
-                continue
-
             # Check if file is in manifest
             if relative in output_to_source:
                 # File is in manifest - check if source exists

@@ -9,7 +9,17 @@ from pathlib import Path
 # Folder name constants
 SOURCES_DIR = "_nest_sources"
 CONTEXT_DIR = "_nest_context"
+NEST_META_DIR = ".nest"
 MASTER_INDEX_FILE = "00_MASTER_INDEX.md"
+INDEX_HINTS_FILE = "00_INDEX_HINTS.yaml"
+GLOSSARY_HINTS_FILE = "00_GLOSSARY_HINTS.yaml"
+GLOSSARY_FILE = "glossary.md"
+INDEX_TABLE_START = "<!-- nest:index-table-start -->"
+INDEX_TABLE_END = "<!-- nest:index-table-end -->"
+GLOSSARY_TABLE_START = "<!-- nest:glossary-start -->"
+GLOSSARY_TABLE_END = "<!-- nest:glossary-end -->"
+MANIFEST_FILENAME = "manifest.json"
+ERROR_LOG_FILENAME = "errors.log"
 SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
 
 # Text file extensions supported in context directory (for indexing and counting)
@@ -17,6 +27,49 @@ CONTEXT_TEXT_EXTENSIONS = [
     ".md", ".txt", ".text", ".rst",
     ".csv", ".json", ".yaml", ".yml", ".toml", ".xml",
 ]
+
+# All file extensions recognized in _nest_sources/ (Docling-convertible + passthrough text)
+ALL_SOURCE_EXTENSIONS = sorted(set(SUPPORTED_EXTENSIONS + CONTEXT_TEXT_EXTENSIONS))
+
+# Pre-computed set for O(1) passthrough extension lookups
+_PASSTHROUGH_EXTENSIONS = frozenset(ext.lower() for ext in CONTEXT_TEXT_EXTENSIONS)
+
+
+def is_passthrough_extension(suffix: str) -> bool:
+    """Check if file extension should be passthrough-copied (not Docling-converted).
+
+    Args:
+        suffix: File extension including leading dot (e.g., ".txt").
+
+    Returns:
+        True if the extension is a text format that should be copied as-is.
+    """
+    return suffix.lower() in _PASSTHROUGH_EXTENSIONS
+
+
+def passthrough_mirror_path(
+    source: Path,
+    source_root: Path,
+    target_root: Path,
+) -> Path:
+    """Compute mirrored output path preserving original extension.
+
+    Unlike mirror_path() which changes the suffix to .md, this preserves
+    the original file extension for passthrough text files.
+
+    Args:
+        source: Absolute path to source file.
+        source_root: Root directory of source files.
+        target_root: Root directory for output files.
+
+    Returns:
+        Absolute path to output file in target directory.
+
+    Raises:
+        ValueError: If source is not under source_root.
+    """
+    relative = source.relative_to(source_root)
+    return target_root / relative
 
 
 def mirror_path(

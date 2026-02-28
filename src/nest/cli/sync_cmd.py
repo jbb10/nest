@@ -13,12 +13,15 @@ import typer
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
+from nest.adapters.passthrough_processor import PassthroughProcessor
 from nest.core.exceptions import NestError, ProcessingError
 from nest.core.models import DryRunResult, ProcessingResult, SyncResult
-from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
+from nest.core.paths import CONTEXT_DIR, ERROR_LOG_FILENAME, NEST_META_DIR, SOURCES_DIR
 from nest.services.discovery_service import DiscoveryService
+from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
+from nest.services.metadata_service import MetadataExtractorService
 from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
 from nest.services.sync_service import SyncService
@@ -72,7 +75,7 @@ def create_sync_service(
 
     Args:
         project_root: Root directory of the project.
-        error_logger: Logger for writing errors to .nest_errors.log.
+        error_logger: Logger for writing errors to .nest/errors.log.
 
     Returns:
         Configured SyncService with real adapters.
@@ -101,6 +104,7 @@ def create_sync_service(
         output=OutputMirrorService(
             filesystem=filesystem,
             processor=processor,
+            passthrough_processor=PassthroughProcessor(),
         ),
         manifest=ManifestService(
             manifest=manifest_adapter,
@@ -114,6 +118,14 @@ def create_sync_service(
             project_root=project_root,
         ),
         index=IndexService(
+            filesystem=filesystem,
+            project_root=project_root,
+        ),
+        metadata=MetadataExtractorService(
+            filesystem=filesystem,
+            project_root=project_root,
+        ),
+        glossary=GlossaryHintsService(
             filesystem=filesystem,
             project_root=project_root,
         ),
@@ -192,10 +204,10 @@ def sync_command(
     project_root = (target_dir or Path.cwd()).resolve()
 
     # AC3: Check for Nest project (manifest must exist)
-    manifest_path = project_root / ".nest_manifest.json"
+    manifest_path = project_root / NEST_META_DIR / "manifest.json"
     if not manifest_path.exists():
         error("No Nest project found")
-        console.print(f"  Reason: .nest_manifest.json not found in {project_root}")
+        console.print(f"  Reason: .nest/manifest.json not found in {project_root}")
         console.print('  Action: Run `nest init "Project Name"` to initialize')
         raise typer.Exit(1)
 
@@ -203,7 +215,9 @@ def sync_command(
     validated_on_error = _validate_on_error(on_error)
 
     # Setup error logger
-    error_log_path = project_root / ".nest_errors.log"
+    error_log_path = project_root / NEST_META_DIR / ERROR_LOG_FILENAME
+    # Ensure .nest/ directory exists for log file
+    error_log_path.parent.mkdir(parents=True, exist_ok=True)
     # cast is needed because LoggerAdapter generic handling varies by python version
     error_logger = setup_error_logger(error_log_path, service_name="sync")
 
@@ -251,7 +265,7 @@ def sync_command(
             log_processing_error(error_logger, e.source_path, e.message)
         error("Sync aborted due to processing failure")
         console.print(f"  [dim]Reason: {e.message}[/dim]")
-        console.print(f"  [dim]See {error_log_path} for details[/dim]")
+        console.print(f"  [dim]See .nest/{ERROR_LOG_FILENAME} for details[/dim]")
         raise typer.Exit(1) from None
 
     except NestError as e:
@@ -285,7 +299,7 @@ def _display_sync_summary(result: SyncResult, console: "Console", error_log_path
 
       Processed: 15 files
       Skipped:   32 unchanged
-      Failed:    2 (see .nest_errors.log)
+      Failed:    2 (see .nest/errors.log)
       Orphans:   3 removed
 
 
@@ -304,7 +318,8 @@ def _display_sync_summary(result: SyncResult, console: "Console", error_log_path
 
     # Show failed count with error log reference
     if result.failed_count > 0:
-        console.print(f"  Failed:    {result.failed_count} (see {error_log_path.name})")
+        log_relative = f"{NEST_META_DIR}/{ERROR_LOG_FILENAME}"
+        console.print(f"  Failed:    {result.failed_count} (see {log_relative})")
     else:
         console.print(f"  Failed:    {result.failed_count}")
 
@@ -321,4 +336,26 @@ def _display_sync_summary(result: SyncResult, console: "Console", error_log_path
         console.print(f"  User-curated: {result.user_curated_count} preserved")
 
     console.print()
-    console.print("  Index updated: 00_MASTER_INDEX.md")
+    console.print("  Index updated: .nest/00_MASTER_INDEX.md")
+
+    # Show enrichment prompt if there are files needing descriptions
+    if result.enrichment_needed > 0:
+        console.print()
+        n = result.enrichment_needed
+        console.print(
+            f"  [cyan]ℹ {n} file(s) need descriptions in the master index.[/cyan]"
+        )
+        console.print(
+            "    Run the @nest-enricher agent in VS Code chat to populate them."
+        )
+
+    # Show glossary prompt if candidate terms were discovered
+    if result.glossary_terms_discovered > 0:
+        console.print()
+        g = result.glossary_terms_discovered
+        console.print(
+            f"  [cyan]ℹ {g} candidate glossary term(s) discovered.[/cyan]"
+        )
+        console.print(
+            "    Run the @nest-glossary agent in VS Code chat to generate/update the glossary."
+        )

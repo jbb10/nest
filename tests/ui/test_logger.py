@@ -15,7 +15,8 @@ class TestSetupErrorLogger:
         """Test that log file is created when first error is logged."""
         from nest.ui.logger import setup_error_logger
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         logger = setup_error_logger(log_file)
 
         # Log an error
@@ -27,7 +28,8 @@ class TestSetupErrorLogger:
         """Test log format: {timestamp} {level} [{service}] {message}."""
         from nest.ui.logger import setup_error_logger
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         logger = setup_error_logger(log_file, service_name="sync")
 
         logger.error("file.pdf: Error description")
@@ -44,7 +46,8 @@ class TestSetupErrorLogger:
         """Test that subsequent logs append to existing file."""
         from nest.ui.logger import setup_error_logger
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
 
         # First logger session
         logger1 = setup_error_logger(log_file, service_name="sync")
@@ -62,15 +65,17 @@ class TestSetupErrorLogger:
         assert "second error" in lines[1]
 
     def test_default_log_file_path(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test that default log file is .nest_errors.log in current directory."""
+        """Test that default log file is .nest/errors.log in current directory."""
         from nest.ui.logger import setup_error_logger
 
         monkeypatch.chdir(tmp_path)
+        # Ensure .nest/ exists in cwd for default path
+        (tmp_path / ".nest").mkdir(parents=True, exist_ok=True)
         logger = setup_error_logger()
 
         logger.error("test")
 
-        assert (tmp_path / ".nest_errors.log").exists()
+        assert (tmp_path / ".nest" / "errors.log").exists()
 
 
 class TestLogProcessingError:
@@ -80,7 +85,8 @@ class TestLogProcessingError:
         """Test that helper logs file path and error message."""
         from nest.ui.logger import log_processing_error, setup_error_logger
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         logger = setup_error_logger(log_file, service_name="sync")
 
         log_processing_error(logger, Path("contracts/alpha.pdf"), "Password protected")
@@ -93,7 +99,8 @@ class TestLogProcessingError:
         """Test that multiple errors are logged correctly."""
         from nest.ui.logger import log_processing_error, setup_error_logger
 
-        log_file = tmp_path / ".nest_errors.log"
+        log_file = tmp_path / ".nest" / "errors.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         logger = setup_error_logger(log_file, service_name="sync")
 
         log_processing_error(logger, Path("file1.pdf"), "Error 1")

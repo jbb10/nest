@@ -235,3 +235,50 @@ class TestComputeOutputPath:
 
         expected = Path("/project/processed_context/legal/contracts/2024/q1/agreement.md")
         assert result == expected
+
+
+class TestFileSystemAdapterUTF8Encoding:
+    """Tests for explicit UTF-8 encoding in FileSystemAdapter I/O."""
+
+    def test_write_read_roundtrip_danish_characters(self, tmp_path: Path) -> None:
+        """Verify UTF-8 round-trip with Danish characters (å, æ, ø)."""
+        adapter = FileSystemAdapter()
+        file_path = tmp_path / "møde_notes.txt"
+
+        adapter.write_text(file_path, "Møde med Jóhann: æbler og ørred")
+        result = adapter.read_text(file_path)
+
+        assert result == "Møde med Jóhann: æbler og ørred"
+
+    def test_write_read_roundtrip_german_characters(self, tmp_path: Path) -> None:
+        """Verify UTF-8 round-trip with German umlauts (ü, ö, ä, ß)."""
+        adapter = FileSystemAdapter()
+        file_path = tmp_path / "über_notes.txt"
+
+        adapter.write_text(file_path, "Straße nach München: Ärger mit Öl")
+        result = adapter.read_text(file_path)
+
+        assert result == "Straße nach München: Ärger mit Öl"
+
+    def test_append_text_preserves_unicode(self, tmp_path: Path) -> None:
+        """Verify append_text preserves Unicode characters."""
+        adapter = FileSystemAdapter()
+        file_path = tmp_path / "unicode.txt"
+
+        adapter.write_text(file_path, "Line 1: café\n")
+        adapter.append_text(file_path, "Line 2: naïve résumé\n")
+        result = adapter.read_text(file_path)
+
+        assert result == "Line 1: café\nLine 2: naïve résumé\n"
+
+    def test_file_written_as_utf8_bytes(self, tmp_path: Path) -> None:
+        """Verify file is actually written as UTF-8 bytes on disk."""
+        adapter = FileSystemAdapter()
+        file_path = tmp_path / "encoding_check.txt"
+        content = "Ærø møde"
+
+        adapter.write_text(file_path, content)
+
+        # Read raw bytes and verify UTF-8 encoding
+        raw = file_path.read_bytes()
+        assert raw.decode("utf-8") == content

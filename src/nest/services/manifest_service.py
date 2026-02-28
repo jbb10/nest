@@ -113,6 +113,37 @@ class ManifestService:
         self._pending_entries[key] = entry
         return entry
 
+    def record_skipped(
+        self,
+        source_path: Path,
+        checksum: str,
+        reason: str,
+    ) -> FileEntry:
+        """Record a file skipped due to collision or other reason.
+
+        Creates a FileEntry with skipped status and stores it for
+        later commit to the manifest.
+
+        Args:
+            source_path: Absolute path to the source document.
+            checksum: SHA-256 hash of the source file.
+            reason: Reason the file was skipped.
+
+        Returns:
+            The created FileEntry instance.
+        """
+        key = source_path_to_manifest_key(source_path, self._raw_inbox)
+
+        entry = FileEntry(
+            sha256=checksum,
+            processed_at=datetime.now(timezone.utc),
+            output="",
+            status="skipped",
+            error=reason,
+        )
+        self._pending_entries[key] = entry
+        return entry
+
     def commit(self) -> None:
         """Write all pending entries to manifest.
 

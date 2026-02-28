@@ -18,11 +18,10 @@ from nest.core.checksum import compute_sha256
 from nest.core.models import Manifest
 from nest.core.orphan_detector import OrphanDetector
 from nest.core.paths import (
+    ALL_SOURCE_EXTENSIONS,
     CONTEXT_DIR,
     CONTEXT_TEXT_EXTENSIONS,
-    MASTER_INDEX_FILE,
     SOURCES_DIR,
-    SUPPORTED_EXTENSIONS,
 )
 
 
@@ -124,7 +123,7 @@ class StatusService:
         if not self._filesystem.exists(sources_dir):
             return (0, 0, 0, 0)
 
-        supported = {ext.lower() for ext in SUPPORTED_EXTENSIONS}
+        supported = {ext.lower() for ext in ALL_SOURCE_EXTENSIONS}
         source_files = [
             p for p in self._filesystem.list_files(sources_dir) if p.suffix.lower() in supported
         ]
@@ -176,9 +175,6 @@ class StatusService:
 
         context_files = 0
         for path in output_files:
-            rel = path.relative_to(context_dir).as_posix()
-            if rel == MASTER_INDEX_FILE:
-                continue
             if path.suffix.lower() not in supported_text:
                 continue
             context_files += 1

@@ -1,7 +1,7 @@
 """Error logging infrastructure for Nest.
 
 Provides file-based error logging for sync operations.
-Logs are written to .nest_errors.log in ISO timestamp format.
+Logs are written to .nest/errors.log in ISO timestamp format.
 
 NEVER use this for user-facing messages - use messages.py Rich helpers.
 This module is for diagnostic/error log files only.
@@ -9,6 +9,8 @@ This module is for diagnostic/error log files only.
 
 import logging
 from pathlib import Path
+
+from nest.core.paths import ERROR_LOG_FILENAME, NEST_META_DIR
 
 
 def setup_error_logger(
@@ -21,14 +23,14 @@ def setup_error_logger(
     Each call creates a new logger instance with its own file handler.
 
     Args:
-        log_file: Path to the log file. Defaults to .nest_errors.log in cwd.
+        log_file: Path to the log file. Defaults to .nest/errors.log in cwd.
         service_name: Service name to include in log entries (e.g., "sync").
 
     Returns:
         Configured logger instance for error logging.
     """
     if log_file is None:
-        log_file = Path(".nest_errors.log")
+        log_file = Path(NEST_META_DIR) / ERROR_LOG_FILENAME
 
     # Create unique logger name to avoid handler accumulation
     logger_name = f"nest.errors.{service_name}.{id(log_file)}"

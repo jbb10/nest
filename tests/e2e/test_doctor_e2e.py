@@ -76,7 +76,7 @@ class TestDoctorE2E:
     def test_doctor_detects_missing_manifest(self, initialized_project: Path) -> None:
         """Test that doctor detects and reports missing manifest."""
         # Delete the manifest
-        manifest_path = initialized_project / ".nest_manifest.json"
+        manifest_path = initialized_project / ".nest" / "manifest.json"
         manifest_path.unlink()
 
         # Run doctor - should detect missing manifest
@@ -138,7 +138,7 @@ class TestDoctorE2E:
     def test_doctor_fix_rebuilds_manifest(self, initialized_project: Path) -> None:
         """Test that --fix flag rebuilds corrupt manifest."""
         # Corrupt the manifest with invalid JSON
-        manifest_path = initialized_project / ".nest_manifest.json"
+        manifest_path = initialized_project / ".nest" / "manifest.json"
         manifest_path.write_text("{invalid json}")
 
         # Run doctor --fix - should rebuild manifest
@@ -188,7 +188,9 @@ class TestDoctorE2E:
         sources_dir.mkdir()
 
         # Create invalid manifest (will fail to rebuild if sources empty and context missing)
-        manifest_path = fresh_temp_dir / ".nest_manifest.json"
+        meta_dir = fresh_temp_dir / ".nest"
+        meta_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = meta_dir / "manifest.json"
         manifest_path.write_text("{bad json}")
 
         # Run doctor --fix - should attempt fixes, may have partial success

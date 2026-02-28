@@ -7,7 +7,7 @@ from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.checksum import compute_sha256
 from nest.core.models import FileEntry, Manifest
-from nest.core.paths import CONTEXT_DIR, MASTER_INDEX_FILE, SOURCES_DIR
+from nest.core.paths import CONTEXT_DIR, SOURCES_DIR
 from nest.services.status_service import StatusService
 
 
@@ -37,7 +37,6 @@ class TestStatusService:
         unchanged_sha = compute_sha256(unchanged_file)
 
         # Context
-        _write_context_file(project_root, MASTER_INDEX_FILE, "# Index\n")
         _write_context_file(project_root, "modified.md")
         _write_context_file(project_root, "unchanged.md")
         _write_context_file(project_root, "orphan.md")
@@ -107,7 +106,6 @@ class TestStatusService:
     def test_context_counts_txt_files(self, tmp_path: Path) -> None:
         """AC5: .txt files in context directory are counted."""
         project_root = tmp_path
-        _write_context_file(project_root, MASTER_INDEX_FILE, "# Index\n")
         _write_context_file(project_root, "notes.txt", "some notes")
         _write_context_file(project_root, "doc.md", "# doc")
 
@@ -127,7 +125,6 @@ class TestStatusService:
     def test_context_excludes_unsupported_extensions(self, tmp_path: Path) -> None:
         """AC5: .png files are excluded from context file count."""
         project_root = tmp_path
-        _write_context_file(project_root, MASTER_INDEX_FILE, "# Index\n")
         _write_context_file(project_root, "doc.md", "# doc")
         # Create a .png file (unsupported)
         png_path = project_root / CONTEXT_DIR / "diagram.png"

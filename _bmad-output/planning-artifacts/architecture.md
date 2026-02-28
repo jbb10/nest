@@ -30,7 +30,7 @@ The core processing loop (sync) handles: file discovery → checksum comparison 
 **Non-Functional Requirements:**
 - **Privacy:** All processing local (Docling, no cloud APIs)
 - **Performance:** Incremental sync via SHA-256 checksums; skip unchanged files
-- **Reliability:** Error logging to `.nest_errors.log`, configurable fail modes
+- **Reliability:** Error logging to `.nest/errors.log`, configurable fail modes
 - **Portability:** Cross-platform (macOS/Linux/Windows via Python 3.10+)
 - **Maintainability:** DRY principle enforced — shared components across commands
 
@@ -53,7 +53,7 @@ The core processing loop (sync) handles: file discovery → checksum comparison 
 ### Cross-Cutting Concerns Identified
 
 1. **Error Handling** — Consistent pattern across all commands (skip vs fail modes)
-2. **Logging** — Unified error log format for `.nest_errors.log`
+2. **Logging** — Unified error log format for `.nest/errors.log`
 3. **Path Normalization** — Cross-platform path handling (Windows backslashes)
 4. **Checksum Computation** — Reused by sync, status, doctor
 5. **Progress Reporting** — Rich terminal output for long operations
@@ -115,7 +115,7 @@ Example guidance after `nest init`:
 ✓ Project "Nike" initialized!
 
 Next steps:
-  1. Drop your documents into raw_inbox/
+  1. Drop your documents into _nest_sources/
   2. Run `nest sync` to process them
   3. Open VS Code and use @nest in Copilot Chat
 
@@ -268,17 +268,28 @@ A story is NOT complete until all applicable E2E tests pass. When creating stori
 
 ### CI Strategy
 
-**Script-Based Architecture:**
-All CI logic lives in scripts that run both locally (for AI agents) and in GitHub Actions.
+**Makefile-Based Architecture:**
+All CI logic is defined in a project-root `Makefile` — the single source of truth for linting, formatting, type checking, and testing. Both developers and GitHub Actions invoke the same `make` targets.
 
 ```
+Makefile          # Single source of truth for all repo operations
 scripts/
-├── ci-lint.sh          # Ruff check + format verification
-├── ci-typecheck.sh     # Pyright strict mode
-├── ci-test.sh          # pytest with coverage (matrix: per Python version)
-├── ci-integration.sh   # Docling processing tests (matrix: per Python version)
-└── ci-e2e.sh           # E2E tests (requires Docling models)
+└── release.sh    # Release automation with human approval gate
 ```
+
+**Makefile Targets:**
+
+| Target | Command | Purpose |
+|--------|---------|---------|
+| `make lint` | `uv run ruff check .` | Lint with ruff |
+| `make format-check` | `uv run ruff format --check .` | Verify formatting |
+| `make format` | `uv run ruff format .` | Auto-format code |
+| `make typecheck` | `uv run pyright` | Strict type checking |
+| `make test` | `uv run pytest tests/ -v --ignore=tests/e2e` | Unit + integration tests |
+| `make test-e2e` | `uv run pytest -m "e2e" --timeout=60` | E2E tests (require Docling) |
+| `make test-all` | `make test` + `make test-e2e` | All tests |
+| `make ci` | lint + format-check + typecheck + test-all | Full pre-release suite |
+| `make release` | `./scripts/release.sh` | Run release process |
 
 **GitHub Actions (`.github/workflows/ci.yml`):**
 
@@ -297,13 +308,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: ./scripts/ci-lint.sh
+      - uses: astral-sh/setup-uv@v5
+      - run: make lint && make format-check
 
   typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: ./scripts/ci-typecheck.sh
+      - uses: astral-sh/setup-uv@v5
+      - run: make typecheck
 
   test:
     runs-on: ubuntu-latest
@@ -315,35 +328,33 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: ./scripts/ci-test.sh
+      - uses: astral-sh/setup-uv@v5
+      - run: make test
 
-  integration:
+  e2e:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11', '3.12']
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - run: ./scripts/ci-integration.sh
+      - uses: astral-sh/setup-uv@v5
+      - run: make test-e2e
 ```
 
-**Local Execution (AI Agents):**
+**Local Execution:**
 ```bash
 # Quick validation (current Python)
-./scripts/ci-lint.sh && ./scripts/ci-typecheck.sh && ./scripts/ci-test.sh
+make ci
 
-# Full matrix (before PR)
-for v in 3.10 3.11 3.12; do
-  uv run --python $v ./scripts/ci-test.sh
-done
+# Individual checks
+make lint
+make typecheck
+make test
 ```
 
 ### CD Strategy: Local Release with Human Gate
 
 **Releases are executed from developer terminal, NOT from GitHub Actions pipeline.**
+
+**Tools:** `git-cliff` for changelog generation, `perl` for cross-platform in-place file editing, `make ci` for validation.
 
 **`scripts/release.sh` Workflow:**
 
@@ -352,14 +363,14 @@ done
 │  1. PRE-FLIGHT CHECKS                               │
 │     • Verify on main branch                         │
 │     • Verify working directory clean                │
-│     • Pull latest from origin                       │
-│     • Run full CI suite (all scripts)              │
+│     • Pull latest from origin (--ff-only)          │
+│     • Verify tools: uv, git, git-cliff, perl      │
 ├─────────────────────────────────────────────────────┤
 │  2. VERSION DETERMINATION                           │
 │     • Read current version from pyproject.toml     │
 │     • Analyze commits since last tag               │
 │     • Suggest version bump (patch/minor/major)     │
-│     • Prompt for confirmation or override          │
+│     • Allow --patch/--minor/--major override       │
 ├─────────────────────────────────────────────────────┤
 │  3. CHANGELOG GENERATION                            │
 │     • Run git-cliff to parse conventional commits  │
@@ -367,28 +378,39 @@ done
 │     • Display preview in terminal                  │
 ├─────────────────────────────────────────────────────┤
 │  4. ⏸️  HUMAN APPROVAL GATE                         │
-│     • Display: new version number                  │
+│     • Display: version bump (old → new)            │
 │     • Display: changelog preview                   │
 │     • Display: files that will be modified         │
 │     • Prompt: "Proceed with release? [y/N]"       │
 │     • STOP here if not approved                    │
 ├─────────────────────────────────────────────────────┤
-│  5. EXECUTE RELEASE (only after approval)          │
-│     • Update version in pyproject.toml             │
-│     • Prepend to CHANGELOG.md                       │
+│  5. UPDATE FILES                                    │
+│     • Update version in pyproject.toml (perl)     │
+│     • Update version in src/nest/__init__.py (perl)│
+│     • Generate CHANGELOG.md via git-cliff          │
+├─────────────────────────────────────────────────────┤
+│  6. CI VALIDATION                                   │
+│     • Run make ci (full suite)                     │
+│     • On failure: rollback file changes, abort     │
+├─────────────────────────────────────────────────────┤
+│  7. COMMIT, TAG & PUSH (after CI passes)           │
 │     • Commit: "chore(release): v{version}"        │
 │     • Create annotated tag: v{version}            │
-│     • **Move 'latest' tag to new release**        │
-│     • Push main branch to origin                   │
-│     • Push tags to origin                          │
+│     • Move 'latest' tag to new release             │
+│     • ⏸️ Second confirmation before push            │
+│     • Push branch + tags to origin                 │
 │     • Display: success message with install cmd   │
 └─────────────────────────────────────────────────────┘
 ```
 
 **Critical:** The `latest` tag is ALWAYS moved to point to the newest release. This ensures `uv tool install ...@latest` gets the most recent stable version.
 
+**Cross-Platform:** Uses `perl -pi -e` for in-place file edits (works identically on macOS and Linux, unlike `sed -i` which differs between BSD and GNU).
+
+**Rollback:** If CI fails or the user aborts at the push confirmation, all local changes (version bumps, tags, commits) are rolled back automatically.
+
 **Post-Push:**
-GitHub Actions triggers on tag push and runs release validation (same CI suite) as safety confirmation.
+GitHub Actions triggers on tag push and runs release validation (same `make` targets) as safety confirmation.
 
 **git-cliff Configuration (`cliff.toml`):**
 
@@ -434,7 +456,7 @@ commit_parsers = [
 **Schema:**
 ```toml
 [install]
-source = "git+https://github.com/jbjornsson/nest"
+source = "git+https://github.com/jbb10/nest"
 installed_version = "1.2.0"
 installed_at = "2026-01-12T10:30:00Z"
 ```
@@ -481,7 +503,7 @@ $ nest update
 
 **Initial Install:**
 ```bash
-$ uv tool install git+https://github.com/jbjornsson/nest@latest
+$ uv tool install git+https://github.com/jbb10/nest@latest
 
 Installing nest v1.2.0...
 ✓ Installed nest
@@ -678,7 +700,7 @@ class SyncResult:
 3. CLI layer inspects `--on-error` flag:
    - `skip` (default): Report failures, exit 0 if any succeeded
    - `fail`: Exit 1 if any failures occurred
-4. All errors logged to `.nest_errors.log` regardless of flag
+4. All errors logged to `.nest/errors.log` regardless of flag
 
 ### Configuration Management
 
@@ -698,7 +720,7 @@ class UserConfig(BaseModel):
     install: InstallConfig
 ```
 
-**Project Manifest (`.nest_manifest.json`):**
+**Project Manifest (`.nest/manifest.json`):**
 
 ```python
 # core/manifest.py
@@ -739,7 +761,7 @@ class Manifest(BaseModel):
 - User guidance messages
 - Color-coded status indicators
 
-**Error Log (`.nest_errors.log`):**
+**Error Log (`.nest/errors.log`):**
 
 ```python
 # Format
@@ -751,7 +773,7 @@ class Manifest(BaseModel):
 import logging
 
 error_logger = logging.getLogger("nest.errors")
-error_logger.addHandler(logging.FileHandler(".nest_errors.log"))
+error_logger.addHandler(logging.FileHandler(".nest/errors.log"))
 error_logger.setLevel(logging.WARNING)
 ```
 
@@ -968,7 +990,7 @@ def test_sync_skips_unchanged_files():
     service = SyncService(mock_fs, MockProcessor(), mock_manifest)
     
     # Act
-    result = service.execute(Path("raw_inbox"))
+    result = service.execute(Path("_nest_sources"))
     
     # Assert
     assert result.skip_count == 1
@@ -984,7 +1006,7 @@ def test_sync_skips_unchanged_files():
 | Success | ✓ | Green | `✓ Processed 10 files` |
 | Failure | ✗ | Red | `✗ Failed to process alpha.pdf` |
 | Warning | ⚠ | Yellow | `⚠ Model checksum mismatch` |
-| Info | • | Blue | `• Scanning raw_inbox/` |
+| Info | • | Blue | `• Scanning _nest_sources/` |
 | Progress | bar | Cyan | `Processing [████████--] 80%` |
 
 **Message formatting rules:**
@@ -1032,7 +1054,7 @@ console.print(f"  Action: {suggested_action}")
   Action: Remove password protection and run `nest sync` again
 ```
 
-**Log errors (`.nest_errors.log`):**
+**Log errors (`.nest/errors.log`):**
 
 Format: `{timestamp} {level} [{context}] {file}: {technical_detail}`
 
@@ -1116,6 +1138,33 @@ def get_output_path(source: str, sources_dir: str, context_dir: str) -> str:
 - Code review should catch convention deviations
 - When in doubt, refer to this document
 
+### Text File I/O Encoding Standard
+
+**All text file I/O MUST explicitly specify `encoding='utf-8'`.**
+
+Relying on Python's platform-dependent default encoding causes cross-platform inconsistencies:
+- macOS/Linux default to UTF-8
+- Windows may default to CP1252 or locale-specific encodings
+
+This leads to corrupt manifest keys, false change detection, and forced rebuilds on Windows.
+
+```python
+# ✓ ALWAYS specify encoding for text I/O
+path.write_text(content, encoding='utf-8')
+path.read_text(encoding='utf-8')
+open(path, 'r', encoding='utf-8')
+open(path, 'w', encoding='utf-8')
+
+# ✗ NEVER rely on platform defaults
+path.write_text(content)  # Platform-dependent!
+path.read_text()          # Platform-dependent!
+```
+
+**Where to apply:**
+- Adapter layer (`FileSystemAdapter`, `ManifestAdapter`) — protects all downstream services
+- Any service that bypasses adapters for direct `Path` I/O (e.g., `.gitignore` handling)
+- Binary I/O (`read_bytes()`, `shutil.copy2`) is not affected
+
 ### Anti-Patterns (What NOT to Do)
 
 ```python
@@ -1142,6 +1191,10 @@ raise Exception("Error")  # What error? Why? What to do?
 # ✗ Missing type hints
 def process(path):  # No types
     return result  # Unknown return type
+
+# ✗ Platform-dependent encoding
+path.write_text(content)  # Missing encoding='utf-8'
+path.read_text()          # Missing encoding='utf-8'
 ```
 
 ## Project Structure & Boundaries
@@ -1206,7 +1259,7 @@ nest/
 │       │   ├── docling_processor.py # Docling document conversion
 │       │   ├── git_client.py        # Git tag queries for update
 │       │   ├── user_config.py       # ~/.config/nest/config.toml
-│       │   └── manifest_adapter.py  # .nest_manifest.json I/O
+│       │   └── manifest_adapter.py  # .nest/manifest.json I/O
 │       │
 │       ├── agents/                  # Agent file generation
 │       │   ├── __init__.py
@@ -1394,8 +1447,8 @@ CLI Layer (sync_cmd.py)
           │
 Service Layer (sync_service.py)
     │
-    ├─ filesystem.list_files(raw_inbox/)
-    ├─ manifest.load(.nest_manifest.json)
+    ├─ filesystem.list_files(_nest_sources/)
+    ├─ manifest.load(.nest/manifest.json)
     │
     ├─ For each file:
     │     ├─ core.checksum.compute_sha256(file)
@@ -1403,7 +1456,7 @@ Service Layer (sync_service.py)
     │     │
     │     ├─ If changed/new:
     │     │     ├─ processor.process(file) → markdown
-    │     │     ├─ filesystem.write_text(processed_context/...)
+    │     │     ├─ filesystem.write_text(_nest_context/...)
     │     │     └─ Add to results
     │     │
     │     └─ If unchanged:

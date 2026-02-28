@@ -18,7 +18,9 @@ class TestManifestAdapterLoad:
     def test_load_raises_manifest_error_when_json_invalid(self, tmp_path: Path) -> None:
         """AC #4: Invalid JSON raises ManifestError with actionable message."""
         # Arrange
-        manifest_path = tmp_path / ".nest_manifest.json"
+        meta_dir = tmp_path / ".nest"
+        meta_dir.mkdir()
+        manifest_path = meta_dir / "manifest.json"
         manifest_path.write_text("{ invalid json without quotes")
         adapter = ManifestAdapter()
 
@@ -35,7 +37,9 @@ class TestManifestAdapterLoad:
     ) -> None:
         """AC #4: Invalid structure raises ManifestError with actionable message."""
         # Arrange - valid JSON but missing required fields
-        manifest_path = tmp_path / ".nest_manifest.json"
+        meta_dir = tmp_path / ".nest"
+        meta_dir.mkdir()
+        manifest_path = meta_dir / "manifest.json"
         manifest_path.write_text('{"wrong_field": "value"}')
         adapter = ManifestAdapter()
 
@@ -50,7 +54,9 @@ class TestManifestAdapterLoad:
     def test_load_error_message_includes_doctor_guidance(self, tmp_path: Path) -> None:
         """AC #4: Error message advises user to run nest doctor."""
         # Arrange
-        manifest_path = tmp_path / ".nest_manifest.json"
+        meta_dir = tmp_path / ".nest"
+        meta_dir.mkdir()
+        manifest_path = meta_dir / "manifest.json"
         manifest_path.write_text("not valid json at all")
         adapter = ManifestAdapter()
 
@@ -78,7 +84,9 @@ class TestManifestAdapterLoad:
             "last_sync": None,
             "files": {},
         }
-        manifest_path = tmp_path / ".nest_manifest.json"
+        meta_dir = tmp_path / ".nest"
+        meta_dir.mkdir()
+        manifest_path = meta_dir / "manifest.json"
         manifest_path.write_text(json.dumps(manifest_data))
         adapter = ManifestAdapter()
 

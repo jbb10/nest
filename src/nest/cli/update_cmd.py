@@ -25,6 +25,7 @@ from nest.core.models import (
     UserConfig,
 )
 from nest.services.agent_migration_service import AgentMigrationService
+from nest.services.migration_service import MetadataMigrationService
 from nest.services.update_service import UpdateService
 from nest.ui.messages import error, get_console, info, success, warning
 
@@ -201,6 +202,33 @@ def _handle_agent_migration(
         info("Keeping existing agent file. Run nest doctor to update later.")
 
 
+def _handle_metadata_migration(
+    project_dir: Path,
+    console: Console,
+) -> None:
+    """Migrate old-layout metadata files to .nest/ directory.
+
+    Args:
+        project_dir: Project directory to check.
+        console: Rich console for output.
+    """
+    migration_service = MetadataMigrationService()
+
+    if not migration_service.detect_legacy_layout(project_dir):
+        return  # Already new layout or not a Nest project
+
+    result = migration_service.migrate(project_dir)
+
+    if result.migrated:
+        for item in result.files_moved:
+            info(item)
+        success("Migrated metadata to .nest/ directory")
+
+    if result.errors:
+        for err in result.errors:
+            warning(err)
+
+
 def update_command(
     check: Annotated[
         bool,
@@ -278,13 +306,16 @@ def update_command(
         success(f"Updated to version {result.version}")
         console.print()
         console.print(
-            "  [dim]What's new: https://github.com/jbjornsson/nest/blob/main/CHANGELOG.md[/dim]"
+            "  [dim]What's new: https://github.com/jbb10/nest/blob/main/CHANGELOG.md[/dim]"
         )
 
         # Step 7: Agent migration check (AC7, AC8, AC9)
         console.print()
         project_dir = target_dir or Path.cwd()
         _handle_agent_migration(migration_service, project_dir, console)
+
+        # Step 8: Metadata directory migration
+        _handle_metadata_migration(project_dir, console)
     else:
         # AC4: Update failure
         console.print()

@@ -2,7 +2,47 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from nest.adapters.protocols import FileSystemProtocol
-from nest.core.paths import CONTEXT_DIR, CONTEXT_TEXT_EXTENSIONS, MASTER_INDEX_FILE
+from nest.core.models import FileMetadata
+from nest.core.paths import (
+    INDEX_TABLE_END,
+    INDEX_TABLE_START,
+    NEST_META_DIR,
+)
+
+
+def parse_index_descriptions(content: str) -> dict[str, str]:
+    """Extract file→description mapping from existing index table.
+
+    Parses the Markdown table between nest:index-table-start/end markers
+    and extracts the description for each file path.
+
+    Args:
+        content: Full content of the master index file.
+
+    Returns:
+        Dict mapping file path to description string.
+    """
+    start = content.find(INDEX_TABLE_START)
+    end = content.find(INDEX_TABLE_END)
+    if start == -1 or end == -1:
+        return {}
+    table_block = content[start:end]
+    descriptions: dict[str, str] = {}
+    for line in table_block.splitlines():
+        if not line.startswith("|"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        # parts: ['', 'file.md', '123', 'description text', '']
+        if len(parts) < 5:
+            continue
+        file_path = parts[1]
+        if not file_path or file_path == "File" or file_path.startswith("--"):
+            continue
+        # Handle descriptions containing pipe characters:
+        # Join parts[3:-1] to reconstruct the full description
+        description = " | ".join(parts[3:-1]).strip()
+        descriptions[file_path] = description
+    return descriptions
 
 
 class IndexService:
@@ -17,13 +57,21 @@ class IndexService:
         """
         self._fs = filesystem
         self._root = project_root
-        self._context_dir = self._root / CONTEXT_DIR
+        self._meta_dir = self._root / NEST_META_DIR
 
-    def generate_content(self, files: list[str], project_name: str) -> str:
-        """Generate content for the master index file.
+    def generate_content(
+        self,
+        files: list[FileMetadata],
+        old_descriptions: dict[str, str],
+        old_hints: dict[str, str],
+        project_name: str,
+    ) -> str:
+        """Generate content for the master index file in table format.
 
         Args:
-            files: List of file paths (relative to processed_context).
+            files: List of FileMetadata for all context files.
+            old_descriptions: Dict of path→description from previous index.
+            old_hints: Dict of path→content_hash from previous hints.
             project_name: Name of the project.
 
         Returns:
@@ -31,7 +79,7 @@ class IndexService:
         """
         timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         # Sort files case-insensitively for better UX
-        sorted_files = sorted(files, key=str.casefold)
+        sorted_files = sorted(files, key=lambda f: f.path.casefold())
         count = len(sorted_files)
 
         lines = [
@@ -39,10 +87,23 @@ class IndexService:
             f"Generated: {timestamp} | Files: {count}",
             "",
             "## File Listing",
+            "",
+            INDEX_TABLE_START,
+            "| File | Lines | Description |",
+            "|------|------:|-------------|",
         ]
 
-        if sorted_files:
-            lines.extend(sorted_files)
+        for file_meta in sorted_files:
+            # Carry forward description if content_hash unchanged
+            description = ""
+            if (
+                file_meta.path in old_hints
+                and old_hints[file_meta.path] == file_meta.content_hash
+            ):
+                description = old_descriptions.get(file_meta.path, "")
+            lines.append(f"| {file_meta.path} | {file_meta.lines} | {description} |")
+
+        lines.append(INDEX_TABLE_END)
 
         # Ensure trailing newline
         lines.append("")
@@ -55,35 +116,23 @@ class IndexService:
         Args:
             content: The content to write.
         """
-        # Ensure directory exists just in case
-        if not self._fs.exists(self._context_dir):
-            self._fs.create_directory(self._context_dir)
+        # Ensure .nest/ directory exists
+        if not self._fs.exists(self._meta_dir):
+            self._fs.create_directory(self._meta_dir)
 
-        index_path = self._context_dir / MASTER_INDEX_FILE
+        index_path = self._meta_dir / "00_MASTER_INDEX.md"
         self._fs.write_text(index_path, content)
 
-    def update_index(self, project_name: str) -> None:
-        """Update the master index by scanning all supported text files in context directory.
+    def read_index_content(self) -> str:
+        """Read the current master index content if it exists.
 
-        Scans the entire context directory for all supported text files (both
-        manifest-tracked and user-curated), sorts them, and generates the index.
-
-        Args:
-            project_name: Name of the project.
+        Returns:
+            Index file content, or empty string if file doesn't exist.
         """
-        # Scan entire context directory for all supported text files
-        all_files = self._fs.list_files(self._context_dir)
-
-        supported = {ext.lower() for ext in CONTEXT_TEXT_EXTENSIONS}
-
-        # Filter to supported text files and exclude the index itself
-        text_files: list[str] = []
-        for file_path in all_files:
-            if file_path.suffix.lower() in supported:
-                relative = file_path.relative_to(self._context_dir).as_posix()
-                # Exclude the master index itself
-                if relative != MASTER_INDEX_FILE:
-                    text_files.append(relative)
-
-        content = self.generate_content(text_files, project_name)
-        self.write_index(content)
+        index_path = self._meta_dir / "00_MASTER_INDEX.md"
+        if not self._fs.exists(index_path):
+            return ""
+        try:
+            return self._fs.read_text(index_path)
+        except OSError:
+            return ""

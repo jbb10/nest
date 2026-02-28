@@ -37,13 +37,13 @@ class DoclingProcessor:
     ]
 
     # Default error log file path (can be overridden)
-    DEFAULT_ERROR_LOG = Path(".nest_errors.log")
+    DEFAULT_ERROR_LOG = Path(".nest") / "errors.log"
 
     def __init__(self, error_log: Path | None = None) -> None:
         """Initialize Docling converter with optimal settings.
 
         Args:
-            error_log: Path to the error log file. Defaults to .nest_errors.log
+            error_log: Path to the error log file. Defaults to .nest/errors.log
                        in the current working directory.
         """
         self._error_log = error_log or self.DEFAULT_ERROR_LOG
@@ -105,7 +105,7 @@ class DoclingProcessor:
             )
         except Exception as e:
             error_msg = str(e)
-            # Log the error to .nest_errors.log
+            # Log the error to .nest/errors.log
             log_processing_error(
                 log_file=self._error_log,
                 context="sync",

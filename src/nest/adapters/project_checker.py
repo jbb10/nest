@@ -4,11 +4,15 @@ from pathlib import Path
 
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.models import Manifest
+from nest.core.paths import NEST_META_DIR
 
 # Folder names (consistent with init and sync commands)
 SOURCE_FOLDER = "_nest_sources"
 CONTEXT_FOLDER = "_nest_context"
 AGENT_FILE_PATH = ".github/agents/nest.agent.md"
+
+# Legacy manifest filename (pre-.nest/ era)
+_LEGACY_MANIFEST = ".nest_manifest.json"
 
 
 class ProjectChecker:
@@ -28,7 +32,7 @@ class ProjectChecker:
             project_dir: Path to the project root directory.
 
         Returns:
-            True if .nest_manifest.json exists, False otherwise.
+            True if .nest/manifest.json exists, False otherwise.
         """
         return self._manifest_adapter.exists(project_dir)
 
@@ -78,3 +82,27 @@ class ProjectChecker:
             True if _nest_context/ directory exists, False otherwise.
         """
         return (project_dir / CONTEXT_FOLDER).is_dir()
+
+    def meta_folder_exists(self, project_dir: Path) -> bool:
+        """Check if .nest/ metadata directory exists.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            True if .nest/ directory exists, False otherwise.
+        """
+        return (project_dir / NEST_META_DIR).is_dir()
+
+    def has_legacy_layout(self, project_dir: Path) -> bool:
+        """Check if project uses the legacy metadata layout.
+
+        Returns True if .nest_manifest.json exists at root (old layout).
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            True if legacy layout detected, False otherwise.
+        """
+        return (project_dir / _LEGACY_MANIFEST).exists()

@@ -7,8 +7,10 @@ from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.protocols import DocumentProcessorProtocol
 from nest.core.models import ProcessingResult
 from nest.services.discovery_service import DiscoveryService
+from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
+from nest.services.metadata_service import MetadataExtractorService
 from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
 from nest.services.sync_service import SyncService
@@ -63,6 +65,10 @@ def test_sync_generates_index_end_to_end(tmp_path: Path):
 
     index_service = IndexService(filesystem=fs_adapter, project_root=project_root)
 
+    metadata_service = MetadataExtractorService(
+        filesystem=fs_adapter, project_root=project_root
+    )
+
     orphan_service = OrphanService(
         filesystem=fs_adapter,
         manifest=manifest_adapter,
@@ -75,6 +81,11 @@ def test_sync_generates_index_end_to_end(tmp_path: Path):
         manifest=manifest_service,
         orphan=orphan_service,
         index=index_service,
+        metadata=metadata_service,
+        glossary=GlossaryHintsService(
+            filesystem=fs_adapter,
+            project_root=project_root,
+        ),
         project_root=project_root,
     )
 
@@ -82,7 +93,7 @@ def test_sync_generates_index_end_to_end(tmp_path: Path):
     sync_service.sync()
 
     # Assert
-    index_file = processed_context / "00_MASTER_INDEX.md"
+    index_file = project_root / ".nest" / "00_MASTER_INDEX.md"
     assert index_file.exists(), "Index file was not created"
     content = index_file.read_text()
     assert f"# Nest Project Index: {project_root.name}" in content
@@ -90,3 +101,7 @@ def test_sync_generates_index_end_to_end(tmp_path: Path):
     # contracts/doc.pdf -> contracts/doc.md
     # Path in index is relative to processed_context
     assert "contracts/doc.md" in content
+    # AC1: verify table format
+    assert "| File | Lines | Description |" in content
+    assert "<!-- nest:index-table-start -->" in content
+    assert "<!-- nest:index-table-end -->" in content

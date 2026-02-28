@@ -89,6 +89,8 @@ class ProjectStatus:
     current_version: str
     agent_file_present: bool
     folders_status: Literal["intact", "sources_missing", "context_missing", "both_missing"]
+    meta_folder_present: bool
+    legacy_layout_detected: bool
     suggestions: list[str]
 
 
@@ -436,6 +438,16 @@ class DoctorService:
             folders_status = "context_missing"
             suggestions.append("Run `nest init` to recreate _nest_context/")
 
+        # Check .nest/ metadata directory
+        meta_present = self._project_checker.meta_folder_exists(project_dir)
+        if not meta_present:
+            suggestions.append(".nest/ metadata directory missing")
+
+        # Check for legacy layout
+        legacy_layout = self._project_checker.has_legacy_layout(project_dir)
+        if legacy_layout:
+            suggestions.append("Legacy layout detected — run `nest update` to migrate")
+
         return ProjectReport(
             status=ProjectStatus(
                 manifest_status=manifest_status,
@@ -443,6 +455,8 @@ class DoctorService:
                 current_version=nest.__version__,
                 agent_file_present=agent_present,
                 folders_status=folders_status,
+                meta_folder_present=meta_present,
+                legacy_layout_detected=legacy_layout,
                 suggestions=suggestions,
             )
         )
@@ -720,6 +734,11 @@ class DoctorService:
                 result = self.regenerate_agent_file(project_dir, project_name)
                 results.append(result)
 
+            # Migrate legacy layout
+            if project_report.status.legacy_layout_detected:
+                result = self.migrate_legacy_layout(project_dir)
+                results.append(result)
+
         return RemediationReport(results=results)
 
     def remediate_issues_interactive(
@@ -810,7 +829,63 @@ class DoctorService:
                     RemediationResult("missing_agent_file", False, False, "User declined")
                 )
 
+        # 5. Legacy layout migration
+        if project_report and project_report.status.legacy_layout_detected:
+            if _confirm("Migrate legacy metadata to .nest/ directory?"):
+                result = self.migrate_legacy_layout(project_dir)
+                results.append(result)
+            else:
+                results.append(
+                    RemediationResult("legacy_layout", False, False, "User declined")
+                )
+
         return RemediationReport(results=results)
+
+    def migrate_legacy_layout(self, project_dir: Path) -> RemediationResult:
+        """Migrate legacy metadata layout to .nest/ directory.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            RemediationResult indicating success or failure.
+        """
+        from nest.services.migration_service import MetadataMigrationService
+
+        try:
+            service = MetadataMigrationService()
+            migration_result = service.migrate(project_dir)
+
+            if migration_result.migrated:
+                moved_summary = ", ".join(migration_result.files_moved)
+                return RemediationResult(
+                    issue="legacy_layout",
+                    attempted=True,
+                    success=True,
+                    message=f"Migrated metadata to .nest/: {moved_summary}",
+                )
+            elif migration_result.errors:
+                return RemediationResult(
+                    issue="legacy_layout",
+                    attempted=True,
+                    success=False,
+                    message=f"Migration errors: {'; '.join(migration_result.errors)}",
+                )
+            else:
+                return RemediationResult(
+                    issue="legacy_layout",
+                    attempted=True,
+                    success=True,
+                    message="Migration complete (no files needed moving)",
+                )
+        except Exception as e:
+            logger.exception("Failed to migrate legacy layout in %s", project_dir)
+            return RemediationResult(
+                issue="legacy_layout",
+                attempted=True,
+                success=False,
+                message=f"Migration failed: {e}",
+            )
 
     def _get_project_name(self, project_dir: Path) -> str:
         """Get project name from manifest or return default.

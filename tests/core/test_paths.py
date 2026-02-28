@@ -6,8 +6,12 @@ Tests the pure path manipulation functions used for output mirroring.
 from pathlib import Path
 
 from nest.core.paths import (
+    ALL_SOURCE_EXTENSIONS,
     CONTEXT_TEXT_EXTENSIONS,
+    SUPPORTED_EXTENSIONS,
+    is_passthrough_extension,
     mirror_path,
+    passthrough_mirror_path,
     relative_to_project,
     source_path_to_manifest_key,
 )
@@ -203,3 +207,110 @@ class TestSourcePathToManifestKey:
         result = source_path_to_manifest_key(source, raw_inbox)
 
         assert result == "My Important Document.pdf"
+
+
+class TestAllSourceExtensions:
+    """Tests for ALL_SOURCE_EXTENSIONS constant."""
+
+    def test_contains_all_supported_extensions(self) -> None:
+        """AC1: ALL_SOURCE_EXTENSIONS includes all Docling-convertible extensions."""
+        for ext in SUPPORTED_EXTENSIONS:
+            assert ext in ALL_SOURCE_EXTENSIONS, f"Missing Docling extension: {ext}"
+
+    def test_contains_all_context_text_extensions(self) -> None:
+        """AC1: ALL_SOURCE_EXTENSIONS includes all passthrough text extensions."""
+        for ext in CONTEXT_TEXT_EXTENSIONS:
+            assert ext in ALL_SOURCE_EXTENSIONS, f"Missing text extension: {ext}"
+
+    def test_is_deduplicated(self) -> None:
+        """ALL_SOURCE_EXTENSIONS has no duplicate entries."""
+        assert len(ALL_SOURCE_EXTENSIONS) == len(set(ALL_SOURCE_EXTENSIONS))
+
+    def test_is_sorted(self) -> None:
+        """ALL_SOURCE_EXTENSIONS is sorted."""
+        assert ALL_SOURCE_EXTENSIONS == sorted(ALL_SOURCE_EXTENSIONS)
+
+    def test_union_count(self) -> None:
+        """ALL_SOURCE_EXTENSIONS has the expected number of entries."""
+        expected = sorted(set(SUPPORTED_EXTENSIONS + CONTEXT_TEXT_EXTENSIONS))
+        assert ALL_SOURCE_EXTENSIONS == expected
+
+
+class TestIsPassthroughExtension:
+    """Tests for is_passthrough_extension function."""
+
+    def test_returns_true_for_text_extensions(self) -> None:
+        """AC1: Text extensions are passthrough."""
+        for ext in CONTEXT_TEXT_EXTENSIONS:
+            assert is_passthrough_extension(ext) is True, f"Expected True for {ext}"
+
+    def test_returns_false_for_docling_extensions(self) -> None:
+        """Docling-convertible extensions are NOT passthrough."""
+        for ext in SUPPORTED_EXTENSIONS:
+            assert is_passthrough_extension(ext) is False, f"Expected False for {ext}"
+
+    def test_case_insensitive(self) -> None:
+        """Extension matching is case-insensitive."""
+        assert is_passthrough_extension(".TXT") is True
+        assert is_passthrough_extension(".Yaml") is True
+        assert is_passthrough_extension(".PDF") is False
+
+    def test_returns_false_for_unknown_extension(self) -> None:
+        """Unknown extensions are not passthrough."""
+        assert is_passthrough_extension(".png") is False
+        assert is_passthrough_extension(".zip") is False
+
+
+class TestPassthroughMirrorPath:
+    """Tests for passthrough_mirror_path function."""
+
+    def test_preserves_original_extension(self) -> None:
+        """AC2: Passthrough mirror preserves original file extension."""
+        source = Path("/project/_nest_sources/notes.txt")
+        source_root = Path("/project/_nest_sources")
+        target_root = Path("/project/_nest_context")
+
+        result = passthrough_mirror_path(source, source_root, target_root)
+
+        assert result == Path("/project/_nest_context/notes.txt")
+        assert result.suffix == ".txt"
+
+    def test_preserves_subdirectory_structure(self) -> None:
+        """AC3: Subdirectory structure is preserved."""
+        source = Path("/project/_nest_sources/team/meeting-notes.md")
+        source_root = Path("/project/_nest_sources")
+        target_root = Path("/project/_nest_context")
+
+        result = passthrough_mirror_path(source, source_root, target_root)
+
+        assert result == Path("/project/_nest_context/team/meeting-notes.md")
+
+    def test_file_at_root_level(self) -> None:
+        """File directly in source root."""
+        source = Path("/project/_nest_sources/readme.md")
+        source_root = Path("/project/_nest_sources")
+        target_root = Path("/project/_nest_context")
+
+        result = passthrough_mirror_path(source, source_root, target_root)
+
+        assert result == Path("/project/_nest_context/readme.md")
+
+    def test_deeply_nested_path(self) -> None:
+        """Deeply nested paths are handled correctly."""
+        source = Path("/project/_nest_sources/a/b/c/d/config.yaml")
+        source_root = Path("/project/_nest_sources")
+        target_root = Path("/project/_nest_context")
+
+        result = passthrough_mirror_path(source, source_root, target_root)
+
+        assert result == Path("/project/_nest_context/a/b/c/d/config.yaml")
+
+    def test_various_text_extensions(self) -> None:
+        """All text extensions preserve their suffix."""
+        source_root = Path("/project/_nest_sources")
+        target_root = Path("/project/_nest_context")
+
+        for ext in CONTEXT_TEXT_EXTENSIONS:
+            source = Path(f"/project/_nest_sources/file{ext}")
+            result = passthrough_mirror_path(source, source_root, target_root)
+            assert result.suffix == ext, f"Failed for {ext}"

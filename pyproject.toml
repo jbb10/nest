@@ -10,8 +10,15 @@ dependencies = [
     "pydantic>=2.0.0",
     "jinja2>=3.1.0",
     "docling>=2.0.0",
+    "pyyaml>=6.0",
     "tomli>=2.0.0; python_version < '3.11'",
 ]
+
+[project.urls]
+Homepage = "https://github.com/jbb10/nest"
+Repository = "https://github.com/jbb10/nest"
+Changelog = "https://github.com/jbb10/nest/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/jbb10/nest/issues"
 
 [project.scripts]
 nest = "nest.cli.main:main"

@@ -74,7 +74,7 @@ class TestSyncProjectValidation:
     """Tests for project validation (AC: #3)."""
 
     def test_sync_fails_when_no_manifest(self, tmp_path: Path) -> None:
-        """Sync should fail with error when .nest_manifest.json doesn't exist."""
+        """Sync should fail with error when .nest/manifest.json doesn't exist."""
         # Create empty directory (no manifest)
         result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
 
@@ -85,7 +85,7 @@ class TestSyncProjectValidation:
         """Error should explain why (manifest not found)."""
         result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
 
-        assert ".nest_manifest.json not found" in result.output
+        assert ".nest/manifest.json not found" in result.output
 
     def test_sync_error_message_shows_action(self, tmp_path: Path) -> None:
         """Error should suggest running nest init."""

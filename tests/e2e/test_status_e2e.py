@@ -16,7 +16,9 @@ from .conftest import run_cli
 
 
 def _write_manifest(project_dir: Path, manifest: dict) -> None:
-    (project_dir / ".nest_manifest.json").write_text(json.dumps(manifest, indent=2))
+    meta_dir = project_dir / ".nest"
+    meta_dir.mkdir(parents=True, exist_ok=True)
+    (meta_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
 
 
 def _sha256(path: Path) -> str:

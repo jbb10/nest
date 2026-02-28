@@ -18,7 +18,7 @@ from nest.services.update_service import UpdateService
 # Mock helpers
 # ---------------------------------------------------------------------------
 
-_DEFAULT_SOURCE = "git+https://github.com/jbjornsson/nest"
+_DEFAULT_SOURCE = "git+https://github.com/jbb10/nest"
 
 
 def _make_config(
@@ -233,13 +233,13 @@ class TestExecuteUpdate:
     def test_preserves_git_plus_prefix(self) -> None:
         config = _make_config(version="1.0.0")
         runner = MockSubprocessRunner()
-        source = "git+https://github.com/jbjornsson/nest"
+        source = "git+https://github.com/jbb10/nest"
         service = UpdateService(MockGitClient(), MockUserConfig(config), runner)
 
         service.execute_update("1.2.0", ["1.2.0", "1.0.0"], source)
 
         cmd = runner.calls[0]
-        assert "git+https://github.com/jbjornsson/nest@v1.2.0" in cmd
+        assert "git+https://github.com/jbb10/nest@v1.2.0" in cmd
 
 
 # ---------------------------------------------------------------------------

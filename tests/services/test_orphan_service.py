@@ -325,7 +325,6 @@ class TestCountUserCuratedFiles:
             output_dir / "config.yaml",
             output_dir / "diagram.png",
             output_dir / "archive.zip",
-            output_dir / "00_MASTER_INDEX.md",
         ]
 
         manifest = Manifest(
@@ -338,5 +337,5 @@ class TestCountUserCuratedFiles:
         service = OrphanService(mock_fs, mock_manifest, project_root)
         count = service.count_user_curated_files()
 
-        # notes.txt + config.yaml = 2 (png, zip excluded; index excluded)
+        # notes.txt + config.yaml = 2 (png, zip excluded)
         assert count == 2

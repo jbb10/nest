@@ -27,7 +27,7 @@ def sample_config() -> UserConfig:
     """A valid UserConfig for testing."""
     return UserConfig(
         install=InstallConfig(
-            source="git+https://github.com/jbjornsson/nest",
+            source="git+https://github.com/jbb10/nest",
             installed_version="0.1.3",
             installed_at=datetime(2026, 2, 12, 10, 30, 0, tzinfo=timezone.utc),
         )
@@ -39,7 +39,7 @@ def valid_toml() -> str:
     """Valid TOML content matching sample_config."""
     return (
         "[install]\n"
-        'source = "git+https://github.com/jbjornsson/nest"\n'
+        'source = "git+https://github.com/jbb10/nest"\n'
         'installed_version = "0.1.3"\n'
         'installed_at = "2026-02-12T10:30:00+00:00"\n'
     )
@@ -62,7 +62,7 @@ class TestLoad:
         result = adapter.load()
 
         assert result is not None
-        assert result.install.source == "git+https://github.com/jbjornsson/nest"
+        assert result.install.source == "git+https://github.com/jbb10/nest"
         assert result.install.installed_version == "0.1.3"
         assert isinstance(result.install.installed_at, datetime)
 
@@ -177,7 +177,7 @@ class TestSave:
 
         loaded = adapter.load()
         assert loaded is not None
-        assert loaded.install.source == "git+https://github.com/jbjornsson/nest"
+        assert loaded.install.source == "git+https://github.com/jbb10/nest"
         assert loaded.install.installed_version == "0.2.0"
 
     def test_save_overwrites_existing_file(
@@ -232,7 +232,7 @@ class TestCreateDefaultConfig:
     def test_default_config_has_correct_source(self) -> None:
         """AC #1: Default source matches expected git URL."""
         config = create_default_config()
-        assert config.install.source == "git+https://github.com/jbjornsson/nest"
+        assert config.install.source == "git+https://github.com/jbb10/nest"
 
     def test_default_config_has_current_version(self) -> None:
         """AC #1: Default version matches nest.__version__."""
@@ -277,6 +277,6 @@ class TestSerializeToml:
         result = _serialize_toml(sample_config)
 
         assert "[install]" in result
-        assert 'source = "git+https://github.com/jbjornsson/nest"' in result
+        assert 'source = "git+https://github.com/jbb10/nest"' in result
         assert 'installed_version = "0.1.3"' in result
         assert "installed_at" in result

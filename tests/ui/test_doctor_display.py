@@ -184,6 +184,8 @@ class TestDisplayProjectReport:
                 current_version="1.0.0",
                 agent_file_present=True,
                 folders_status="intact",
+                meta_folder_present=True,
+                legacy_layout_detected=False,
                 suggestions=[],
             )
         )
@@ -209,6 +211,8 @@ class TestDisplayProjectReport:
                 current_version="1.0.0",
                 agent_file_present=False,
                 folders_status="sources_missing",
+                meta_folder_present=True,
+                legacy_layout_detected=False,
                 suggestions=[
                     "Run `nest init` to create project",
                     "Run `nest init` to regenerate agent file",
@@ -241,6 +245,8 @@ class TestDisplayProjectReport:
                 current_version="1.0.0",
                 agent_file_present=True,
                 folders_status="intact",
+                meta_folder_present=True,
+                legacy_layout_detected=False,
                 suggestions=["Run `nest update` to migrate"],
             )
         )
