@@ -32,6 +32,7 @@ from nest.services.update_service import UpdateService
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_config() -> UserConfig:
     """Create a minimal UserConfig for testing."""
     from datetime import datetime, timezone
@@ -78,6 +79,7 @@ def _make_no_color_console() -> Console:
 # _ensure_config tests (Task 3.2, 3.3)
 # ---------------------------------------------------------------------------
 
+
 class TestEnsureConfig:
     """Tests for _ensure_config helper."""
 
@@ -109,6 +111,7 @@ class TestEnsureConfig:
 # ---------------------------------------------------------------------------
 # _display_versions tests (Task 3.4)
 # ---------------------------------------------------------------------------
+
 
 class TestDisplayVersions:
     """Tests for _display_versions helper."""
@@ -148,6 +151,7 @@ class TestDisplayVersions:
 # ---------------------------------------------------------------------------
 # update_command tests — --check flag (Task 3.5, 3.6)
 # ---------------------------------------------------------------------------
+
 
 class TestUpdateCheckFlag:
     """Tests for --check flag behavior."""
@@ -196,6 +200,7 @@ class TestUpdateCheckFlag:
 # update_command tests — already up-to-date (Task 3.7)
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateAlreadyUpToDate:
     """Tests for already-up-to-date scenario."""
 
@@ -231,6 +236,7 @@ class TestUpdateAlreadyUpToDate:
 # update_command tests — network error (Task 3.8)
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateNetworkError:
     """Tests for network error during version discovery."""
 
@@ -260,6 +266,7 @@ class TestUpdateNetworkError:
 # ---------------------------------------------------------------------------
 # update_command tests — no versions found (Task 3.9)
 # ---------------------------------------------------------------------------
+
 
 class TestUpdateNoVersions:
     """Tests for no versions found scenario."""
@@ -294,6 +301,7 @@ class TestUpdateNoVersions:
 # ---------------------------------------------------------------------------
 # Successful update (Task 3.10)
 # ---------------------------------------------------------------------------
+
 
 class TestSuccessfulUpdate:
     """Tests for successful update flow."""
@@ -332,6 +340,7 @@ class TestSuccessfulUpdate:
 # ---------------------------------------------------------------------------
 # Update failure (Task 3.11)
 # ---------------------------------------------------------------------------
+
 
 class TestUpdateFailure:
     """Tests for update failure scenario."""
@@ -373,6 +382,7 @@ class TestUpdateFailure:
 # User cancellation (Task 3.12)
 # ---------------------------------------------------------------------------
 
+
 class TestUserCancellation:
     """Tests for user cancellation scenario."""
 
@@ -407,12 +417,11 @@ class TestUserCancellation:
 # Agent migration prompt (Task 3.13)
 # ---------------------------------------------------------------------------
 
+
 class TestAgentMigrationPrompt:
     """Tests for agent migration prompt after update."""
 
-    def test_migration_prompt_shown_when_needed(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_migration_prompt_shown_when_needed(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Migration prompt shown when check returns migration_needed=True."""
         console = _make_no_color_console()
         mock_service = MagicMock()
@@ -432,9 +441,7 @@ class TestAgentMigrationPrompt:
         output = capsys.readouterr().out
         assert "Agent file updated" in output
 
-    def test_migration_declined_shows_info(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_migration_declined_shows_info(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Declining migration shows info message."""
         console = _make_no_color_console()
         mock_service = MagicMock()
@@ -451,9 +458,7 @@ class TestAgentMigrationPrompt:
         output = capsys.readouterr().out
         assert "Keeping existing agent file" in output
 
-    def test_migration_up_to_date_no_prompt(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_migration_up_to_date_no_prompt(self, capsys: pytest.CaptureFixture[str]) -> None:
         """No prompt when agent file is up to date (AC8)."""
         console = _make_no_color_console()
         mock_service = MagicMock()
@@ -472,12 +477,11 @@ class TestAgentMigrationPrompt:
 # Agent migration skipped (Task 3.14)
 # ---------------------------------------------------------------------------
 
+
 class TestAgentMigrationSkipped:
     """Tests for agent migration silently skipped."""
 
-    def test_migration_skipped_silently(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_migration_skipped_silently(self, capsys: pytest.CaptureFixture[str]) -> None:
         """No output when migration is skipped (not a Nest project)."""
         console = _make_no_color_console()
         mock_service = MagicMock()
@@ -497,12 +501,11 @@ class TestAgentMigrationSkipped:
 # Agent migration failure (Task 3.15)
 # ---------------------------------------------------------------------------
 
+
 class TestAgentMigrationFailure:
     """Tests for agent migration failure handling."""
 
-    def test_migration_failure_shows_warning(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_migration_failure_shows_warning(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Migration failure shows warning but doesn't raise."""
         console = _make_no_color_console()
         mock_service = MagicMock()
@@ -526,6 +529,7 @@ class TestAgentMigrationFailure:
 # ---------------------------------------------------------------------------
 # --dir flag (Task 3.16)
 # ---------------------------------------------------------------------------
+
 
 class TestDirFlag:
     """Tests for --dir flag passing correct path."""
@@ -564,6 +568,7 @@ class TestDirFlag:
 # Composition root (Task 3.17)
 # ---------------------------------------------------------------------------
 
+
 class TestCompositionRoot:
     """Tests for composition root functions."""
 
@@ -586,6 +591,7 @@ class TestCompositionRoot:
 # ---------------------------------------------------------------------------
 # _prompt_for_version tests
 # ---------------------------------------------------------------------------
+
 
 class TestPromptForVersion:
     """Tests for version prompt handling."""
@@ -639,6 +645,7 @@ class TestPromptForVersion:
 # _run_update tests
 # ---------------------------------------------------------------------------
 
+
 class TestRunUpdate:
     """Tests for _run_update helper."""
 
@@ -646,9 +653,7 @@ class TestRunUpdate:
         """_run_update passes correct args to service."""
         console = _make_no_color_console()
         mock_service = MagicMock()
-        expected_result = UpdateResult(
-            success=True, version="2.0.0", previous_version="1.0.0"
-        )
+        expected_result = UpdateResult(success=True, version="2.0.0", previous_version="1.0.0")
         mock_service.execute_update.return_value = expected_result
         check_result = _make_check_result()
 
@@ -666,12 +671,11 @@ class TestRunUpdate:
 # Agent migration — missing file creates it (AC7 variant)
 # ---------------------------------------------------------------------------
 
+
 class TestAgentMigrationMissingFile:
     """Tests for agent migration when file is missing."""
 
-    def test_missing_agent_file_prompt(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_missing_agent_file_prompt(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Missing agent file shows create prompt."""
         console = _make_no_color_console()
         mock_service = MagicMock()

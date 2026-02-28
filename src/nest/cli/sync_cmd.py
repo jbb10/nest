@@ -342,20 +342,14 @@ def _display_sync_summary(result: SyncResult, console: "Console", error_log_path
     if result.enrichment_needed > 0:
         console.print()
         n = result.enrichment_needed
-        console.print(
-            f"  [cyan]ℹ {n} file(s) need descriptions in the master index.[/cyan]"
-        )
-        console.print(
-            "    Run the @nest-enricher agent in VS Code chat to populate them."
-        )
+        console.print(f"  [cyan]ℹ {n} file(s) need descriptions in the master index.[/cyan]")
+        console.print("    Run the @nest-enricher agent in VS Code chat to populate them.")
 
     # Show glossary prompt if candidate terms were discovered
     if result.glossary_terms_discovered > 0:
         console.print()
         g = result.glossary_terms_discovered
-        console.print(
-            f"  [cyan]ℹ {g} candidate glossary term(s) discovered.[/cyan]"
-        )
+        console.print(f"  [cyan]ℹ {g} candidate glossary term(s) discovered.[/cyan]")
         console.print(
             "    Run the @nest-glossary agent in VS Code chat to generate/update the glossary."
         )

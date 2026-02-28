@@ -22,6 +22,7 @@ from nest.services.doctor_service import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_env_report(
     python: str = "pass",
     uv: str = "pass",
@@ -70,6 +71,7 @@ def _make_project_report(
 # ---------------------------------------------------------------------------
 # _count_issues tests  (Task 8.1)
 # ---------------------------------------------------------------------------
+
 
 class TestCountIssues:
     """Tests for _count_issues helper."""
@@ -189,6 +191,7 @@ class TestCountIssues:
 # display_issue_summary tests  (Task 8.3)
 # ---------------------------------------------------------------------------
 
+
 class TestDisplayIssueSummary:
     """Tests for display_issue_summary."""
 
@@ -223,6 +226,7 @@ class TestDisplayIssueSummary:
 # display_success_message tests  (Task 8.4)
 # ---------------------------------------------------------------------------
 
+
 class TestDisplaySuccessMessage:
     """Tests for display_success_message."""
 
@@ -255,6 +259,7 @@ class TestDisplaySuccessMessage:
 # display_remediation_report tests  (Task 8.5)
 # ---------------------------------------------------------------------------
 
+
 class TestDisplayRemediationReport:
     """Tests for display_remediation_report."""
 
@@ -263,15 +268,22 @@ class TestDisplayRemediationReport:
         from nest.services.doctor_service import RemediationReport, RemediationResult
         from nest.ui.doctor_display import display_remediation_report
 
-        report = RemediationReport(results=[
-            RemediationResult(
-                "missing_folders", True, True,
-                "Created folders: _nest_sources/, _nest_context/",
-            ),
-            RemediationResult(
-                "missing_agent_file", True, True, "Agent file regenerated",
-            ),
-        ])
+        report = RemediationReport(
+            results=[
+                RemediationResult(
+                    "missing_folders",
+                    True,
+                    True,
+                    "Created folders: _nest_sources/, _nest_context/",
+                ),
+                RemediationResult(
+                    "missing_agent_file",
+                    True,
+                    True,
+                    "Agent file regenerated",
+                ),
+            ]
+        )
         buf = StringIO()
         console = Console(file=buf, force_terminal=False, color_system=None, width=120)
         display_remediation_report(report, console)
@@ -286,10 +298,12 @@ class TestDisplayRemediationReport:
         from nest.services.doctor_service import RemediationReport, RemediationResult
         from nest.ui.doctor_display import display_remediation_report
 
-        report = RemediationReport(results=[
-            RemediationResult("missing_folders", True, True, "Created folders"),
-            RemediationResult("corrupt_manifest", True, False, "Failed to rebuild manifest"),
-        ])
+        report = RemediationReport(
+            results=[
+                RemediationResult("missing_folders", True, True, "Created folders"),
+                RemediationResult("corrupt_manifest", True, False, "Failed to rebuild manifest"),
+            ]
+        )
         buf = StringIO()
         console = Console(file=buf, force_terminal=False, color_system=None, width=120)
         display_remediation_report(report, console)

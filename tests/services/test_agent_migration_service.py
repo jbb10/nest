@@ -98,9 +98,7 @@ class TestCheckMigrationNeeded:
         fs.existing_paths.add(AGENT_PATH)
         fs.file_contents[AGENT_PATH] = "old-content"
 
-        service = AgentMigrationService(
-            agent_writer=writer, filesystem=fs, manifest=manifest
-        )
+        service = AgentMigrationService(agent_writer=writer, filesystem=fs, manifest=manifest)
         result = service.check_migration_needed(PROJECT_DIR)
 
         # The writer renders with "Nike" — and since local differs, migration_needed
@@ -219,9 +217,7 @@ class TestExecuteMigration:
         manifest._manifest = Manifest(nest_version="1.0.0", project_name="Nike")
         writer = MockAgentWriter()
         fs = MockFileSystem()
-        service = AgentMigrationService(
-            agent_writer=writer, filesystem=fs, manifest=manifest
-        )
+        service = AgentMigrationService(agent_writer=writer, filesystem=fs, manifest=manifest)
 
         result = service.execute_migration(PROJECT_DIR)
 

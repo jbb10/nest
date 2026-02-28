@@ -133,9 +133,7 @@ class SyncService:
         output_dir = self._project_root / CONTEXT_DIR
 
         # Pre-scan for name collisions between passthrough and Docling files
-        files_to_process, collision_skipped = self._resolve_collisions(
-            files_to_process, raw_inbox
-        )
+        files_to_process, collision_skipped = self._resolve_collisions(files_to_process, raw_inbox)
 
         # Record collision-skipped files in manifest
         for skipped_file in collision_skipped:
@@ -367,8 +365,7 @@ class SyncService:
                     # e.g., report.pdf + report.docx both → report.md)
                     existing_file, _ = output_map[output_key]
                     logger.warning(
-                        "Output path collision: %s and %s both produce %s "
-                        "— keeping %s",
+                        "Output path collision: %s and %s both produce %s — keeping %s",
                         existing_file.path.name,
                         file_info.path.name,
                         output_key,

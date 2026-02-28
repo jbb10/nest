@@ -82,9 +82,7 @@ class TestDoclingModelDownloader:
         )
 
     @patch("nest.adapters.docling_downloader.time.sleep")
-    def test_download_retries_on_network_error(
-        self, mock_sleep: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_download_retries_on_network_error(self, mock_sleep: MagicMock, tmp_path: Path) -> None:
         """Test download retries on network errors."""
         downloader = DoclingModelDownloader()
         mock_download = MagicMock(
@@ -122,9 +120,7 @@ class TestDoclingModelDownloader:
         assert mock_sleep.call_count == 2
 
     @patch("nest.adapters.docling_downloader.time.sleep")
-    def test_download_exponential_backoff(
-        self, mock_sleep: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_download_exponential_backoff(self, mock_sleep: MagicMock, tmp_path: Path) -> None:
         """Test exponential backoff between retries."""
         downloader = DoclingModelDownloader()
         mock_download = MagicMock(

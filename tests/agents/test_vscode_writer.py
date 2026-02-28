@@ -11,9 +11,7 @@ from nest.agents.vscode_writer import VSCodeAgentWriter
 class TestRender:
     """Tests for the render() method (AC1, AC2, AC8)."""
 
-    def test_render_returns_string_with_project_name(
-        self, mock_filesystem: MockFileSystem
-    ) -> None:
+    def test_render_returns_string_with_project_name(self, mock_filesystem: MockFileSystem) -> None:
         """Test that render() returns string with correct project name interpolation."""
         writer = VSCodeAgentWriter(filesystem=mock_filesystem)
 
@@ -23,9 +21,7 @@ class TestRender:
         assert "Nike" in result
         assert "description: Expert analyst for Nike project documents" in result
 
-    def test_render_does_not_write_to_filesystem(
-        self, mock_filesystem: MockFileSystem
-    ) -> None:
+    def test_render_does_not_write_to_filesystem(self, mock_filesystem: MockFileSystem) -> None:
         """Test that render() does NOT write to filesystem."""
         writer = VSCodeAgentWriter(filesystem=mock_filesystem)
 
@@ -34,9 +30,7 @@ class TestRender:
         assert len(mock_filesystem.written_files) == 0
         assert len(mock_filesystem.created_dirs) == 0
 
-    def test_render_matches_generate_output(
-        self, mock_filesystem: MockFileSystem
-    ) -> None:
+    def test_render_matches_generate_output(self, mock_filesystem: MockFileSystem) -> None:
         """Test that render() produces same content as generate() writes."""
         writer = VSCodeAgentWriter(filesystem=mock_filesystem)
         output_path = Path("/project/.github/agents/nest.agent.md")

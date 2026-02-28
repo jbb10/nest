@@ -100,9 +100,7 @@ class TestSyncE2E:
 
         # Snapshot manifest state after first sync
         manifest_before = json.loads(manifest_path.read_text())
-        checksums_before = {
-            k: v["sha256"] for k, v in manifest_before["files"].items()
-        }
+        checksums_before = {k: v["sha256"] for k, v in manifest_before["files"].items()}
 
         # Snapshot output file mtimes after first sync
         output_files = sorted(processed_dir.rglob("*.md"))
@@ -117,9 +115,7 @@ class TestSyncE2E:
 
         # Verify manifest checksums are identical
         manifest_after = json.loads(manifest_path.read_text())
-        checksums_after = {
-            k: v["sha256"] for k, v in manifest_after["files"].items()
-        }
+        checksums_after = {k: v["sha256"] for k, v in manifest_after["files"].items()}
         assert checksums_before == checksums_after, (
             f"Manifest checksums changed between syncs!\n"
             f"Before: {checksums_before}\nAfter: {checksums_after}"

@@ -155,9 +155,7 @@ class TestNoConfig:
     """AC9: No config → ConfigError."""
 
     def test_raises_config_error(self) -> None:
-        service = UpdateService(
-            MockGitClient(), MockUserConfig(None), MockSubprocessRunner()
-        )
+        service = UpdateService(MockGitClient(), MockUserConfig(None), MockSubprocessRunner())
 
         with pytest.raises(ConfigError, match="No user config found"):
             service.check_for_updates()
@@ -204,9 +202,7 @@ class TestExecuteUpdate:
     def test_runs_correct_uv_command(self) -> None:
         config = _make_config(version="1.0.0")
         runner = MockSubprocessRunner()
-        service = UpdateService(
-            MockGitClient(), MockUserConfig(config), runner
-        )
+        service = UpdateService(MockGitClient(), MockUserConfig(config), runner)
 
         result = service.execute_update("1.2.0", ["1.2.0", "1.1.0", "1.0.0"], _DEFAULT_SOURCE)
 
@@ -215,7 +211,10 @@ class TestExecuteUpdate:
         assert result.previous_version == "1.0.0"
         assert len(runner.calls) == 1
         assert runner.calls[0] == [
-            "uv", "tool", "install", "--force",
+            "uv",
+            "tool",
+            "install",
+            "--force",
             f"{_DEFAULT_SOURCE}@v1.2.0",
         ]
 
@@ -255,9 +254,7 @@ class TestInstallSpecificVersion:
         runner = MockSubprocessRunner()
         service = UpdateService(MockGitClient(), MockUserConfig(config), runner)
 
-        result = service.execute_update(
-            "1.1.0", ["1.2.0", "1.1.0", "1.0.0"], _DEFAULT_SOURCE
-        )
+        result = service.execute_update("1.1.0", ["1.2.0", "1.1.0", "1.0.0"], _DEFAULT_SOURCE)
 
         assert result.success is True
         assert result.version == "1.1.0"
@@ -273,16 +270,12 @@ class TestValidateVersion:
     """AC5: validate_version accepts/rejects versions."""
 
     def test_valid_version_returns_none(self) -> None:
-        service = UpdateService(
-            MockGitClient(), MockUserConfig(), MockSubprocessRunner()
-        )
+        service = UpdateService(MockGitClient(), MockUserConfig(), MockSubprocessRunner())
 
         assert service.validate_version("1.2.0", ["1.2.0", "1.1.0"]) is None
 
     def test_invalid_version_returns_error(self) -> None:
-        service = UpdateService(
-            MockGitClient(), MockUserConfig(), MockSubprocessRunner()
-        )
+        service = UpdateService(MockGitClient(), MockUserConfig(), MockSubprocessRunner())
 
         error = service.validate_version("1.9.9", ["1.4.0", "1.3.1"])
 
@@ -313,9 +306,7 @@ class TestSubprocessFailure:
 
     def test_called_process_error(self) -> None:
         config = _make_config(version="1.0.0")
-        error = subprocess.CalledProcessError(
-            returncode=1, cmd=["uv"], stderr="install failed"
-        )
+        error = subprocess.CalledProcessError(returncode=1, cmd=["uv"], stderr="install failed")
         runner = MockSubprocessRunner(raise_error=error)
         user_cfg = MockUserConfig(config)
         service = UpdateService(MockGitClient(), user_cfg, runner)
@@ -343,9 +334,7 @@ class TestSubprocessFailure:
         config = _make_config(version="1.0.0")
         error = subprocess.CalledProcessError(returncode=2, cmd=["uv"])
         user_cfg = MockUserConfig(config)
-        service = UpdateService(
-            MockGitClient(), user_cfg, MockSubprocessRunner(raise_error=error)
-        )
+        service = UpdateService(MockGitClient(), user_cfg, MockSubprocessRunner(raise_error=error))
 
         service.execute_update("1.2.0", ["1.2.0", "1.0.0"], _DEFAULT_SOURCE)
 

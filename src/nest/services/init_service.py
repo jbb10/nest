@@ -141,4 +141,3 @@ class InitService:
                 lines.append(comment)
                 lines.append(entry)
             gitignore.write_text("\n".join(lines) + "\n", encoding="utf-8")
-

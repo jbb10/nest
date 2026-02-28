@@ -265,8 +265,7 @@ def update_command(
         # AC13: Network/config error
         error("Cannot check for updates")
         console.print(
-            "  [dim]Reason: Cannot reach update server."
-            " Check your internet connection.[/dim]"
+            "  [dim]Reason: Cannot reach update server. Check your internet connection.[/dim]"
         )
         console.print("  [dim]Action: Verify your network connection and try again[/dim]")
         raise typer.Exit(1) from None

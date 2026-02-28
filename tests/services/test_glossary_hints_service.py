@@ -201,9 +201,7 @@ class TestIncrementalProcessing:
             Path("/app/_nest_context/new.md"),
         ]
         svc = GlossaryHintsService(filesystem=fs, project_root=Path("/app"))
-        result = svc.extract_all(
-            Path("/app/_nest_context"), changed_files={"new.md"}
-        )
+        result = svc.extract_all(Path("/app/_nest_context"), changed_files={"new.md"})
         names = {t.term for t in result.terms}
         assert "XYZ" in names
         assert "PDC" not in names  # old.md was skipped

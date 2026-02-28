@@ -97,9 +97,7 @@ class TestErrorPropagation:
 
     @patch("nest.adapters.subprocess_runner.subprocess.run")
     def test_propagates_timeout_expired(self, mock_run: MagicMock) -> None:
-        mock_run.side_effect = subprocess.TimeoutExpired(
-            cmd=["uv", "tool", "install"], timeout=120
-        )
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd=["uv", "tool", "install"], timeout=120)
         adapter = SubprocessRunnerAdapter()
 
         with pytest.raises(subprocess.TimeoutExpired):

@@ -180,9 +180,7 @@ class TestSave:
         assert loaded.install.source == "git+https://github.com/jbb10/nest"
         assert loaded.install.installed_version == "0.2.0"
 
-    def test_save_overwrites_existing_file(
-        self, tmp_path: Path, sample_config: UserConfig
-    ) -> None:
+    def test_save_overwrites_existing_file(self, tmp_path: Path, sample_config: UserConfig) -> None:
         """save() overwrites previous config content."""
         adapter = UserConfigAdapter(config_dir=tmp_path)
         adapter.save(sample_config)

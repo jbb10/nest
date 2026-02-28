@@ -23,8 +23,16 @@ class TestContextTextExtensions:
     def test_contains_all_expected_extensions(self) -> None:
         """AC1: Constant contains all 10 expected text extensions."""
         expected = {
-            ".md", ".txt", ".text", ".rst",
-            ".csv", ".json", ".yaml", ".yml", ".toml", ".xml",
+            ".md",
+            ".txt",
+            ".text",
+            ".rst",
+            ".csv",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".xml",
         }
         assert set(CONTEXT_TEXT_EXTENSIONS) == expected
 

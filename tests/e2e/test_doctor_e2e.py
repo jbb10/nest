@@ -107,6 +107,7 @@ class TestDoctorE2E:
         context_dir = initialized_project / "_nest_context"
 
         import shutil
+
         if sources_dir.exists():
             shutil.rmtree(sources_dir)
         if context_dir.exists():
@@ -146,6 +147,7 @@ class TestDoctorE2E:
 
         # Verify manifest is now valid JSON
         import json
+
         with open(manifest_path) as f:
             manifest = json.load(f)
 
@@ -163,6 +165,7 @@ class TestDoctorE2E:
         agent_file.unlink()
 
         import shutil
+
         if sources_dir.exists():
             shutil.rmtree(sources_dir)
         if context_dir.exists():
@@ -243,9 +246,7 @@ class TestDoctorE2E:
         assert "Agent file missing" in result.stdout
         assert "nest doctor --fix" in result.stdout
 
-    def test_doctor_shows_success_message_when_all_pass(
-        self, initialized_project: Path
-    ) -> None:
+    def test_doctor_shows_success_message_when_all_pass(self, initialized_project: Path) -> None:
         """Test that 'All systems operational' is shown when all pass (AC3)."""
         result = run_cli(["doctor"], cwd=initialized_project, timeout=30)
 

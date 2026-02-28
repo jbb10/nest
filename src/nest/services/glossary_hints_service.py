@@ -95,9 +95,7 @@ class GlossaryHintsService:
         self._fs = filesystem
         self._project_root = project_root
 
-    def extract_terms_from_file(
-        self, file_path: Path, content: str
-    ) -> list[CandidateTerm]:
+    def extract_terms_from_file(self, file_path: Path, content: str) -> list[CandidateTerm]:
         """Extract candidate glossary terms from a single file's content.
 
         Detects abbreviations, proper nouns, and tracks occurrences
@@ -295,9 +293,7 @@ class GlossaryHintsService:
 
         self._fs.write_text(hints_path, content)
 
-    def _extract_terms_for_file(
-        self, relative_path: str, content: str
-    ) -> list[CandidateTerm]:
+    def _extract_terms_for_file(self, relative_path: str, content: str) -> list[CandidateTerm]:
         """Extract candidate terms from file content with relative path tracking.
 
         Args:
@@ -388,9 +384,7 @@ class GlossaryHintsService:
         return results
 
     @staticmethod
-    def _merge_term(
-        term_map: dict[str, CandidateTerm], new_term: CandidateTerm
-    ) -> None:
+    def _merge_term(term_map: dict[str, CandidateTerm], new_term: CandidateTerm) -> None:
         """Merge a term into the term map, aggregating occurrences and sources.
 
         Args:
@@ -400,9 +394,7 @@ class GlossaryHintsService:
         key = new_term.term
         if key in term_map:
             existing = term_map[key]
-            merged_sources = list(
-                dict.fromkeys(existing.source_files + new_term.source_files)
-            )
+            merged_sources = list(dict.fromkeys(existing.source_files + new_term.source_files))
             merged_snippets = list(
                 dict.fromkeys(existing.context_snippets + new_term.context_snippets)
             )[:3]

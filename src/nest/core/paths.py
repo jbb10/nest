@@ -24,8 +24,16 @@ SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
 
 # Text file extensions supported in context directory (for indexing and counting)
 CONTEXT_TEXT_EXTENSIONS = [
-    ".md", ".txt", ".text", ".rst",
-    ".csv", ".json", ".yaml", ".yml", ".toml", ".xml",
+    ".md",
+    ".txt",
+    ".text",
+    ".rst",
+    ".csv",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".toml",
+    ".xml",
 ]
 
 # All file extensions recognized in _nest_sources/ (Docling-convertible + passthrough text)

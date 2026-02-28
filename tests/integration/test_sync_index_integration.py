@@ -65,9 +65,7 @@ def test_sync_generates_index_end_to_end(tmp_path: Path):
 
     index_service = IndexService(filesystem=fs_adapter, project_root=project_root)
 
-    metadata_service = MetadataExtractorService(
-        filesystem=fs_adapter, project_root=project_root
-    )
+    metadata_service = MetadataExtractorService(filesystem=fs_adapter, project_root=project_root)
 
     orphan_service = OrphanService(
         filesystem=fs_adapter,

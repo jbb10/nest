@@ -54,9 +54,7 @@ class UpdateService:
         """
         config = self._user_config.load()
         if config is None:
-            raise ConfigError(
-                "No user config found. Run any nest command first to create config."
-            )
+            raise ConfigError("No user config found. Run any nest command first to create config.")
 
         source = config.install.source
         current = config.install.installed_version

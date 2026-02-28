@@ -938,14 +938,12 @@ class TestRemediateIssuesAuto:
                 agent_file_present=False,
                 folders_status="both_missing",
                 meta_folder_present=True,
-            legacy_layout_detected=False,
-            suggestions=[],
+                legacy_layout_detected=False,
+                suggestions=[],
             )
         )
 
-        report = service.remediate_issues_auto(
-            tmp_path, env_report, None, project_report
-        )
+        report = service.remediate_issues_auto(tmp_path, env_report, None, project_report)
 
         assert report.any_attempted is True
         assert len(report.results) == 3
@@ -970,14 +968,12 @@ class TestRemediateIssuesAuto:
                 agent_file_present=True,
                 folders_status="intact",
                 meta_folder_present=True,
-            legacy_layout_detected=False,
-            suggestions=[],
+                legacy_layout_detected=False,
+                suggestions=[],
             )
         )
 
-        report = service.remediate_issues_auto(
-            tmp_path, env_report, None, project_report
-        )
+        report = service.remediate_issues_auto(tmp_path, env_report, None, project_report)
 
         assert report.any_attempted is False
         assert len(report.results) == 0
@@ -1019,8 +1015,8 @@ class TestRemediateIssuesInteractive:
                 agent_file_present=False,
                 folders_status="both_missing",
                 meta_folder_present=True,
-            legacy_layout_detected=False,
-            suggestions=[],
+                legacy_layout_detected=False,
+                suggestions=[],
             )
         )
 
@@ -1057,8 +1053,8 @@ class TestRemediateIssuesInteractive:
                 agent_file_present=False,
                 folders_status="both_missing",
                 meta_folder_present=True,
-            legacy_layout_detected=False,
-            suggestions=[],
+                legacy_layout_detected=False,
+                suggestions=[],
             )
         )
 
@@ -1107,8 +1103,8 @@ class TestRemediateIssuesInteractive:
                 agent_file_present=False,
                 folders_status="intact",
                 meta_folder_present=True,
-            legacy_layout_detected=False,
-            suggestions=[],
+                legacy_layout_detected=False,
+                suggestions=[],
             )
         )
 

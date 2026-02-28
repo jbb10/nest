@@ -96,10 +96,7 @@ class IndexService:
         for file_meta in sorted_files:
             # Carry forward description if content_hash unchanged
             description = ""
-            if (
-                file_meta.path in old_hints
-                and old_hints[file_meta.path] == file_meta.content_hash
-            ):
+            if file_meta.path in old_hints and old_hints[file_meta.path] == file_meta.content_hash:
                 description = old_descriptions.get(file_meta.path, "")
             lines.append(f"| {file_meta.path} | {file_meta.lines} | {description} |")
 

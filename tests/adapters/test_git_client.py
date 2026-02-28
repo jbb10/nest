@@ -83,9 +83,7 @@ class TestListTags:
         assert "git+https://github.com/jbb10/nest" not in cmd
 
     @patch("nest.adapters.git_client.subprocess.run")
-    def test_passes_url_without_git_prefix_unchanged(
-        self, mock_run: MagicMock
-    ) -> None:
+    def test_passes_url_without_git_prefix_unchanged(self, mock_run: MagicMock) -> None:
         """AC #1: URLs without git+ prefix passed as-is."""
         mock_run.return_value = MagicMock(stdout="", returncode=0)
         adapter = GitClientAdapter()
@@ -116,9 +114,7 @@ class TestNoTags:
         assert tags == []
 
     @patch("nest.adapters.git_client.subprocess.run")
-    def test_whitespace_only_output_returns_empty_list(
-        self, mock_run: MagicMock
-    ) -> None:
+    def test_whitespace_only_output_returns_empty_list(self, mock_run: MagicMock) -> None:
         """AC #7: Whitespace-only stdout returns empty list."""
         mock_run.return_value = MagicMock(stdout="  \n  \n", returncode=0)
         adapter = GitClientAdapter()
@@ -137,9 +133,7 @@ class TestErrorHandling:
     """Tests for error scenarios."""
 
     @patch("nest.adapters.git_client.subprocess.run")
-    def test_raises_config_error_on_subprocess_failure(
-        self, mock_run: MagicMock
-    ) -> None:
+    def test_raises_config_error_on_subprocess_failure(self, mock_run: MagicMock) -> None:
         """AC #6: CalledProcessError raises ConfigError."""
         mock_run.side_effect = subprocess.CalledProcessError(128, "git")
         adapter = GitClientAdapter()
@@ -181,15 +175,11 @@ class TestCleanUrl:
 
     def test_strips_git_plus(self) -> None:
         """Strips git+ prefix."""
-        assert _clean_url("git+https://github.com/jbb10/nest") == (
-            "https://github.com/jbb10/nest"
-        )
+        assert _clean_url("git+https://github.com/jbb10/nest") == ("https://github.com/jbb10/nest")
 
     def test_no_prefix_unchanged(self) -> None:
         """URLs without git+ prefix are unchanged."""
-        assert _clean_url("https://github.com/jbb10/nest") == (
-            "https://github.com/jbb10/nest"
-        )
+        assert _clean_url("https://github.com/jbb10/nest") == ("https://github.com/jbb10/nest")
 
 
 # ---------------------------------------------------------------------------

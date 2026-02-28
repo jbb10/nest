@@ -779,9 +779,7 @@ class DoctorService:
                 or not project_report.status.agent_file_present
             )
             if needs_name and project_name == "Nest Project" and input_callback:
-                user_input = input_callback(
-                    "Enter project name (default: Nest Project)"
-                )
+                user_input = input_callback("Enter project name (default: Nest Project)")
                 if user_input.strip():
                     project_name = user_input.strip()
 
@@ -791,9 +789,7 @@ class DoctorService:
                 result = self.download_models()
                 results.append(result)
             else:
-                results.append(
-                    RemediationResult("missing_models", False, False, "User declined")
-                )
+                results.append(RemediationResult("missing_models", False, False, "User declined"))
 
         # 2. Folders (Structural)
         if project_report and project_report.status.folders_status != "intact":
@@ -801,9 +797,7 @@ class DoctorService:
                 result = self.recreate_folders(project_dir)
                 results.append(result)
             else:
-                results.append(
-                    RemediationResult("missing_folders", False, False, "User declined")
-                )
+                results.append(RemediationResult("missing_folders", False, False, "User declined"))
 
         # 3. Manifest (State)
         if project_report and project_report.status.manifest_status in (
@@ -815,9 +809,7 @@ class DoctorService:
                 result = self.rebuild_manifest(project_dir, project_name)
                 results.append(result)
             else:
-                results.append(
-                    RemediationResult("corrupt_manifest", False, False, "User declined")
-                )
+                results.append(RemediationResult("corrupt_manifest", False, False, "User declined"))
 
         # 4. Agent file (Last)
         if project_report and not project_report.status.agent_file_present:
@@ -835,9 +827,7 @@ class DoctorService:
                 result = self.migrate_legacy_layout(project_dir)
                 results.append(result)
             else:
-                results.append(
-                    RemediationResult("legacy_layout", False, False, "User declined")
-                )
+                results.append(RemediationResult("legacy_layout", False, False, "User declined"))
 
         return RemediationReport(results=results)
 
