@@ -94,8 +94,8 @@ class TestMigrate:
         assert result2.files_moved == []
         assert result2.errors == []
 
-    def test_never_overwrites_existing_nest_files(self, tmp_path: Path) -> None:
-        """migrate() should not overwrite files already in .nest/."""
+    def test_removes_legacy_file_when_target_exists(self, tmp_path: Path) -> None:
+        """migrate() should remove legacy file when .nest/ already has the file."""
         # Create both old and new manifest
         (tmp_path / ".nest_manifest.json").write_text('{"old": true}')
         meta_dir = tmp_path / NEST_META_DIR
@@ -105,12 +105,15 @@ class TestMigrate:
         service = MetadataMigrationService()
         result = service.migrate(tmp_path)
 
-        # Should not move since target exists
-        assert result.migrated is False
-
-        # New file should be preserved
+        # Legacy file should be removed
+        assert not (tmp_path / ".nest_manifest.json").exists()
+        # .nest/ file should be preserved with original content
         content = (meta_dir / "manifest.json").read_text()
         assert '"new"' in content
+        # Should report as migrated since cleanup happened
+        assert result.migrated is True
+        assert len(result.files_moved) == 1
+        assert "removed" in result.files_moved[0]
 
     def test_creates_nest_directory(self, tmp_path: Path) -> None:
         """migrate() should create .nest/ if it doesn't exist."""

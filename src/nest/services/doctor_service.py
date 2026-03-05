@@ -1,13 +1,9 @@
 """Doctor service for environment and project validation."""
 
-import json
 import logging
-import re
 import shutil
 import subprocess
 import sys
-import urllib.error
-import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -15,10 +11,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import nest
-from nest.adapters.protocols import ModelCheckerProtocol, ProjectCheckerProtocol
+from nest.adapters.protocols import (
+    GitClientProtocol,
+    ModelCheckerProtocol,
+    ProjectCheckerProtocol,
+    UserConfigProtocol,
+)
 from nest.core.checksum import compute_sha256
-from nest.core.exceptions import ManifestError
+from nest.core.exceptions import ConfigError, ManifestError
 from nest.core.models import FileEntry, Manifest
+from nest.core.version import is_newer, sort_versions
 
 logger = logging.getLogger("nest.errors")
 
@@ -150,6 +152,8 @@ class DoctorService:
         manifest_adapter: "ManifestProtocol | None" = None,
         filesystem: "FileSystemProtocol | None" = None,
         agent_writer: "AgentWriterProtocol | None" = None,
+        git_client: GitClientProtocol | None = None,
+        user_config: UserConfigProtocol | None = None,
     ) -> None:
         """Initialize doctor service.
 
@@ -164,12 +168,18 @@ class DoctorService:
                        If None, folder recreation will not be available.
             agent_writer: Optional agent writer for file regeneration.
                          If None, agent file regeneration will not be available.
+            git_client: Optional git client for querying remote version tags.
+                       If None, version check will report current version only.
+            user_config: Optional user config for reading install source.
+                        If None, version check will report current version only.
         """
         self._model_checker = model_checker
         self._project_checker = project_checker
         self._manifest_adapter = manifest_adapter
         self._filesystem = filesystem
         self._agent_writer = agent_writer
+        self._git_client = git_client
+        self._user_config = user_config
 
     def check_environment(self) -> EnvironmentReport:
         """Check Python, uv, and Nest versions.
@@ -265,7 +275,11 @@ class DoctorService:
             )
 
     def _check_nest_version(self) -> EnvironmentStatus:
-        """Check Nest version.
+        """Check Nest version against latest available from git remote.
+
+        Uses the same git-tag-based version discovery as ``nest update``
+        (reading the install source from user config) to avoid false
+        positives from unrelated PyPI packages.
 
         Returns:
             Environment status for Nest version check.
@@ -273,7 +287,7 @@ class DoctorService:
         current_version = nest.__version__
         latest_version = self._fetch_latest_version()
 
-        if latest_version and self._is_newer_version(latest_version, current_version):
+        if latest_version and is_newer(latest_version, current_version):
             return EnvironmentStatus(
                 name="Nest",
                 status="warning",
@@ -289,64 +303,32 @@ class DoctorService:
         )
 
     def _fetch_latest_version(self) -> str | None:
-        """Fetch the latest Nest version from PyPI.
+        """Fetch the latest Nest version from the configured git remote.
+
+        Reads the install source URL from user config, queries git tags,
+        and returns the newest semver tag.  Returns *None* silently if
+        user config is missing, git client is unavailable, or the
+        network query fails — version check is non-blocking.
 
         Returns:
             Latest version string or None if unavailable.
         """
-        url = "https://pypi.org/pypi/nest/json"
-        request = urllib.request.Request(url, headers={"User-Agent": "nest-doctor"})
-        try:
-            with urllib.request.urlopen(request, timeout=2) as response:
-                if response.status != 200:
-                    return None
-                data = json.loads(response.read().decode("utf-8"))
-        except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        if self._git_client is None or self._user_config is None:
             return None
 
-        version = data.get("info", {}).get("version")
-        if isinstance(version, str) and version:
-            return version
-        return None
+        try:
+            config = self._user_config.load()
+            if config is None:
+                return None
 
-    def _is_newer_version(self, latest: str, current: str) -> bool:
-        """Compare two version strings.
-
-        Args:
-            latest: Latest available version string.
-            current: Current installed version string.
-
-        Returns:
-            True if latest is newer than current.
-        """
-        latest_parts = self._parse_version(latest)
-        current_parts = self._parse_version(current)
-
-        if latest_parts is None or current_parts is None:
-            return False
-
-        return latest_parts > current_parts
-
-    def _parse_version(self, version: str) -> tuple[int, ...] | None:
-        """Parse a version string into comparable numeric parts.
-
-        Args:
-            version: Version string to parse.
-
-        Returns:
-            Tuple of numeric parts or None if parsing fails.
-        """
-        normalized = version.strip().lstrip("v")
-        parts = re.split(r"[.+-]", normalized)
-        numbers: list[int] = []
-
-        for part in parts:
-            if part.isdigit():
-                numbers.append(int(part))
-            else:
-                break
-
-        return tuple(numbers) if numbers else None
+            source = config.install.source
+            tags = self._git_client.list_tags(source)
+            available = sort_versions(tags)
+            return available[0] if available else None
+        except (ConfigError, Exception):  # noqa: BLE001
+            # Non-blocking: network failures or config errors
+            # should not break the doctor command
+            return None
 
     def check_ml_models(self) -> ModelReport | None:
         """Check ML model cache status.

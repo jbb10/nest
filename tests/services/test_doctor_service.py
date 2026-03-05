@@ -129,13 +129,29 @@ class TestUvInstallationCheck:
 class TestNestVersionCheck:
     """Tests for Nest version validation."""
 
-    def test_nest_version_reported(self) -> None:
-        """Nest version should be reported from __version__."""
+    def test_nest_version_reported_no_git_client(self) -> None:
+        """Nest version should be reported from __version__ when no git client."""
         service = DoctorService()
 
         with patch("nest.__version__", "1.0.0"):
-            with patch.object(service, "_fetch_latest_version", return_value=None):
-                status = service._check_nest_version()
+            status = service._check_nest_version()
+
+        assert status.name == "Nest"
+        assert status.status == "pass"
+        assert status.current_value == "1.0.0"
+
+    def test_nest_version_reported_with_git_client(self) -> None:
+        """Nest version should be reported when git returns same version."""
+        mock_git = MagicMock()
+        mock_git.list_tags.return_value = ["v1.0.0"]
+        mock_config = MagicMock()
+        mock_config.load.return_value = MagicMock(
+            install=MagicMock(source="git+https://github.com/jbb10/nest")
+        )
+        service = DoctorService(git_client=mock_git, user_config=mock_config)
+
+        with patch("nest.__version__", "1.0.0"):
+            status = service._check_nest_version()
 
         assert status.name == "Nest"
         assert status.status == "pass"
@@ -143,17 +159,54 @@ class TestNestVersionCheck:
 
     def test_nest_version_update_available_warns(self) -> None:
         """Newer Nest version should be reported as available."""
-        service = DoctorService()
+        mock_git = MagicMock()
+        mock_git.list_tags.return_value = ["v1.2.0", "v1.0.0"]
+        mock_config = MagicMock()
+        mock_config.load.return_value = MagicMock(
+            install=MagicMock(source="git+https://github.com/jbb10/nest")
+        )
+        service = DoctorService(git_client=mock_git, user_config=mock_config)
 
         with patch("nest.__version__", "1.0.0"):
-            with patch.object(service, "_fetch_latest_version", return_value="1.2.0"):
-                status = service._check_nest_version()
+            status = service._check_nest_version()
 
         assert status.name == "Nest"
         assert status.status == "warning"
         assert status.current_value == "1.0.0"
         assert "available" in (status.message or "")
         assert status.suggestion is not None
+
+    def test_nest_version_check_graceful_on_network_error(self) -> None:
+        """Git client error should not break doctor — just skip version comparison."""
+        from nest.core.exceptions import ConfigError
+
+        mock_git = MagicMock()
+        mock_git.list_tags.side_effect = ConfigError("network error")
+        mock_config = MagicMock()
+        mock_config.load.return_value = MagicMock(
+            install=MagicMock(source="git+https://github.com/jbb10/nest")
+        )
+        service = DoctorService(git_client=mock_git, user_config=mock_config)
+
+        with patch("nest.__version__", "1.0.0"):
+            status = service._check_nest_version()
+
+        assert status.name == "Nest"
+        assert status.status == "pass"
+        assert status.current_value == "1.0.0"
+
+    def test_nest_version_check_graceful_on_missing_config(self) -> None:
+        """Missing user config should not break doctor."""
+        mock_git = MagicMock()
+        mock_config = MagicMock()
+        mock_config.load.return_value = None
+        service = DoctorService(git_client=mock_git, user_config=mock_config)
+
+        with patch("nest.__version__", "1.0.0"):
+            status = service._check_nest_version()
+
+        assert status.status == "pass"
+        assert status.current_value == "1.0.0"
 
 
 class TestCheckEnvironment:

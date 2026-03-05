@@ -85,8 +85,15 @@ class MetadataMigrationService:
             if not old_path.exists():
                 continue
 
-            # Never overwrite existing .nest/ files
+            # If target already exists, remove the legacy file (cleanup)
+            # rather than leaving it around to trigger perpetual detection.
             if new_path.exists():
+                try:
+                    old_path.unlink()
+                    files_moved.append(f"{old_relative} removed (already in .nest/)")
+                except OSError as e:
+                    logger.warning("Failed to remove legacy %s: %s", old_relative, e)
+                    errors.append(f"Failed to remove legacy {old_relative}: {e}")
                 continue
 
             try:

@@ -9,9 +9,11 @@ import typer
 from rich.prompt import Confirm, Prompt
 
 from nest.adapters.filesystem import FileSystemAdapter
+from nest.adapters.git_client import GitClientAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.project_checker import ProjectChecker
 from nest.adapters.protocols import ModelCheckerProtocol
+from nest.adapters.user_config import UserConfigAdapter
 from nest.agents.vscode_writer import VSCodeAgentWriter
 from nest.core.exceptions import ModelError
 from nest.services.doctor_service import (
@@ -51,6 +53,8 @@ def create_doctor_service(project_checker: ProjectChecker) -> DoctorService:
         manifest_adapter=ManifestAdapter(),
         filesystem=filesystem,
         agent_writer=VSCodeAgentWriter(filesystem),
+        git_client=GitClientAdapter(),
+        user_config=UserConfigAdapter(),
     )
 
 
