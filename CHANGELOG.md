@@ -2,6 +2,15 @@
 
 All notable changes to Nest.
 
+## [v0.3.1] - 2026-03-05
+
+### Bug Fixes
+
+- doctor version check uses git tags instead of PyPI, migration cleans up legacy files
+
+### Maintenance
+
+- update version to 0.3.0 in uv.lock and log additional errors
 ## [v0.3.0] - 2026-02-28
 
 ### Bug Fixes
