@@ -2,6 +2,11 @@
 
 All notable changes to Nest.
 
+## [v0.4.0] - 2026-03-16
+
+### Features
+
+- **ai**: add built-in enrichment and config workflows
 ## [v0.3.1] - 2026-03-05
 
 ### Bug Fixes
