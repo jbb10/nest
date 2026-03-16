@@ -7,7 +7,6 @@ from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.protocols import DocumentProcessorProtocol
 from nest.core.models import ProcessingResult
 from nest.services.discovery_service import DiscoveryService
-from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
 from nest.services.metadata_service import MetadataExtractorService
@@ -80,10 +79,6 @@ def test_sync_generates_index_end_to_end(tmp_path: Path):
         orphan=orphan_service,
         index=index_service,
         metadata=metadata_service,
-        glossary=GlossaryHintsService(
-            filesystem=fs_adapter,
-            project_root=project_root,
-        ),
         project_root=project_root,
     )
 

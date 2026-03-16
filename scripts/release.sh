@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 #
 # Release script for Nest
-# Usage: ./scripts/release.sh [--patch|--minor|--major]
+# Usage: ./scripts/release.sh [--yes|-y] [--patch|--minor|--major]
+#
+# Flags:
+#   --yes, -y         Skip all confirmation prompts (for AI/CI use)
+#   --patch           Force a patch bump
+#   --minor           Force a minor bump
+#   --major           Force a major bump
 #
 # Automatically determines version bump from conventional commits:
 #   fix:              → patch (0.0.X)
@@ -36,16 +42,21 @@ header(){ echo -e "\n${BOLD}${BLUE}═══ $1 ═══${NC}\n"; }
 # ─── Parse Arguments ─────────────────────────────────────────────────────────
 
 FORCE_BUMP=""
+AUTO_YES=false
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --yes|-y) AUTO_YES=true; shift ;;
         --patch) FORCE_BUMP="patch"; shift ;;
         --minor) FORCE_BUMP="minor"; shift ;;
         --major) FORCE_BUMP="major"; shift ;;
         -h|--help)
-            echo "Usage: $0 [--patch|--minor|--major]"
+            echo "Usage: $0 [--yes|-y] [--patch|--minor|--major]"
             echo ""
-            echo "Automatically determines version bump from conventional commits,"
-            echo "or use flags to force a specific bump type."
+            echo "Options:"
+            echo "  --yes, -y    Skip all confirmation prompts (for AI/CI use)"
+            echo "  --patch      Force a patch version bump"
+            echo "  --minor      Force a minor version bump"
+            echo "  --major      Force a major version bump"
             echo ""
             echo "Requires: uv, git, git-cliff, perl"
             exit 0
@@ -53,6 +64,18 @@ while [[ $# -gt 0 ]]; do
         *) error "Unknown option: $1" ;;
     esac
 done
+
+# Helper: prompt for confirmation (auto-accepts when --yes is set)
+confirm() {
+    local prompt="$1"
+    if $AUTO_YES; then
+        info "Auto-confirmed: $prompt"
+        return 0
+    fi
+    read -p "$prompt (y/N) " -n 1 -r
+    echo
+    [[ $REPLY =~ ^[Yy]$ ]]
+}
 
 # ─── Pre-flight Checks ───────────────────────────────────────────────────────
 
@@ -81,9 +104,7 @@ info "Working directory is clean"
 CURRENT_BRANCH=$(git branch --show-current)
 if [ "$CURRENT_BRANCH" != "main" ]; then
     warn "Not on main branch (currently on: $CURRENT_BRANCH)"
-    read -p "Continue anyway? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    if ! confirm "Continue anyway?"; then
         exit 1
     fi
 else
@@ -221,7 +242,7 @@ fi
 
 echo "$CHANGELOG_ENTRY"
 
-# ─── Human Approval Gate ─────────────────────────────────────────────────────
+# ─── Approval Gate ────────────────────────────────────────────────────────────
 
 header "Release Confirmation"
 
@@ -230,9 +251,7 @@ echo -e "  Tag:      ${BOLD}v$NEW_VERSION${NC}"
 echo -e "  Branch:   ${BOLD}$CURRENT_BRANCH${NC}"
 echo -e "  Files:    pyproject.toml, src/nest/__init__.py, CHANGELOG.md"
 echo ""
-read -p "Proceed with release? (y/N) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+if ! confirm "Proceed with release?"; then
     info "Release aborted."
     exit 0
 fi
@@ -286,7 +305,9 @@ git add pyproject.toml src/nest/__init__.py CHANGELOG.md
 git commit -m "chore(release): v$NEW_VERSION"
 info "Created commit: chore(release): v$NEW_VERSION"
 
-git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION"
+git tag -a "v$NEW_VERSION" --cleanup=verbatim -m "Release v$NEW_VERSION
+
+$CHANGELOG_ENTRY"
 info "Created annotated tag: v$NEW_VERSION"
 
 # Move 'latest' tag
@@ -303,9 +324,7 @@ echo -e "    • Branch ${BOLD}$CURRENT_BRANCH${NC} to origin"
 echo -e "    • Tag ${BOLD}v$NEW_VERSION${NC}"
 echo -e "    • Tag ${BOLD}latest${NC} (force-update)"
 echo ""
-read -p "Push to remote? (y/N) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+if ! confirm "Push to remote?"; then
     warn "Aborting push. Rolling back local changes..."
     git tag -d "v$NEW_VERSION" 2>/dev/null || true
     git tag -d latest 2>/dev/null || true

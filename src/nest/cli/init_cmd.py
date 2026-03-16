@@ -85,18 +85,6 @@ def init_command(
         service = create_init_service()
         service.execute(project_name, resolved_dir)
 
-        # Generate additional agent files (composition root approach — concrete type known here)
-        agent_writer = VSCodeAgentWriter(filesystem=FileSystemAdapter())
-        agents_dir = resolved_dir / ".github" / "agents"
-        for gen_method, filename in [
-            (agent_writer.generate_enricher, "nest-enricher.agent.md"),
-            (agent_writer.generate_glossary, "nest-glossary.agent.md"),
-        ]:
-            try:
-                gen_method(project_name.strip(), agents_dir / filename)
-            except OSError as e:
-                logger.warning("Could not generate %s: %s", filename, e)
-
         success(f'Project "{project_name}" initialized!')
         console.print()
         console.print("[bold]Next steps:[/bold]")

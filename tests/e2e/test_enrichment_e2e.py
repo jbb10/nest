@@ -1,7 +1,7 @@
 """E2E tests for the index enrichment pipeline (Story 5.1).
 
 Tests verify table format index, hints file generation,
-description preservation/clearing, and enricher agent creation.
+and description preservation/clearing.
 These tests use passthrough text files (no Docling needed).
 """
 
@@ -204,24 +204,3 @@ class TestEnrichmentE2E:
         # 00_MASTER_INDEX.md itself should also not appear
         if table_start != -1 and table_end != -1:
             assert "00_MASTER_INDEX" not in table_section
-
-    def test_enricher_agent_created_on_init(self, fresh_temp_dir: Path) -> None:
-        """AC7: nest init should create the enricher agent file.
-
-        After init, .github/agents/nest-enricher.agent.md should exist
-        with instructions for the enricher agent.
-        """
-        project_dir = fresh_temp_dir
-
-        # Run init
-        result = run_cli(["init", "TestEnricherProject"], cwd=project_dir)
-        assert result.exit_code == 0, f"Init failed: {result.stderr}\n{result.stdout}"
-
-        # Assert enricher agent file exists
-        agent_path = project_dir / ".github" / "agents" / "nest-enricher.agent.md"
-        assert agent_path.exists(), "nest-enricher.agent.md should be created by init"
-
-        # Assert basic content
-        agent_content = agent_path.read_text()
-        assert "enricher" in agent_content.lower() or "description" in agent_content.lower()
-        assert "00_INDEX_HINTS" in agent_content or "hints" in agent_content.lower()

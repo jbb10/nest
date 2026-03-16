@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 from typing import Literal, Protocol, runtime_checkable
 
-from nest.core.models import Manifest, ProcessingResult, UserConfig
+from nest.core.models import LLMCompletionResult, Manifest, ProcessingResult, UserConfig
 
 
 @runtime_checkable
@@ -549,4 +549,35 @@ class SubprocessRunnerProtocol(Protocol):
             subprocess.CalledProcessError: If command returns non-zero exit code.
             subprocess.TimeoutExpired: If command exceeds timeout.
         """
+        ...
+
+
+@runtime_checkable
+class LLMProviderProtocol(Protocol):
+    """Protocol for LLM completion operations.
+
+    Implementations handle sending chat completion requests to LLM APIs.
+    Used by AI enrichment and glossary services.
+    """
+
+    def complete(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+    ) -> LLMCompletionResult | None:
+        """Send a chat completion request.
+
+        Args:
+            system_prompt: System-level instructions for the model.
+            user_prompt: User message content.
+
+        Returns:
+            LLMCompletionResult with response text and token usage,
+            or None if the call failed (error is logged internally).
+        """
+        ...
+
+    @property
+    def model_name(self) -> str:
+        """Return the configured model name."""
         ...

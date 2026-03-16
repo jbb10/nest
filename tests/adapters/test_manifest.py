@@ -5,11 +5,13 @@ Tests manifest file operations including error handling.
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.exceptions import ManifestError
+from nest.core.models import Manifest
 
 
 class TestManifestAdapterLoad:
@@ -97,3 +99,27 @@ class TestManifestAdapterLoad:
         assert result.nest_version == "1.0.0"
         assert result.project_name == "test-project"
         assert result.files == {}
+
+
+class TestManifestAdapterSave:
+    """Tests for ManifestAdapter.save() write behavior."""
+
+    def test_save_writes_manifest_with_lf_newlines(self, tmp_path: Path) -> None:
+        """Manifest writes pass newline='\n' explicitly for cross-platform stability."""
+        adapter = ManifestAdapter()
+        manifest = Manifest(
+            nest_version="1.0.0",
+            project_name="test-project",
+            last_sync=None,
+            files={},
+        )
+
+        with patch(
+            "pathlib.Path.write_text",
+            autospec=True,
+            wraps=Path.write_text,
+        ) as mock_write_text:
+            adapter.save(tmp_path, manifest)
+
+        assert mock_write_text.call_args is not None
+        assert mock_write_text.call_args.kwargs["newline"] == "\n"

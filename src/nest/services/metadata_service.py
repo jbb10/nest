@@ -17,7 +17,7 @@ from nest.adapters.protocols import FileSystemProtocol
 from nest.core.models import FileMetadata, HeadingInfo
 from nest.core.paths import (
     CONTEXT_TEXT_EXTENSIONS,
-    GLOSSARY_HINTS_FILE,
+    GLOSSARY_FILE,
     INDEX_HINTS_FILE,
     MASTER_INDEX_FILE,
 )
@@ -27,13 +27,19 @@ logger = logging.getLogger(__name__)
 HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
 
-def _compute_content_hash(headings: list[HeadingInfo], first_paragraph: str, lines: int) -> str:
+def _compute_content_hash(
+    headings: list[HeadingInfo],
+    first_paragraph: str,
+    lines: int,
+    content: str,
+) -> str:
     """Deterministic hash of extracted metadata for change detection.
 
     Args:
         headings: List of heading info objects.
         first_paragraph: First paragraph text.
         lines: Line count.
+        content: Full file content.
 
     Returns:
         16-character hex prefix of SHA-256 hash.
@@ -43,6 +49,7 @@ def _compute_content_hash(headings: list[HeadingInfo], first_paragraph: str, lin
             "headings": [{"level": h.level, "text": h.text} for h in headings],
             "first_paragraph": first_paragraph,
             "lines": lines,
+            "content": content,
         },
         sort_keys=True,
     )
@@ -142,7 +149,7 @@ class MetadataExtractorService:
         except (OSError, UnicodeDecodeError) as e:
             logger.warning("Cannot read %s: %s", file_path, e)
             # Return minimal metadata for unreadable files
-            empty_hash = _compute_content_hash([], "", 0)
+            empty_hash = _compute_content_hash([], "", 0, "")
             return FileMetadata(
                 path=relative,
                 content_hash=empty_hash,
@@ -156,7 +163,7 @@ class MetadataExtractorService:
         headings = _extract_headings(content) if is_markdown else []
         first_paragraph = _extract_first_paragraph(content, is_markdown=is_markdown)
         table_columns = _extract_csv_columns(content) if suffix == ".csv" else []
-        content_hash = _compute_content_hash(headings, first_paragraph, lines)
+        content_hash = _compute_content_hash(headings, first_paragraph, lines, content)
 
         return FileMetadata(
             path=relative,
@@ -170,7 +177,7 @@ class MetadataExtractorService:
     def extract_all(self, context_dir: Path) -> list[FileMetadata]:
         """Extract metadata for all supported text files in context directory.
 
-        Excludes 00_MASTER_INDEX.md and 00_INDEX_HINTS.yaml.
+        Excludes 00_MASTER_INDEX.md, 00_INDEX_HINTS.yaml, and glossary.md.
 
         Args:
             context_dir: Absolute path to the context directory.
@@ -180,7 +187,7 @@ class MetadataExtractorService:
         """
         all_files = self._fs.list_files(context_dir)
         supported = {ext.lower() for ext in CONTEXT_TEXT_EXTENSIONS}
-        excluded = {MASTER_INDEX_FILE, INDEX_HINTS_FILE, GLOSSARY_HINTS_FILE}
+        excluded = {MASTER_INDEX_FILE, INDEX_HINTS_FILE, GLOSSARY_FILE}
 
         results: list[FileMetadata] = []
         for file_path in all_files:

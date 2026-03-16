@@ -12,7 +12,13 @@ from nest.adapters.protocols import (
     ModelDownloaderProtocol,
 )
 from nest.core.exceptions import NestError
-from nest.core.paths import CONTEXT_DIR, NEST_META_DIR, SOURCES_DIR
+from nest.core.paths import (
+    CONTEXT_DIR,
+    CONTEXT_TEXT_EXTENSIONS,
+    NEST_META_DIR,
+    SOURCES_DIR,
+    SUPPORTED_EXTENSIONS,
+)
 from nest.ui.messages import info, status_done, status_start
 
 # Directories to create during init
@@ -23,11 +29,15 @@ INIT_DIRECTORIES = [
     ".github/agents",
 ]
 
-# Entries for .gitignore
+# Entries for .gitignore — only per-machine runtime artifacts
 _GITIGNORE_ENTRIES = [
-    ("# Nest - source documents (private/confidential)", "_nest_sources/"),
-    ("# Nest - internal metadata", ".nest/"),
+    ("# Nest - per-machine runtime artifacts", ".nest/errors.log"),
 ]
+
+# Comment block delimiter for detecting existing Nest gitattributes
+_GITATTRIBUTES_MARKER = "# Nest — cross-platform line ending normalization"
+
+_NEST_METADATA_TEXT_EXTENSIONS = (".json", ".md", ".yaml")
 
 
 class InitService:
@@ -93,6 +103,9 @@ class InitService:
         # Create/update .gitignore
         self._setup_gitignore(target_dir)
 
+        # Create/update .gitattributes for cross-platform line endings
+        self._setup_gitattributes(target_dir)
+
         # Generate agent file with progress
         status_start("Generating agent file")
         agent_path = target_dir / ".github" / "agents" / "nest.agent.md"
@@ -134,10 +147,59 @@ class InitService:
                 if content and not content.endswith("\n"):
                     content += "\n"
                 content += "\n".join(additions) + "\n"
-                gitignore.write_text(content, encoding="utf-8")
+                gitignore.write_text(content, encoding="utf-8", newline="\n")
         else:
             lines: list[str] = []
             for comment, entry in _GITIGNORE_ENTRIES:
                 lines.append(comment)
                 lines.append(entry)
-            gitignore.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            gitignore.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+    @staticmethod
+    def _setup_gitattributes(target_dir: Path) -> None:
+        """Create or update .gitattributes with Nest line ending rules.
+
+        Generates entries for binary source documents and text files
+        across _nest_sources/, _nest_context/, and .nest/ directories.
+        Uses a comment marker for idempotent append.
+
+        Args:
+            target_dir: Path to the project root directory.
+        """
+        gitattributes = target_dir / ".gitattributes"
+
+        # Build the Nest block
+        block_lines: list[str] = [_GITATTRIBUTES_MARKER]
+        block_lines.append("# Binary source documents — never touch line endings")
+        for ext in SUPPORTED_EXTENSIONS:
+            block_lines.append(f"{SOURCES_DIR}/**/*{ext} binary")
+
+        block_lines.append("")
+        block_lines.append("# Text source files — normalize to LF for consistent checksums")
+        for ext in CONTEXT_TEXT_EXTENSIONS:
+            block_lines.append(f"{SOURCES_DIR}/**/*{ext} text eol=lf")
+
+        block_lines.append("")
+        block_lines.append("# Context output — same LF normalization")
+        for ext in CONTEXT_TEXT_EXTENSIONS:
+            block_lines.append(f"{CONTEXT_DIR}/**/*{ext} text eol=lf")
+
+        block_lines.append("")
+        block_lines.append("# Nest metadata — LF normalized")
+        for ext in _NEST_METADATA_TEXT_EXTENSIONS:
+            block_lines.append(f"{NEST_META_DIR}/**/*{ext} text eol=lf")
+
+        nest_block = "\n".join(block_lines) + "\n"
+
+        if gitattributes.exists():
+            content = gitattributes.read_text(encoding="utf-8")
+            # Skip if Nest block already present
+            if _GITATTRIBUTES_MARKER in content:
+                return
+            # Append with separator
+            if content and not content.endswith("\n"):
+                content += "\n"
+            content += "\n" + nest_block
+            gitattributes.write_text(content, encoding="utf-8", newline="\n")
+        else:
+            gitattributes.write_text(nest_block, encoding="utf-8", newline="\n")

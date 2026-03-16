@@ -12,7 +12,6 @@ CONTEXT_DIR = "_nest_context"
 NEST_META_DIR = ".nest"
 MASTER_INDEX_FILE = "00_MASTER_INDEX.md"
 INDEX_HINTS_FILE = "00_INDEX_HINTS.yaml"
-GLOSSARY_HINTS_FILE = "00_GLOSSARY_HINTS.yaml"
 GLOSSARY_FILE = "glossary.md"
 INDEX_TABLE_START = "<!-- nest:index-table-start -->"
 INDEX_TABLE_END = "<!-- nest:index-table-end -->"
@@ -20,6 +19,7 @@ GLOSSARY_TABLE_START = "<!-- nest:glossary-start -->"
 GLOSSARY_TABLE_END = "<!-- nest:glossary-end -->"
 MANIFEST_FILENAME = "manifest.json"
 ERROR_LOG_FILENAME = "errors.log"
+AI_SEEN_MARKER = ".ai_seen"
 SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
 
 # Text file extensions supported in context directory (for indexing and counting)

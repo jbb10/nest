@@ -11,6 +11,27 @@ import pytest
 class TestSetupErrorLogger:
     """Tests for setup_error_logger function."""
 
+    def test_logger_uses_non_legacy_namespace(self, tmp_path: Path) -> None:
+        """Logger name should not use the legacy nest.errors namespace."""
+        from nest.ui.logger import setup_error_logger
+
+        log_file = tmp_path / ".nest" / "errors.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        logger = setup_error_logger(log_file, service_name="sync")
+
+        assert logger.logger.name.startswith("nest.error_log.sync.")
+        assert "nest.errors" not in logger.logger.name
+
+    def test_logger_disables_propagation(self, tmp_path: Path) -> None:
+        """Logger should not propagate to parent handlers."""
+        from nest.ui.logger import setup_error_logger
+
+        log_file = tmp_path / ".nest" / "errors.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        logger = setup_error_logger(log_file, service_name="sync")
+
+        assert logger.logger.propagate is False
+
     def test_creates_log_file_on_first_write(self, tmp_path: Path) -> None:
         """Test that log file is created when first error is logged."""
         from nest.ui.logger import setup_error_logger

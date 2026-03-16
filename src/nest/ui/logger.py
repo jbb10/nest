@@ -32,10 +32,11 @@ def setup_error_logger(
     if log_file is None:
         log_file = Path(NEST_META_DIR) / ERROR_LOG_FILENAME
 
-    # Create unique logger name to avoid handler accumulation
-    logger_name = f"nest.errors.{service_name}.{id(log_file)}"
+    # Use a dedicated namespace outside the legacy error-logger hierarchy.
+    logger_name = f"nest.error_log.{service_name}.{id(log_file)}"
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.ERROR)
+    logger.propagate = False
 
     # Clear any existing handlers to prevent duplicates
     if logger.hasHandlers():

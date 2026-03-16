@@ -5,6 +5,7 @@ dry-run, force reprocessing, and orphan cleanup control.
 """
 
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal
 
@@ -16,16 +17,21 @@ from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.passthrough_processor import PassthroughProcessor
 from nest.core.exceptions import NestError, ProcessingError
 from nest.core.models import DryRunResult, ProcessingResult, SyncResult
-from nest.core.paths import CONTEXT_DIR, ERROR_LOG_FILENAME, NEST_META_DIR, SOURCES_DIR
+from nest.core.paths import (
+    AI_SEEN_MARKER,
+    CONTEXT_DIR,
+    ERROR_LOG_FILENAME,
+    NEST_META_DIR,
+    SOURCES_DIR,
+)
 from nest.services.discovery_service import DiscoveryService
-from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
 from nest.services.metadata_service import MetadataExtractorService
 from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
 from nest.services.sync_service import SyncService
-from nest.ui.logger import log_processing_error, setup_error_logger
+from nest.ui.logger import setup_error_logger
 from nest.ui.messages import error, get_console, success
 from nest.ui.progress import SyncProgress
 
@@ -48,6 +54,7 @@ class NoOpProcessor:
 def create_sync_service(
     project_root: Path,
     error_logger: "logging.Logger | logging.LoggerAdapter[logging.Logger] | None" = None,
+    no_ai: bool = False,
 ) -> SyncService:
     """Composition root for sync service.
 
@@ -76,6 +83,7 @@ def create_sync_service(
     Args:
         project_root: Root directory of the project.
         error_logger: Logger for writing errors to .nest/errors.log.
+        no_ai: If True, skip AI enrichment even when API key is configured.
 
     Returns:
         Configured SyncService with real adapters.
@@ -94,6 +102,25 @@ def create_sync_service(
     # Project paths
     raw_inbox = project_root / SOURCES_DIR
     output_dir = project_root / CONTEXT_DIR
+
+    # AI enrichment (optional)
+    ai_enrichment = None
+    ai_glossary = None
+    if not no_ai:
+        from nest.adapters.llm_provider import create_llm_provider
+
+        llm_provider = create_llm_provider()
+        if llm_provider is not None:
+            from nest.services.ai_enrichment_service import AIEnrichmentService
+
+            ai_enrichment = AIEnrichmentService(llm_provider=llm_provider)
+
+            from nest.services.ai_glossary_service import AIGlossaryService
+
+            ai_glossary = AIGlossaryService(
+                llm_provider=llm_provider,
+                filesystem=filesystem,
+            )
 
     # Wire up services with their dependencies
     return SyncService(
@@ -125,12 +152,10 @@ def create_sync_service(
             filesystem=filesystem,
             project_root=project_root,
         ),
-        glossary=GlossaryHintsService(
-            filesystem=filesystem,
-            project_root=project_root,
-        ),
         project_root=project_root,
         error_logger=error_logger,
+        ai_enrichment=ai_enrichment,
+        ai_glossary=ai_glossary,
     )
 
 
@@ -180,6 +205,13 @@ def sync_command(
             help="Detect orphans but don't remove them",
         ),
     ] = False,
+    no_ai: Annotated[
+        bool,
+        typer.Option(
+            "--no-ai",
+            help="Skip AI enrichment even when API key is configured",
+        ),
+    ] = False,
     target_dir: Annotated[
         Path | None,
         typer.Option(
@@ -222,7 +254,7 @@ def sync_command(
     error_logger = setup_error_logger(error_log_path, service_name="sync")
 
     try:
-        service = create_sync_service(project_root, error_logger=error_logger)
+        service = create_sync_service(project_root, error_logger=error_logger, no_ai=no_ai)
 
         # 1. Discovery phase
         changes = service.discover(force=force)
@@ -242,6 +274,21 @@ def sync_command(
         # Calculate total for progress using discovered changes
         files_to_process_count = len(changes.new_files) + len(changes.modified_files)
 
+        # Detect AI env var key for first-run message
+        ai_detected_key = ""
+        if not no_ai:
+            if os.environ.get("NEST_AI_API_KEY"):
+                ai_detected_key = "NEST_AI_API_KEY"
+            elif os.environ.get("OPENAI_API_KEY"):
+                ai_detected_key = "OPENAI_API_KEY"
+
+        # AI progress callback for console display
+        def ai_progress_callback(message: str) -> None:
+            if message == "start":
+                console.print("  🤖 AI enrichment...", end="")
+            else:
+                console.print(f" {message}")
+
         # Execute sync with progress bar
         with SyncProgress(console=console, disabled=files_to_process_count == 0) as progress:
             progress.start(total=files_to_process_count)
@@ -252,17 +299,21 @@ def sync_command(
                 dry_run=False,
                 force=force,
                 progress_callback=progress.advance,
+                ai_progress_callback=ai_progress_callback,
                 changes=changes,
             )
 
         # Normal sync complete - display summary
-        _display_sync_summary(result, console, error_log_path)  # type: ignore[arg-type]
+        _display_sync_summary(
+            result,  # type: ignore[arg-type]
+            console,
+            error_log_path,
+            ai_detected_key=ai_detected_key,
+            project_root=project_root,
+        )
 
     except ProcessingError as e:
         # Fail mode triggered - error already logged by SyncService
-        # Log to file if source_path available (for fail-fast abort)
-        if e.source_path:
-            log_processing_error(error_logger, e.source_path, e.message)
         error("Sync aborted due to processing failure")
         console.print(f"  [dim]Reason: {e.message}[/dim]")
         console.print(f"  [dim]See .nest/{ERROR_LOG_FILENAME} for details[/dim]")
@@ -291,7 +342,13 @@ def _display_dry_run_result(result: DryRunResult, console: "Console") -> None:
     console.print("[dim]Run without --dry-run to execute.[/dim]")
 
 
-def _display_sync_summary(result: SyncResult, console: "Console", error_log_path: Path) -> None:
+def _display_sync_summary(
+    result: SyncResult,
+    console: "Console",
+    error_log_path: Path,
+    ai_detected_key: str = "",
+    project_root: Path | None = None,
+) -> None:
     """Display sync completion summary.
 
     Shows:
@@ -308,6 +365,8 @@ def _display_sync_summary(result: SyncResult, console: "Console", error_log_path
         result: SyncResult from sync with all counts.
         console: Rich console for output.
         error_log_path: Path to error log file.
+        ai_detected_key: Name of the env var that triggered AI (e.g., ``"OPENAI_API_KEY"``).
+        project_root: Project root directory for marker file operations.
     """
     success("Sync complete")
     console.print()
@@ -338,18 +397,36 @@ def _display_sync_summary(result: SyncResult, console: "Console", error_log_path
     console.print()
     console.print("  Index updated: .nest/00_MASTER_INDEX.md")
 
-    # Show enrichment prompt if there are files needing descriptions
-    if result.enrichment_needed > 0:
-        console.print()
-        n = result.enrichment_needed
-        console.print(f"  [cyan]ℹ {n} file(s) need descriptions in the master index.[/cyan]")
-        console.print("    Run the @nest-enricher agent in VS Code chat to populate them.")
+    # Aggregated AI token display
+    total_prompt = result.ai_prompt_tokens + result.ai_glossary_prompt_tokens
+    total_completion = result.ai_completion_tokens + result.ai_glossary_completion_tokens
+    total_tokens = total_prompt + total_completion
 
-    # Show glossary prompt if candidate terms were discovered
-    if result.glossary_terms_discovered > 0:
-        console.print()
-        g = result.glossary_terms_discovered
-        console.print(f"  [cyan]ℹ {g} candidate glossary term(s) discovered.[/cyan]")
+    if total_tokens > 0:
         console.print(
-            "    Run the @nest-glossary agent in VS Code chat to generate/update the glossary."
+            f"  AI tokens:    {total_tokens:,} "
+            f"(prompt: {total_prompt:,}, completion: {total_completion:,})"
         )
+
+    # Show AI activity counts (enrichment + glossary) on separate detail lines
+    if result.ai_files_enriched > 0:
+        console.print(f"  AI enriched:  {result.ai_files_enriched} descriptions")
+
+    if result.ai_glossary_terms_added > 0:
+        console.print(f"  AI glossary:  {result.ai_glossary_terms_added} terms defined")
+
+    # First-run AI discovery message
+    ai_was_used = (
+        result.ai_files_enriched > 0
+        or result.ai_glossary_terms_added > 0
+        or (result.ai_prompt_tokens + result.ai_glossary_prompt_tokens) > 0
+    )
+
+    if ai_was_used and ai_detected_key and project_root is not None:
+        ai_marker = project_root / NEST_META_DIR / AI_SEEN_MARKER
+        if not ai_marker.exists():
+            console.print()
+            console.print(f"  🤖 AI enrichment enabled (found {ai_detected_key})")
+            console.print("  💡 Run 'nest config ai' to change AI settings. Use --no-ai to skip.")
+            # Create marker file
+            ai_marker.touch()

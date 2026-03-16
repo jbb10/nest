@@ -14,7 +14,6 @@ from docling.datamodel.pipeline_options import (
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc.base import ImageRefMode
 
-from nest.core.logging import log_processing_error
 from nest.core.models import ProcessingResult
 
 
@@ -36,17 +35,8 @@ class DoclingProcessor:
         InputFormat.HTML,
     ]
 
-    # Default error log file path (can be overridden)
-    DEFAULT_ERROR_LOG = Path(".nest") / "errors.log"
-
-    def __init__(self, error_log: Path | None = None) -> None:
-        """Initialize Docling converter with optimal settings.
-
-        Args:
-            error_log: Path to the error log file. Defaults to .nest/errors.log
-                       in the current working directory.
-        """
-        self._error_log = error_log or self.DEFAULT_ERROR_LOG
+    def __init__(self) -> None:
+        """Initialize Docling converter with optimal settings."""
 
         # Configure table structure with TableFormer ACCURATE mode and cell matching
         table_structure_options = TableStructureOptions(
@@ -96,7 +86,7 @@ class DoclingProcessor:
             output.parent.mkdir(parents=True, exist_ok=True)
 
             # Write markdown output
-            output.write_text(markdown_content, encoding="utf-8")
+            output.write_text(markdown_content, encoding="utf-8", newline="\n")
 
             return ProcessingResult(
                 source_path=source,
@@ -105,13 +95,7 @@ class DoclingProcessor:
             )
         except Exception as e:
             error_msg = str(e)
-            # Log the error to .nest/errors.log
-            log_processing_error(
-                log_file=self._error_log,
-                context="sync",
-                file_path=source,
-                error=error_msg,
-            )
+
             return ProcessingResult(
                 source_path=source,
                 status="failed",

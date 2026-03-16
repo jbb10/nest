@@ -282,22 +282,14 @@ class TestDoclingProcessorBase64Exclusion:
         assert not base64_pattern.search(content)
 
 
-class TestDoclingProcessorErrorLogging:
-    """Tests for error logging integration (AC6, AC7)."""
+class TestDoclingProcessorErrorHandling:
+    """Tests for error handling without logging (AC2 — adapters return results, never log)."""
 
-    def test_failed_processing_logs_to_error_file(self, tmp_path: Path) -> None:
-        """Test that failed processing writes to .nest/errors.log."""
-        import logging
-
+    def test_failed_processing_returns_failed_result(self, tmp_path: Path) -> None:
+        """Test that failed processing returns ProcessingResult with status='failed'."""
         from nest.adapters.docling_processor import DoclingProcessor
 
-        # Clear any existing handlers
-        logger = logging.getLogger("nest.errors")
-        logger.handlers.clear()
-
-        error_log = tmp_path / ".nest" / "errors.log"
-        error_log.parent.mkdir(parents=True, exist_ok=True)
-        processor = DoclingProcessor(error_log=error_log)
+        processor = DoclingProcessor()
 
         # Process a nonexistent file to trigger an error
         source = tmp_path / "does_not_exist.pdf"
@@ -305,37 +297,20 @@ class TestDoclingProcessorErrorLogging:
 
         result = processor.process(source, output)
 
-        # Flush handlers to ensure log is written
-        for handler in logger.handlers:
-            handler.flush()
-
         assert result.status == "failed"
-        assert error_log.exists()
-        content = error_log.read_text()
-        assert "does_not_exist.pdf" in content
-        assert "[sync]" in content
+        assert result.error is not None
+        assert "does_not_exist" in result.error
 
-    def test_error_log_uses_custom_path(self, tmp_path: Path) -> None:
-        """Test that processor uses provided error_log path."""
-        import logging
+    def test_failed_processing_does_not_import_logging(self) -> None:
+        """Test that DoclingProcessor does not import any logging module."""
+        import importlib
+        import inspect
 
-        from nest.adapters.docling_processor import DoclingProcessor
+        from nest.adapters import docling_processor
 
-        # Clear any existing handlers
-        logger = logging.getLogger("nest.errors")
-        logger.handlers.clear()
-
-        custom_log = tmp_path / "custom" / "errors.log"
-        processor = DoclingProcessor(error_log=custom_log)
-
-        source = tmp_path / "bad_file.xyz"
-        source.write_text("not a valid document")
-        output = tmp_path / "output.md"
-
-        processor.process(source, output)
-
-        # Flush handlers
-        for handler in logger.handlers:
-            handler.flush()
-
-        assert custom_log.exists()
+        importlib.reload(docling_processor)
+        source = inspect.getsource(docling_processor)
+        assert "from nest.core.logging" not in source
+        assert "log_processing_error" not in source
+        assert "import logging" not in source
+        assert "logger.debug" not in source

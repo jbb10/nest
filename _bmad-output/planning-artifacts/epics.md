@@ -42,13 +42,20 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 **FR24:** `nest sync` generates `00_INDEX_HINTS.yaml` with deterministic metadata (headings, first paragraph, line count, content hash) for each context file, and uses content hashes to preserve existing index descriptions across syncs when file content is unchanged
 **FR25:** `nest sync` produces `00_MASTER_INDEX.md` in Markdown table format (File | Lines | Description) and prompts user to run the `@nest-enricher` agent when files lack descriptions
 **FR26:** `nest init` ships a `@nest-glossary` VS Code agent that generates and maintains a `glossary.md` in `_nest_context/` containing project-specific terms, abbreviations, stakeholder names, and domain jargon extracted from project documents; `nest sync` provides deterministic candidate-term hints to support the agent
+**FR27:** `nest sync` auto-detects AI configuration from environment variables (`NEST_AI_*` with fallback to `OPENAI_*`) and, when available, automatically generates short descriptions for index entries and populates a project glossary — without requiring any per-project configuration
+**FR28:** `nest sync` AI enrichment runs incrementally — only files with changed or missing content hashes trigger LLM calls for descriptions; only new/changed candidate glossary terms trigger LLM calls for definitions
+**FR29:** `nest sync` runs AI index enrichment and AI glossary generation in parallel after document processing completes, using threading for I/O-bound LLM calls
+**FR30:** `nest sync` reports token usage after sync when AI enrichment was active (prompt tokens, completion tokens), and supports `--no-ai` flag to skip AI enrichment entirely
+**FR31:** `nest config ai` command writes AI configuration (`NEST_AI_ENDPOINT`, `NEST_AI_MODEL`, `NEST_AI_API_KEY`) as `export` statements to the user's shell RC file (`.zshrc`, `.bashrc`, `.bash_profile`, or `.profile`), with idempotent updates via comment-delimited blocks
+**FR32:** `nest init` no longer generates `nest-enricher.agent.md` or `nest-glossary.agent.md`; only the primary `nest.agent.md` is generated. The enricher and glossary agent templates are removed from the codebase
+**FR33:** AI configuration uses a fallback chain: `NEST_AI_API_KEY` → `OPENAI_API_KEY`, `NEST_AI_ENDPOINT` → `OPENAI_API_BASE` (default: `https://api.openai.com/v1`), `NEST_AI_MODEL` → `OPENAI_MODEL` (default: `gpt-4o-mini`). AI is enabled when an API key is found; otherwise sync completes without AI enrichment
 
 ### Non-Functional Requirements
 
 **NFR1:** Privacy — All document processing runs locally via Docling (no cloud APIs)
 **NFR2:** Performance — Incremental sync via SHA-256 checksums; skip unchanged files
 **NFR3:** Reliability — Error logging to `.nest/errors.log` with configurable fail modes
-**NFR4:** Portability — Cross-platform support (macOS/Linux/Windows) via Python 3.10+
+**NFR4:** Portability — Cross-platform support (macOS/Linux/Windows) via Python 3.10+, with LF line-ending normalization via `.gitattributes` and `newline='\n'` in Python writes to ensure consistent checksums across platforms
 **NFR5:** Maintainability — DRY principle: shared components across commands (download_models, build_manifest, generate_agent_file, compute_checksum, generate_index)
 **NFR6:** Testability — Dependency injection pattern; all external dependencies injectable via protocols
 **NFR7:** Extensibility — Agent generation behind protocol interface to support future platforms (Cursor, etc.)
@@ -121,6 +128,13 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 | FR24 | Epic 5 | Metadata extraction and content hash tracking for index enrichment |
 | FR25 | Epic 5 | Table-format index with descriptions and enricher agent prompt |
 | FR26 | Epic 5 | Glossary agent for project-specific term extraction and curation |
+| FR27 | Epic 6 | Auto-detect AI from env vars, enrich index + glossary during sync |
+| FR28 | Epic 6 | Incremental AI enrichment using content hashes |
+| FR29 | Epic 6 | Parallel AI enrichment + glossary generation |
+| FR30 | Epic 6 | Token usage reporting + `--no-ai` flag |
+| FR31 | Epic 6 | `nest config ai` writes to shell RC file |
+| FR32 | Epic 6 | Remove enricher/glossary agent templates from init and codebase |
+| FR33 | Epic 6 | Env var fallback chain for AI configuration |
 
 ## Epic List
 
@@ -201,6 +215,28 @@ As a user who has synced documents, I want the master index to contain short, LL
 
 ---
 
+### Epic 6: Built-in AI Enrichment
+As a user who syncs documents, I want Nest to automatically generate file descriptions and a project glossary using my existing AI API keys, so that my index is enriched and terminology is catalogued without manual agent invocations.
+
+**FRs covered:** FR27, FR28, FR29, FR30, FR31, FR32, FR33
+
+**Scope:**
+- LLM provider adapter with env-var-based configuration (fallback chain: `NEST_AI_*` → `OPENAI_*`)
+- Automatic AI detection during sync (no setup ceremony if keys already in environment)
+- Built-in index enrichment: generates ≤15-word descriptions using existing metadata hints
+- Built-in glossary generation: defines project-specific terms using existing candidate term hints
+- Incremental processing: only calls LLM for changed/new files and terms
+- Parallel execution of enrichment + glossary via `ThreadPoolExecutor`
+- Token usage reporting in sync summary output
+- `--no-ai` flag to skip AI enrichment
+- `nest config ai` subcommand that writes `export` lines to shell RC file
+- Removal of `nest-enricher.agent.md` and `nest-glossary.agent.md` agent templates
+- Graceful degradation: no AI config = unenriched index, no glossary, no error
+
+**Dependencies:** Epic 5 (metadata extraction and glossary hints infrastructure)
+
+---
+
 ## Epic 1: Project Initialization
 
 As a user starting a new project, I can run a single command to create a smart, AI-ready folder structure so I'm immediately set up to start adding documents.
@@ -232,12 +268,20 @@ As a user starting a new project, I can run a single command to create a smart, 
 
 **Given** a `.gitignore` file exists in the directory
 **When** I run `nest init "Nike"`
-**Then** `_nest_sources/` is appended to `.gitignore` if not already present
+**Then** `.nest/errors.log` is appended to `.gitignore` if not already present
 **And** a comment explaining why is included
 
 **Given** a `.gitignore` file does NOT exist
 **When** I run `nest init "Nike"`
-**Then** a new `.gitignore` is created with `_nest_sources/` entry
+**Then** a new `.gitignore` is created with only `.nest/errors.log` entry
+**And** all other Nest files (`_nest_sources/`, `_nest_context/`, `.nest/manifest.json`) remain committable
+
+**Given** I run `nest init "Nike"`
+**When** project scaffolding completes
+**Then** a `.gitattributes` file is created (or updated if one exists)
+**And** it marks `_nest_sources/**/*.pdf`, `.docx`, `.pptx`, `.xlsx` as `binary`
+**And** it marks all text file extensions in `_nest_sources/`, `_nest_context/`, and `.nest/` as `text eol=lf`
+**And** this ensures cross-platform checksum consistency for shared knowledge base usage
 
 **Given** I run `nest init` without a project name
 **When** the command executes
@@ -1445,3 +1489,421 @@ terms:
 
 ---
 
+## Epic 6: Built-in AI Enrichment
+
+As a user who syncs documents, I want Nest to automatically generate file descriptions and a project glossary using my existing AI API keys, so that my index is enriched and terminology is catalogued without manual agent invocations.
+
+### Story 6.1: LLM Provider Adapter & AI Detection
+
+**As a** developer building AI-powered features for Nest,
+**I want** a protocol-based LLM adapter that auto-detects API credentials from environment variables,
+**So that** all AI features have a consistent, testable interface to call LLMs with zero per-project configuration.
+
+**Acceptance Criteria:**
+
+**Given** `NEST_AI_API_KEY` is set in the environment
+**When** the LLM provider is initialized
+**Then** it uses `NEST_AI_API_KEY` as the API key
+**And** checks `NEST_AI_ENDPOINT` for the base URL (default: `https://api.openai.com/v1`)
+**And** checks `NEST_AI_MODEL` for the model name (default: `gpt-4o-mini`)
+
+**Given** `NEST_AI_API_KEY` is NOT set but `OPENAI_API_KEY` IS set
+**When** the LLM provider is initialized
+**Then** it falls back to `OPENAI_API_KEY`
+**And** falls back to `OPENAI_API_BASE` for endpoint
+**And** falls back to `OPENAI_MODEL` for model name
+
+**Given** neither `NEST_AI_API_KEY` nor `OPENAI_API_KEY` is set
+**When** the LLM provider is initialized
+**Then** it returns `None` (AI is not available)
+**And** no error is raised
+
+**Given** a valid LLM provider is created
+**When** `complete(system_prompt, user_prompt)` is called
+**Then** it sends a chat completion request to the configured endpoint
+**And** returns the response text and token usage (prompt_tokens, completion_tokens)
+
+**Given** the LLM API call fails (network error, auth error, timeout)
+**When** the error is caught
+**Then** the error is logged via Python logging
+**And** a `None` result is returned (caller handles graceful degradation)
+**And** no exception propagates to the user
+
+**Given** the adapter is used in tests
+**When** `LLMProviderProtocol` is referenced
+**Then** it is a `@runtime_checkable` Protocol in `adapters/protocols.py`
+**And** test doubles can be injected via standard DI pattern
+
+**Given** the `openai` Python SDK is added as a dependency
+**When** `pyproject.toml` is updated
+**Then** `openai>=1.0.0` is listed in the project dependencies
+
+---
+
+### Story 6.2: AI Index Enrichment in Sync
+
+**As a** user who has synced project documents,
+**I want** Nest to automatically generate short descriptions for each file in the master index during sync,
+**So that** the index is immediately useful for finding relevant documents without manually running an agent.
+
+**Acceptance Criteria:**
+
+**Given** sync completes processing and AI is configured (API key detected in environment)
+**When** the index generation phase runs
+**Then** an `AIEnrichmentService` is called with the metadata hints (`00_INDEX_HINTS.yaml` data) for files needing descriptions
+**And** for each file with an empty or changed description, a single LLM call generates a ≤15-word description
+**And** the generated descriptions are written into the `00_MASTER_INDEX.md` table
+
+**Given** a file's `content_hash` has NOT changed since last sync
+**When** AI enrichment runs
+**Then** the existing description is carried forward (no LLM call made)
+**And** tokens are not wasted on unchanged files
+
+**Given** a file's `content_hash` HAS changed since last sync
+**When** AI enrichment runs
+**Then** the old description is discarded
+**And** a new LLM call generates a fresh description based on updated hints
+
+**Given** a file is brand new (not in previous index)
+**When** AI enrichment runs
+**Then** an LLM call generates a description for the new file
+
+**Given** the LLM call fails for a specific file
+**When** the error is caught
+**Then** the description for that file remains empty (same as unenriched state)
+**And** a warning is logged
+**And** sync continues processing remaining files
+
+**Given** AI is NOT configured (no API key in environment)
+**When** sync runs
+**Then** the index is generated without descriptions (same behavior as before Epic 6)
+**And** no error or warning about AI is shown
+
+**Given** the `--no-ai` flag is passed to `nest sync`
+**When** sync runs with AI configured
+**Then** AI enrichment is skipped entirely
+**And** existing descriptions from previous syncs are still carried forward via content hash logic
+
+**Given** the system prompt for index enrichment
+**When** constructing the LLM call
+**Then** the prompt instructs the model to write a description of at most 15 words
+**And** the prompt provides the file's headings, first paragraph, and line count from the hints
+**And** the prompt forbids pipe characters in the output (Markdown table safety)
+
+**Given** all unit and integration tests
+**When** the changes are complete
+**Then** all tests pass with LLM calls mocked via `LLMProviderProtocol` test doubles
+
+**Dependencies:** Story 6.1 (LLM Provider Adapter)
+
+---
+
+### Story 6.3: AI Glossary Generation in Sync
+
+**As a** user who has synced project documents,
+**I want** Nest to automatically generate and maintain a project glossary of terms, abbreviations, and stakeholder names during sync,
+**So that** I and the @nest agent can understand project-specific language without running a separate agent.
+
+**Acceptance Criteria:**
+
+**Given** sync completes processing and AI is configured (API key detected in environment)
+**When** glossary candidate terms exist in `00_GLOSSARY_HINTS.yaml`
+**Then** an `AIGlossaryService` is called with the candidate terms
+**And** for each new candidate term (not already defined in `glossary.md`), an LLM call determines:
+  - Whether the term is truly project-specific (skip generic industry terms)
+  - A 1-2 sentence definition based on context snippets
+  - A category (Abbreviation, Stakeholder, Domain Term, Project Name, Tool/System, Other)
+**And** the results are written into `_nest_context/glossary.md` between `<!-- nest:glossary-start -->` and `<!-- nest:glossary-end -->` markers
+
+**Given** `glossary.md` already exists with human-edited definitions
+**When** AI glossary generation runs
+**Then** existing definitions are preserved verbatim (never modified or deleted)
+**And** only new terms are added to the table
+**And** the table is kept sorted alphabetically by Term
+
+**Given** no candidate terms have changed since last sync
+**When** AI glossary generation runs
+**Then** no LLM calls are made
+**And** `glossary.md` is not modified
+
+**Given** new candidate terms are discovered from changed/new files
+**When** AI glossary generation runs
+**Then** only the new terms trigger LLM calls
+**And** terms from unchanged files are not re-processed
+
+**Given** the LLM determines a candidate term is generic (e.g., common industry jargon)
+**When** the filtering decision is made
+**Then** the term is skipped and not added to the glossary
+
+**Given** the LLM call fails for a specific term
+**When** the error is caught
+**Then** that term is skipped (can be retried on next sync)
+**And** a warning is logged
+**And** other terms continue processing
+
+**Given** AI is NOT configured (no API key in environment)
+**When** sync runs
+**Then** no `glossary.md` is generated or modified
+**And** candidate terms are still extracted to `00_GLOSSARY_HINTS.yaml` (the deterministic Phase 1 continues)
+
+**Given** the `--no-ai` flag is passed to `nest sync`
+**When** sync runs
+**Then** AI glossary generation is skipped
+**And** existing `glossary.md` is not modified
+
+**Given** `glossary.md` does not yet exist
+**When** AI glossary generation runs for the first time
+**Then** the file is created with the standard header and table markers
+**And** all qualifying candidate terms are added
+
+**Given** the system prompt for glossary generation
+**When** constructing each LLM call
+**Then** the prompt provides the term, its category hint, occurrence count, source files, and context snippets
+**And** the prompt instructs the model to return: is_project_specific (bool), definition (1-2 sentences), category
+**And** the prompt forbids pipe characters in the definition
+
+**Given** all unit and integration tests
+**When** the changes are complete
+**Then** all tests pass with LLM calls mocked via `LLMProviderProtocol` test doubles
+
+**Dependencies:** Story 6.1 (LLM Provider Adapter)
+
+---
+
+### Story 6.4: Parallel AI Execution & Token Reporting
+
+**As a** user running `nest sync` with AI enrichment,
+**I want** the index enrichment and glossary generation to run in parallel and see how many tokens were used,
+**So that** sync completes faster and I can track AI usage costs.
+
+**Acceptance Criteria:**
+
+**Given** AI is configured and both index enrichment and glossary generation have work to do
+**When** sync reaches the AI phase (after document processing, manifest commit, and orphan cleanup)
+**Then** index enrichment and glossary generation run concurrently via `concurrent.futures.ThreadPoolExecutor` with `max_workers=2`
+**And** both tasks complete before the sync summary is displayed
+
+**Given** one AI task fails (e.g., glossary times out) while the other succeeds
+**When** parallel execution completes
+**Then** the successful task's results are applied normally
+**And** the failed task degrades gracefully (partial results or empty)
+**And** errors are logged
+
+**Given** only one AI task has work (e.g., no new glossary terms but index needs enrichment)
+**When** sync reaches the AI phase
+**Then** only the task with work runs (no unnecessary thread spawning)
+
+**Given** AI enrichment runs (either or both tasks)
+**When** sync summary is displayed
+**Then** token usage is reported:
+```
+  AI tokens:    1,247 (prompt: 983, completion: 264)
+```
+**And** the token counts are aggregated across both enrichment and glossary calls
+
+**Given** AI enrichment runs but generates zero descriptions and zero glossary terms (all cached)
+**When** sync summary is displayed
+**Then** no token usage line is shown (nothing to report)
+
+**Given** the first time AI is detected during sync
+**When** sync summary is displayed
+**Then** a one-time informational tip is shown:
+```
+  🤖 AI enrichment enabled (found OPENAI_API_KEY)
+```
+**And** a tip is shown: `💡 Run 'nest config ai' to change AI settings. Use --no-ai to skip.`
+
+**Given** AI has been used in previous syncs for this project
+**When** subsequent syncs run
+**Then** the "AI enrichment enabled" discovery message is NOT repeated
+**And** only token usage is reported (if tokens were consumed)
+
+**Given** progress display is active during sync
+**When** the AI phase runs
+**Then** a progress indicator shows AI activity: `🤖 AI enrichment...`
+**And** completion shows counts: `4 descriptions, 3 glossary terms`
+
+**Given** all unit and integration tests
+**When** the changes are complete
+**Then** parallel execution is tested with both tasks mocked
+**And** token aggregation is tested
+**And** all tests pass with no regressions
+
+**Dependencies:** Story 6.2 (AI Index Enrichment), Story 6.3 (AI Glossary Generation)
+
+---
+
+### Story 6.5: `nest config ai` Shell RC Writer
+
+**As a** user who wants to set up AI enrichment,
+**I want** a `nest config ai` command that writes my API credentials to my shell RC file,
+**So that** the keys are available as environment variables in all future terminal sessions without manual editing.
+
+**Acceptance Criteria:**
+
+**Given** the user runs `nest config ai`
+**When** the command starts
+**Then** it detects the user's shell from the `$SHELL` environment variable
+**And** resolves the correct RC file:
+  - zsh → `~/.zshrc`
+  - bash (macOS) → `~/.bash_profile` if it exists, else `~/.bashrc`
+  - bash (Linux) → `~/.bashrc`
+  - fish → `~/.config/fish/config.fish`
+  - fallback → `~/.profile`
+
+**Given** the shell RC file is identified
+**When** the interactive prompt runs
+**Then** it asks for:
+  - API endpoint (with default: `https://api.openai.com/v1`)
+  - Model/deployment name (with default: `gpt-4o-mini`)
+  - API key (input masked with `••••` style)
+
+**Given** the user provides all values
+**When** the config is saved
+**Then** the following block is written to the shell RC file:
+```bash
+# --- Nest AI Configuration (managed by `nest config ai`) ---
+export NEST_AI_ENDPOINT="https://..."
+export NEST_AI_MODEL="gpt-4o-mini"
+export NEST_AI_API_KEY="sk-..."
+# --- End Nest AI Configuration ---
+```
+**And** a success message is shown: `✓ Added to ~/.zshrc`
+**And** a reminder is shown: `⚠ Run 'source ~/.zshrc' or open a new terminal to activate.`
+
+**Given** the Nest AI config block already exists in the RC file
+**When** `nest config ai` runs again
+**Then** the existing block is replaced (not duplicated)
+**And** all other content in the RC file is preserved
+
+**Given** the RC file does not exist
+**When** `nest config ai` runs
+**Then** the file is created with the config block
+**And** the parent directory is created if needed (e.g., `~/.config/fish/`)
+
+**Given** AI env vars are already set in the environment (from any source)
+**When** `nest config ai` runs
+**Then** it shows the current values as defaults in the prompts:
+```
+  API endpoint [https://my-corp.openai.azure.com/]: 
+  Model [gpt-4o-mini]: 
+  API key [••••sk-1234]: 
+```
+**And** the user can press Enter to keep existing values or type new ones
+
+**Given** the user wants to remove AI configuration
+**When** running `nest config ai --remove`
+**Then** the Nest AI config block is removed from the RC file
+**And** all other content is preserved
+**And** a message confirms: `✓ AI configuration removed from ~/.zshrc`
+
+**Given** fish shell is detected
+**When** config is written
+**Then** fish-compatible syntax is used:
+```fish
+# --- Nest AI Configuration (managed by `nest config ai`) ---
+set -gx NEST_AI_ENDPOINT "https://..."
+set -gx NEST_AI_MODEL "gpt-4o-mini"
+set -gx NEST_AI_API_KEY "sk-..."
+# --- End Nest AI Configuration ---
+```
+
+**Given** all unit tests
+**When** the changes are complete
+**Then** RC file detection is tested for all shell types
+**And** idempotent write/replace is tested
+**And** fish syntax generation is tested
+**And** all tests pass with no regressions
+
+---
+
+### Story 6.6: Remove Enricher & Glossary Agents
+
+**As a** user,
+**I want** the separate enricher and glossary agents removed from the project,
+**So that** I'm not confused by multiple agents and all AI enrichment happens automatically during sync.
+
+**Acceptance Criteria:**
+
+**Given** `nest init` runs to create a new project
+**When** agent files are generated
+**Then** only `.github/agents/nest.agent.md` is created
+**And** `nest-enricher.agent.md` is NOT created
+**And** `nest-glossary.agent.md` is NOT created
+
+**Given** the codebase is updated
+**When** agent template files are reviewed
+**Then** `src/nest/agents/templates/enricher.md.jinja` is deleted
+**And** `src/nest/agents/templates/glossary.md.jinja` is deleted
+
+**Given** `VSCodeAgentWriter` in `src/nest/agents/vscode_writer.py`
+**When** the class is reviewed
+**Then** `render_enricher()` method is removed
+**And** `generate_enricher()` method is removed
+**And** `render_glossary()` method is removed
+**And** `generate_glossary()` method is removed
+**And** only `render()` and `generate()` methods remain (for the primary nest agent)
+
+**Given** `init_cmd.py` wires up agent generation
+**When** init runs
+**Then** any calls to `generate_enricher()` or `generate_glossary()` are removed
+**And** only the primary `nest.agent.md` is generated
+
+**Given** sync completes and AI is NOT configured
+**When** the sync summary is displayed
+**Then** NO message about running `@nest-enricher` or `@nest-glossary` agents is shown
+**And** the old prompt messages are removed from `_display_sync_summary` in `sync_cmd.py`
+
+**Given** sync completes and AI IS configured
+**When** the sync summary is displayed
+**Then** enrichment results are shown inline (descriptions generated, glossary terms defined, token usage)
+**And** no reference to agent invocation is made
+
+**Given** `ProjectChecker` validates project state
+**When** agent file checks run
+**Then** only `nest.agent.md` presence is checked
+**And** no checks for `nest-enricher.agent.md` or `nest-glossary.agent.md` exist
+
+**Given** all existing tests reference enricher or glossary agents
+**When** tests are updated
+**Then** tests for `render_enricher`, `generate_enricher`, `render_glossary`, `generate_glossary` are removed
+**And** tests for `init_cmd` no longer assert enricher/glossary agent file creation
+**And** tests for sync summary no longer assert agent prompt messages
+**And** all remaining tests pass with no regressions
+
+**Dependencies:** Story 6.2 (AI Index Enrichment), Story 6.3 (AI Glossary Generation) — remove the old mechanism only after the replacement is in place
+
+---
+
+### Story 6.8: Unified LLM Glossary Pipeline
+
+**As a** user who syncs project documents,
+**I want** Nest to extract and define glossary terms in a single LLM pass per document (instead of regex extraction → per-term LLM calls),
+**So that** the glossary captures all term types (not just abbreviations and proper nouns), the pipeline is simpler, and ~400 lines of regex/merge/threshold code are eliminated.
+
+**Acceptance Criteria:**
+
+**Given** sync completes processing and AI is configured
+**When** changed/new context files exist
+**Then** `AIGlossaryService.generate()` is called with changed file paths
+**And** for each file (or chunk), a single LLM call extracts AND defines all glossary-worthy terms in Markdown table row format
+**And** new terms are appended to `glossary.md` with Source(s) populated from the filename
+**And** existing definitions are preserved verbatim (human-edit safe)
+**And** only changed/new files are sent to the LLM (incremental)
+
+**Given** a context file exceeds ~40K tokens
+**When** the file is processed
+**Then** it is split into chunks on paragraph boundaries
+**And** terms are deduplicated across chunks
+
+**Given** all code changes are complete
+**When** searching the codebase
+**Then** `GlossaryHintsService`, `CandidateTerm`, `GlossaryHints`, `GLOSSARY_HINTS_FILE`, and `00_GLOSSARY_HINTS.yaml` are fully removed from `src/` and `tests/`
+
+**Given** `00_GLOSSARY_HINTS.yaml` exists from a previous sync
+**When** the first new-style sync runs
+**Then** the file is deleted (legacy cleanup)
+
+**Dependencies:** Story 6.3 (AI Glossary Generation in Sync), Story 5.2 (Glossary Agent Integration)
+
+---

@@ -1172,3 +1172,10 @@ class TestRemediateIssuesInteractive:
 
         assert len(input_calls) == 1
         assert report.any_attempted is True
+
+
+def test_doctor_service_uses_standard_logger():
+    """AC3: Verify doctor service doesn't hardcode 'nest.errors' logger name."""
+    import nest.services.doctor_service
+
+    assert nest.services.doctor_service.logger.name == "nest.services.doctor_service"

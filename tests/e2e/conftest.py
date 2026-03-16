@@ -30,6 +30,34 @@ skip_without_docling = pytest.mark.skipif(
 )
 
 
+def ai_available() -> bool:
+    """Check if an AI API key is configured in the environment."""
+    return bool(os.environ.get("NEST_AI_API_KEY") or os.environ.get("OPENAI_API_KEY"))
+
+
+skip_without_ai = pytest.mark.skipif(
+    not ai_available(),
+    reason="AI API key not configured",
+)
+
+
+def ai_env_vars() -> dict[str, str]:
+    """Return AI env vars from current environment for subprocess."""
+    env: dict[str, str] = {}
+    for key in (
+        "NEST_AI_API_KEY",
+        "NEST_AI_ENDPOINT",
+        "NEST_AI_MODEL",
+        "OPENAI_API_KEY",
+        "OPENAI_API_BASE",
+        "OPENAI_MODEL",
+    ):
+        val = os.environ.get(key)
+        if val:
+            env[key] = val
+    return env
+
+
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     """Print temp directory path at the end of E2E test runs."""
     # Only print if we actually ran E2E tests (check if any were collected)

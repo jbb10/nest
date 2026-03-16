@@ -30,7 +30,7 @@ class FileSystemAdapter:
             path: Path to the file to write.
             content: Text content to write.
         """
-        path.write_text(content, encoding="utf-8")
+        path.write_text(content, encoding="utf-8", newline="\n")
 
     def read_text(self, path: Path) -> str:
         """Read text content from a file.

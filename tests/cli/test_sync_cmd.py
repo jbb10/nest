@@ -1,12 +1,15 @@
 """Tests for sync command CLI."""
 
 from pathlib import Path
+from unittest.mock import Mock
 
 import typer
 from typer.testing import CliRunner
 
 from nest.cli.main import app
-from nest.cli.sync_cmd import _validate_on_error
+from nest.cli.sync_cmd import _display_sync_summary, _validate_on_error
+from nest.core.models import SyncResult
+from nest.core.paths import AI_SEEN_MARKER, NEST_META_DIR
 
 runner = CliRunner()
 
@@ -92,3 +95,185 @@ class TestSyncProjectValidation:
         result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
 
         assert "nest init" in result.output
+
+
+class TestDisplaySyncSummaryAggregatedTokens:
+    """Tests for aggregated AI token display (Story 6.4)."""
+
+    def _make_console(self) -> tuple["Mock", list[str]]:
+        from rich.console import Console
+
+        output_lines: list[str] = []
+        console = Mock(spec=Console)
+        console.print.side_effect = lambda *args, **kwargs: output_lines.append(
+            " ".join(str(a) for a in args)
+        )
+        return console, output_lines
+
+    def test_display_sync_summary_shows_aggregated_tokens(self) -> None:
+        """Combined prompt+completion from both services shown in single line."""
+        console, lines = self._make_console()
+        result = SyncResult(
+            ai_prompt_tokens=500,
+            ai_completion_tokens=100,
+            ai_glossary_prompt_tokens=300,
+            ai_glossary_completion_tokens=50,
+            ai_files_enriched=2,
+            ai_glossary_terms_added=3,
+        )
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        token_lines = [line for line in lines if "AI tokens:" in line]
+        assert len(token_lines) == 1
+        assert "950" in token_lines[0]
+        assert "prompt: 800" in token_lines[0]
+        assert "completion: 150" in token_lines[0]
+
+    def test_display_sync_summary_hides_tokens_when_zero(self) -> None:
+        """All tokens zero → no AI tokens line."""
+        console, lines = self._make_console()
+        result = SyncResult()
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        token_lines = [line for line in lines if "AI tokens:" in line]
+        assert len(token_lines) == 0
+
+    def test_display_sync_summary_shows_enrichment_count(self) -> None:
+        """'AI enriched: X descriptions' shown when > 0."""
+        console, lines = self._make_console()
+        result = SyncResult(
+            ai_files_enriched=4,
+            ai_prompt_tokens=100,
+            ai_completion_tokens=20,
+        )
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        enriched_lines = [line for line in lines if "AI enriched:" in line]
+        assert len(enriched_lines) == 1
+        assert "4 descriptions" in enriched_lines[0]
+
+    def test_display_sync_summary_shows_glossary_count(self) -> None:
+        """'AI glossary: X terms defined' shown when > 0."""
+        console, lines = self._make_console()
+        result = SyncResult(
+            ai_glossary_terms_added=5,
+            ai_glossary_prompt_tokens=200,
+            ai_glossary_completion_tokens=30,
+        )
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        glossary_lines = [line for line in lines if "AI glossary:" in line]
+        assert len(glossary_lines) == 1
+        assert "5 terms defined" in glossary_lines[0]
+
+
+class TestDisplaySyncSummaryFirstRun:
+    """Tests for first-run AI discovery message (Story 6.4)."""
+
+    def _make_console(self) -> tuple["Mock", list[str]]:
+        from rich.console import Console
+
+        output_lines: list[str] = []
+        console = Mock(spec=Console)
+        console.print.side_effect = lambda *args, **kwargs: output_lines.append(
+            " ".join(str(a) for a in args)
+        )
+        return console, output_lines
+
+    def test_display_sync_summary_shows_first_run_message(self, tmp_path: Path) -> None:
+        """No .ai_seen marker → discovery message shown."""
+        meta_dir = tmp_path / NEST_META_DIR
+        meta_dir.mkdir()
+
+        console, lines = self._make_console()
+        result = SyncResult(
+            ai_files_enriched=2,
+            ai_prompt_tokens=100,
+            ai_completion_tokens=20,
+        )
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/tmp/errors.log"),
+            ai_detected_key="OPENAI_API_KEY",
+            project_root=tmp_path,
+        )
+
+        full_output = "\n".join(lines)
+        assert "AI enrichment enabled" in full_output
+        assert "OPENAI_API_KEY" in full_output
+
+    def test_display_sync_summary_creates_marker_file(self, tmp_path: Path) -> None:
+        """.ai_seen file created after first AI use."""
+        meta_dir = tmp_path / NEST_META_DIR
+        meta_dir.mkdir()
+
+        console, _ = self._make_console()
+        result = SyncResult(
+            ai_files_enriched=1,
+            ai_prompt_tokens=50,
+            ai_completion_tokens=10,
+        )
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/tmp/errors.log"),
+            ai_detected_key="OPENAI_API_KEY",
+            project_root=tmp_path,
+        )
+
+        marker = meta_dir / AI_SEEN_MARKER
+        assert marker.exists()
+
+    def test_display_sync_summary_suppresses_message_on_subsequent_runs(
+        self, tmp_path: Path
+    ) -> None:
+        """.ai_seen exists → no discovery message."""
+        meta_dir = tmp_path / NEST_META_DIR
+        meta_dir.mkdir()
+        (meta_dir / AI_SEEN_MARKER).touch()
+
+        console, lines = self._make_console()
+        result = SyncResult(
+            ai_files_enriched=2,
+            ai_prompt_tokens=100,
+            ai_completion_tokens=20,
+        )
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/tmp/errors.log"),
+            ai_detected_key="OPENAI_API_KEY",
+            project_root=tmp_path,
+        )
+
+        full_output = "\n".join(lines)
+        assert "AI enrichment enabled" not in full_output
+
+    def test_display_sync_summary_no_message_when_no_ai_used(self, tmp_path: Path) -> None:
+        """AI not active → no discovery message even without marker."""
+        meta_dir = tmp_path / NEST_META_DIR
+        meta_dir.mkdir()
+
+        console, lines = self._make_console()
+        result = SyncResult()  # Zero AI activity
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/tmp/errors.log"),
+            ai_detected_key="OPENAI_API_KEY",
+            project_root=tmp_path,
+        )
+
+        full_output = "\n".join(lines)
+        assert "AI enrichment enabled" not in full_output
+        # Marker should NOT be created
+        assert not (meta_dir / AI_SEEN_MARKER).exists()

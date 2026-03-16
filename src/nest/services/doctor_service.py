@@ -22,7 +22,7 @@ from nest.core.exceptions import ConfigError, ManifestError
 from nest.core.models import FileEntry, Manifest
 from nest.core.version import is_newer, sort_versions
 
-logger = logging.getLogger("nest.errors")
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from nest.adapters.protocols import (

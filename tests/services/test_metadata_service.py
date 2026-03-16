@@ -114,31 +114,37 @@ class TestComputeContentHash:
     def test_deterministic_same_input(self):
         """Same input should produce same hash."""
         headings = [HeadingInfo(level=1, text="Title")]
-        hash1 = _compute_content_hash(headings, "paragraph", 10)
-        hash2 = _compute_content_hash(headings, "paragraph", 10)
+        hash1 = _compute_content_hash(headings, "paragraph", 10, "body")
+        hash2 = _compute_content_hash(headings, "paragraph", 10, "body")
         assert hash1 == hash2
 
     def test_hash_length_is_16(self):
         """Hash should be 16 hex characters."""
-        result = _compute_content_hash([], "", 0)
+        result = _compute_content_hash([], "", 0, "")
         assert len(result) == 16
 
     def test_hash_changes_when_headings_change(self):
         """Hash should change when headings differ."""
-        h1 = _compute_content_hash([HeadingInfo(level=1, text="Old")], "", 10)
-        h2 = _compute_content_hash([HeadingInfo(level=1, text="New")], "", 10)
+        h1 = _compute_content_hash([HeadingInfo(level=1, text="Old")], "", 10, "body")
+        h2 = _compute_content_hash([HeadingInfo(level=1, text="New")], "", 10, "body")
         assert h1 != h2
 
     def test_hash_changes_when_paragraph_changes(self):
         """Hash should change when first paragraph differs."""
-        h1 = _compute_content_hash([], "old text", 10)
-        h2 = _compute_content_hash([], "new text", 10)
+        h1 = _compute_content_hash([], "old text", 10, "body")
+        h2 = _compute_content_hash([], "new text", 10, "body")
         assert h1 != h2
 
     def test_hash_changes_when_lines_change(self):
         """Hash should change when line count differs."""
-        h1 = _compute_content_hash([], "", 10)
-        h2 = _compute_content_hash([], "", 20)
+        h1 = _compute_content_hash([], "", 10, "body")
+        h2 = _compute_content_hash([], "", 20, "body")
+        assert h1 != h2
+
+    def test_hash_changes_when_content_changes(self):
+        """Hash should change when file body changes."""
+        h1 = _compute_content_hash([], "same", 10, "old body")
+        h2 = _compute_content_hash([], "same", 10, "new body")
         assert h1 != h2
 
 
@@ -244,13 +250,12 @@ class TestExtractAll:
     """Tests for MetadataExtractorService.extract_all()."""
 
     def test_excludes_master_index_and_hints(self):
-        """Should exclude 00_MASTER_INDEX.md, 00_INDEX_HINTS.yaml, and 00_GLOSSARY_HINTS.yaml."""
+        """Should exclude 00_MASTER_INDEX.md and 00_INDEX_HINTS.yaml."""
         fs = Mock(spec=FileSystemProtocol)
         fs.list_files.return_value = [
             Path("/app/_nest_context/doc.md"),
             Path("/app/_nest_context/00_MASTER_INDEX.md"),
             Path("/app/_nest_context/00_INDEX_HINTS.yaml"),
-            Path("/app/_nest_context/00_GLOSSARY_HINTS.yaml"),
         ]
         fs.read_text.return_value = "content\n"
         service = MetadataExtractorService(filesystem=fs, project_root=Path("/app"))
@@ -260,20 +265,17 @@ class TestExtractAll:
         assert len(results) == 1
         assert results[0].path == "doc.md"
 
-    def test_glossary_md_included_in_index(self):
-        """glossary.md should NOT be excluded — it's user-facing content."""
+    def test_glossary_md_excluded_from_metadata_scan(self):
+        """glossary.md should be excluded to prevent self-trigger AI loops."""
         fs = Mock(spec=FileSystemProtocol)
         fs.list_files.return_value = [
             Path("/app/_nest_context/glossary.md"),
-            Path("/app/_nest_context/00_GLOSSARY_HINTS.yaml"),
         ]
         fs.read_text.return_value = "# Glossary\n"
         service = MetadataExtractorService(filesystem=fs, project_root=Path("/app"))
 
         results = service.extract_all(Path("/app/_nest_context"))
-
-        paths = [r.path for r in results]
-        assert "glossary.md" in paths
+        assert results == []
 
     def test_filters_to_supported_extensions(self):
         """Should only process files with supported text extensions."""

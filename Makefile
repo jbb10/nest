@@ -37,4 +37,4 @@ test-all: test test-e2e
 ci: lint format-check typecheck test-all
 
 release:
-	./scripts/release.sh
+	./scripts/release.sh --yes

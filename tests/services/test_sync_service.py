@@ -15,7 +15,6 @@ from nest.core.models import (
     SyncResult,
 )
 from nest.services.discovery_service import DiscoveryService
-from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
 from nest.services.metadata_service import MetadataExtractorService
@@ -49,14 +48,6 @@ def mock_deps():
         "<!-- nest:index-table-end -->\n"
     )
 
-    from nest.core.models import GlossaryHints
-
-    glossary_mock = Mock(spec=GlossaryHintsService)
-    glossary_mock.load_previous_hints.return_value = None
-    glossary_mock.extract_all.return_value = GlossaryHints(terms=[])
-    glossary_mock.merge_with_previous.return_value = GlossaryHints(terms=[])
-    glossary_mock.write_hints.return_value = None
-
     return {
         "discovery": Mock(spec=DiscoveryService),
         "output": Mock(spec=OutputMirrorService),
@@ -64,7 +55,6 @@ def mock_deps():
         "orphan": orphan_mock,
         "index": index_mock,
         "metadata": metadata_mock,
-        "glossary": glossary_mock,
         "project_root": Path("/app"),
     }
 
@@ -78,7 +68,6 @@ def _create_sync_service(deps: dict) -> SyncService:
         orphan=deps["orphan"],
         index=deps["index"],
         metadata=deps["metadata"],
-        glossary=deps["glossary"],
         project_root=deps["project_root"],
     )
 
@@ -197,64 +186,16 @@ class TestSyncIndexIntegration:
 
         assert result.enrichment_needed == 1
 
-    def test_glossary_terms_discovered_in_sync_result(self, mock_deps):
-        """glossary_terms_discovered should reflect merged glossary term count."""
-        from nest.core.models import CandidateTerm, GlossaryHints
-
-        service = _create_sync_service(mock_deps)
-
-        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
-        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
-
-        mock_deps["glossary"].merge_with_previous.return_value = GlossaryHints(
-            terms=[
-                CandidateTerm(
-                    term="PDC",
-                    category="abbreviation",
-                    occurrences=5,
-                    source_files=["doc.md"],
-                    context_snippets=["The PDC board"],
-                ),
-                CandidateTerm(
-                    term="SME",
-                    category="abbreviation",
-                    occurrences=3,
-                    source_files=["doc.md"],
-                    context_snippets=["SME review"],
-                ),
-            ]
-        )
-
-        result = service.sync()
-
-        assert result.glossary_terms_discovered == 2
-
-    def test_glossary_service_called_during_sync(self, mock_deps):
-        """GlossaryHintsService should be called during normal sync."""
-        service = _create_sync_service(mock_deps)
-
-        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
-        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
-
-        service.sync()
-
-        mock_deps["glossary"].load_previous_hints.assert_called_once()
-        mock_deps["glossary"].extract_all.assert_called_once()
-        mock_deps["glossary"].merge_with_previous.assert_called_once()
-        mock_deps["glossary"].write_hints.assert_called_once()
-
     def test_glossary_skipped_during_dry_run(self, mock_deps):
-        """Glossary hints should NOT be processed during dry-run."""
+        """Glossary should NOT be processed during dry-run."""
         service = _create_sync_service(mock_deps)
 
         mock_deps["orphan"].detect_orphans.return_value = []
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
 
-        service.sync(dry_run=True)
+        result = service.sync(dry_run=True)
 
-        mock_deps["glossary"].load_previous_hints.assert_not_called()
-        mock_deps["glossary"].extract_all.assert_not_called()
-        mock_deps["glossary"].write_hints.assert_not_called()
+        assert isinstance(result, DryRunResult)
 
     def test_enrichment_needed_zero_when_all_described(self, mock_deps):
         """enrichment_needed should be 0 when all files have descriptions."""
@@ -1062,3 +1003,801 @@ class TestSyncCollisionDetection:
         # Both files should be processed
         assert result.processed_count == 2
         mock_deps["manifest"].record_skipped.assert_not_called()
+
+    def test_same_type_collision_tracks_skipped_file(self, mock_deps):
+        """AC4: Same-type collision (e.g., .docx + .pdf → same .md) tracks displaced file."""
+        mock_deps["project_root"] = Path("/app")
+        service = _create_sync_service(mock_deps)
+
+        # report.docx and report.pdf both produce report.md — same-type collision
+        changes = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(
+                    path=Path("/app/_nest_sources/report.docx"),
+                    checksum="aaa",
+                    status="new",
+                ),
+                DiscoveredFile(
+                    path=Path("/app/_nest_sources/report.pdf"),
+                    checksum="bbb",
+                    status="new",
+                ),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/_nest_sources/report.pdf"),
+            status="success",
+            output_path=Path("/app/_nest_context/report.md"),
+        )
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        result = service.sync(changes=changes)
+
+        assert isinstance(result, SyncResult)
+        # Only 1 file should be processed (last one wins)
+        assert result.processed_count == 1
+        # Collision adds to skipped count
+        assert result.skipped_count == 1
+        # The displaced file should be recorded as skipped in manifest
+        mock_deps["manifest"].record_skipped.assert_called_once()
+        skipped_call = mock_deps["manifest"].record_skipped.call_args
+        # Verify the reason contains collision info
+        assert "collision" in skipped_call[1].get("reason", skipped_call[0][-1]).lower()
+
+
+class TestSyncAIEnrichment:
+    """Tests for AI enrichment integration in SyncService."""
+
+    def test_sync_with_ai_enrichment_merges_descriptions(self, mock_deps):
+        """AI descriptions should be merged into old_descriptions before index generation."""
+        from nest.core.models import AIEnrichmentResult, FileMetadata
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.return_value = AIEnrichmentResult(
+            descriptions={"doc.md": "AI generated description"},
+            prompt_tokens=50,
+            completion_tokens=5,
+            files_enriched=1,
+            files_skipped=0,
+            files_failed=0,
+        )
+
+        # Metadata returns a file so AI enrichment has something to process
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+        )
+
+        service.sync()
+
+        # AI enrichment should have been called
+        ai_mock.enrich.assert_called_once()
+        # Index generation should have been called with merged descriptions
+        mock_deps["index"].generate_content.assert_called_once()
+        call_args = mock_deps["index"].generate_content.call_args
+        passed_old_descriptions = call_args[0][1]
+        passed_old_hints = call_args[0][2]
+        # AI description must be in old_descriptions
+        assert "doc.md" in passed_old_descriptions
+        assert passed_old_descriptions["doc.md"] == "AI generated description"
+        # old_hints must be updated so generate_content reads the description
+        assert passed_old_hints.get("doc.md") == "new_hash"
+
+    def test_sync_without_ai_generates_unenriched_index(self, mock_deps):
+        """ai_enrichment=None → same behavior as before, no AI calls."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        result = service.sync()
+
+        assert isinstance(result, SyncResult)
+        assert result.ai_prompt_tokens == 0
+        assert result.ai_completion_tokens == 0
+        assert result.ai_files_enriched == 0
+
+    def test_sync_returns_ai_token_counts(self, mock_deps):
+        """Token counts should propagate from AI enrichment to SyncResult."""
+        from nest.core.models import AIEnrichmentResult
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.return_value = AIEnrichmentResult(
+            descriptions={"a.md": "Desc A", "b.md": "Desc B"},
+            prompt_tokens=200,
+            completion_tokens=30,
+            files_enriched=2,
+            files_skipped=0,
+            files_failed=0,
+        )
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+        )
+
+        result = service.sync()
+
+        assert result.ai_prompt_tokens == 200
+        assert result.ai_completion_tokens == 30
+        assert result.ai_files_enriched == 2
+
+
+class TestSyncAIGlossary:
+    """Tests for AI glossary integration in SyncService."""
+
+    def test_sync_with_ai_glossary_generates_terms(self, mock_deps):
+        """AI glossary called when changed context files exist."""
+        from nest.core.models import AIGlossaryResult, FileMetadata
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+            terms_added=3,
+            terms_skipped_existing=0,
+            terms_failed=0,
+            prompt_tokens=300,
+            completion_tokens=40,
+        )
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        ai_glossary_mock.generate.assert_called_once()
+        assert result.ai_glossary_terms_added == 3
+        assert result.ai_glossary_prompt_tokens == 300
+        assert result.ai_glossary_completion_tokens == 40
+
+    def test_sync_without_ai_glossary_skips_generation(self, mock_deps):
+        """ai_glossary=None -> same behavior as before."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        result = service.sync()
+
+        assert isinstance(result, SyncResult)
+        assert result.ai_glossary_terms_added == 0
+        assert result.ai_glossary_prompt_tokens == 0
+        assert result.ai_glossary_completion_tokens == 0
+
+    def test_sync_returns_ai_glossary_token_counts(self, mock_deps):
+        """Token counts should propagate from AI glossary to SyncResult."""
+        from nest.core.models import AIGlossaryResult, FileMetadata
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+            terms_added=2,
+            prompt_tokens=150,
+            completion_tokens=25,
+        )
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        assert result.ai_glossary_prompt_tokens == 150
+        assert result.ai_glossary_completion_tokens == 25
+        assert result.ai_glossary_terms_added == 2
+
+    def test_sync_skips_ai_glossary_when_no_terms(self, mock_deps):
+        """No changed files -> glossary service not called."""
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+
+        # Default mock_deps returns no metadata (no changed files)
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        ai_glossary_mock.generate.assert_not_called()
+        assert result.ai_glossary_terms_added == 0
+
+    def test_sync_passes_project_context_to_glossary(self, mock_deps):
+        """Glossary call includes optional project context when available."""
+        from nest.core.models import AIGlossaryResult, FileMetadata
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(terms_added=1)
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_glossary=ai_glossary_mock,
+        )
+
+        service._load_project_context = Mock(return_value="Project context text")  # type: ignore[method-assign]
+        service.sync()
+
+        args = ai_glossary_mock.generate.call_args.args
+        assert args[3] == "Project context text"
+
+
+class TestSyncParallelAI:
+    """Tests for parallel AI execution in SyncService (Story 6.4)."""
+
+    def test_sync_runs_ai_tasks_in_parallel_when_both_have_work(self, mock_deps):
+        """Both enrichment and glossary execute and results merge correctly."""
+        from nest.core.models import (
+            AIEnrichmentResult,
+            AIGlossaryResult,
+            FileMetadata,
+        )
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.return_value = AIEnrichmentResult(
+            descriptions={"doc.md": "AI desc"},
+            prompt_tokens=100,
+            completion_tokens=20,
+            files_enriched=1,
+        )
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+            terms_added=2,
+            prompt_tokens=200,
+            completion_tokens=30,
+        )
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+
+        file_meta = FileMetadata(path="doc.md", content_hash="h1", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        ai_mock.enrich.assert_called_once()
+        ai_glossary_mock.generate.assert_called_once()
+        assert result.ai_files_enriched == 1
+        assert result.ai_glossary_terms_added == 2
+        assert result.ai_prompt_tokens == 100
+        assert result.ai_completion_tokens == 20
+        assert result.ai_glossary_prompt_tokens == 200
+        assert result.ai_glossary_completion_tokens == 30
+
+    def test_sync_runs_only_enrichment_when_no_glossary_terms(self, mock_deps):
+        """No changed files → no glossary thread spawned."""
+        from nest.core.models import AIEnrichmentResult
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.return_value = AIEnrichmentResult(
+            descriptions={"x.md": "desc"},
+            prompt_tokens=50,
+            completion_tokens=10,
+            files_enriched=1,
+        )
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+
+        # Default: no metadata (no changed files)
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        ai_mock.enrich.assert_called_once()
+        ai_glossary_mock.generate.assert_not_called()
+        assert result.ai_files_enriched == 1
+        assert result.ai_glossary_terms_added == 0
+
+    def test_sync_runs_only_glossary_when_no_enrichment_service(self, mock_deps):
+        """Enrichment is None, changed files exist."""
+        from nest.core.models import AIGlossaryResult, FileMetadata
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+            terms_added=3,
+            prompt_tokens=150,
+            completion_tokens=25,
+        )
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=None,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        ai_glossary_mock.generate.assert_called_once()
+        assert result.ai_glossary_terms_added == 3
+        assert result.ai_files_enriched == 0
+
+    def test_sync_skips_ai_entirely_when_both_none(self, mock_deps):
+        """Both services None → no executor created."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        result = service.sync()
+
+        assert result.ai_files_enriched == 0
+        assert result.ai_glossary_terms_added == 0
+        assert result.ai_prompt_tokens == 0
+        assert result.ai_glossary_prompt_tokens == 0
+
+    def test_sync_sequential_enrichment_failure_degrades_gracefully(self, mock_deps):
+        """Enrichment-only path raises → sync completes with zero AI results."""
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.side_effect = RuntimeError("Sequential enrichment crash")
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+            ai_glossary=None,
+        )
+
+        result = service.sync()
+
+        assert result.ai_files_enriched == 0
+        assert result.ai_prompt_tokens == 0
+
+    def test_sync_sequential_glossary_failure_degrades_gracefully(self, mock_deps):
+        """Glossary-only path raises → sync completes with zero glossary results."""
+        from nest.core.models import FileMetadata
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.side_effect = RuntimeError("Sequential glossary crash")
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=None,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        assert result.ai_glossary_terms_added == 0
+        assert result.ai_glossary_prompt_tokens == 0
+
+    def test_sync_enrichment_failure_doesnt_block_glossary(self, mock_deps):
+        """Enrichment raises exception → glossary still succeeds."""
+        from nest.core.models import AIGlossaryResult, FileMetadata
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.side_effect = RuntimeError("Enrichment network timeout")
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+            terms_added=2,
+            prompt_tokens=100,
+            completion_tokens=15,
+        )
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        assert result.ai_files_enriched == 0
+        assert result.ai_prompt_tokens == 0
+        assert result.ai_glossary_terms_added == 2
+        assert result.ai_glossary_prompt_tokens == 100
+
+    def test_sync_glossary_failure_doesnt_block_enrichment(self, mock_deps):
+        """Glossary raises exception → enrichment still succeeds."""
+        from nest.core.models import AIEnrichmentResult, FileMetadata
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.return_value = AIEnrichmentResult(
+            descriptions={"f.md": "desc"},
+            prompt_tokens=80,
+            completion_tokens=12,
+            files_enriched=1,
+        )
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.side_effect = RuntimeError("Glossary API rate limit exceeded")
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        assert result.ai_files_enriched == 1
+        assert result.ai_prompt_tokens == 80
+        assert result.ai_glossary_terms_added == 0
+        assert result.ai_glossary_prompt_tokens == 0
+
+    def test_sync_both_ai_tasks_fail_gracefully(self, mock_deps):
+        """Both fail → sync completes, zero AI results."""
+        from nest.core.models import FileMetadata
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.side_effect = RuntimeError("Enrichment crash")
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.side_effect = RuntimeError("Glossary crash")
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        assert result.ai_files_enriched == 0
+        assert result.ai_prompt_tokens == 0
+        assert result.ai_glossary_terms_added == 0
+        assert result.ai_glossary_prompt_tokens == 0
+
+    def test_sync_aggregates_tokens_from_both_ai_tasks(self, mock_deps):
+        """Token counts from both tasks sum correctly in SyncResult."""
+        from nest.core.models import (
+            AIEnrichmentResult,
+            AIGlossaryResult,
+            FileMetadata,
+        )
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.return_value = AIEnrichmentResult(
+            descriptions={"a.md": "A"},
+            prompt_tokens=500,
+            completion_tokens=100,
+            files_enriched=1,
+        )
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+            terms_added=2,
+            prompt_tokens=300,
+            completion_tokens=50,
+        )
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        # Enrichment tokens
+        assert result.ai_prompt_tokens == 500
+        assert result.ai_completion_tokens == 100
+        # Glossary tokens
+        assert result.ai_glossary_prompt_tokens == 300
+        assert result.ai_glossary_completion_tokens == 50
+        # Total (aggregation tests at display layer)
+        total = (
+            result.ai_prompt_tokens
+            + result.ai_glossary_prompt_tokens
+            + result.ai_completion_tokens
+            + result.ai_glossary_completion_tokens
+        )
+        assert total == 950
+
+    def test_sync_parallel_results_applied_to_descriptions(self, mock_deps):
+        """Enrichment descriptions merged into old_descriptions after parallel run."""
+        from nest.core.models import (
+            AIEnrichmentResult,
+            AIGlossaryResult,
+            FileMetadata,
+        )
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.return_value = AIEnrichmentResult(
+            descriptions={"doc.md": "Parallel AI desc"},
+            prompt_tokens=10,
+            completion_tokens=5,
+            files_enriched=1,
+        )
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+            terms_added=1,
+            prompt_tokens=10,
+            completion_tokens=5,
+        )
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+
+        file_meta = FileMetadata(path="doc.md", content_hash="hx", lines=5)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        service.sync()
+
+        # Verify index was generated with AI descriptions
+        call_args = mock_deps["index"].generate_content.call_args
+        passed_descriptions = call_args[0][1]
+        assert passed_descriptions.get("doc.md") == "Parallel AI desc"
+
+    def test_sync_calls_ai_progress_callback_on_start(self, mock_deps):
+        """Callback receives 'start' when AI phase begins."""
+        from nest.core.models import AIEnrichmentResult
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.return_value = AIEnrichmentResult(
+            descriptions={},
+            prompt_tokens=0,
+            completion_tokens=0,
+            files_enriched=0,
+        )
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+        )
+
+        callback_calls: list[str] = []
+        service.sync(ai_progress_callback=lambda msg: callback_calls.append(msg))
+
+        assert "start" in callback_calls
+
+    def test_sync_calls_ai_progress_callback_with_summary(self, mock_deps):
+        """Callback receives summary like '4 descriptions, 3 glossary terms'."""
+        from nest.core.models import (
+            AIEnrichmentResult,
+            AIGlossaryResult,
+            FileMetadata,
+        )
+        from nest.services.ai_enrichment_service import AIEnrichmentService
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_mock = Mock(spec=AIEnrichmentService)
+        ai_mock.enrich.return_value = AIEnrichmentResult(
+            descriptions={"a.md": "d1", "b.md": "d2", "c.md": "d3", "d.md": "d4"},
+            prompt_tokens=100,
+            completion_tokens=20,
+            files_enriched=4,
+        )
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+            terms_added=3,
+            prompt_tokens=50,
+            completion_tokens=10,
+        )
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_enrichment=ai_mock,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        callback_calls: list[str] = []
+        service.sync(ai_progress_callback=lambda msg: callback_calls.append(msg))
+
+        assert "start" in callback_calls
+        assert "4 descriptions, 3 glossary terms" in callback_calls
+
+    def test_sync_no_ai_progress_callback_when_no_ai_work(self, mock_deps):
+        """Callback not called when no AI tasks."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        callback_calls: list[str] = []
+        service.sync(ai_progress_callback=lambda msg: callback_calls.append(msg))
+
+        assert callback_calls == []

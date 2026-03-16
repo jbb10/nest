@@ -97,4 +97,4 @@ class ManifestAdapter:
         meta_dir.mkdir(parents=True, exist_ok=True)
         manifest_path = meta_dir / MANIFEST_FILENAME
         json_str = manifest.model_dump_json(indent=2)
-        manifest_path.write_text(json_str, encoding="utf-8")
+        manifest_path.write_text(json_str, encoding="utf-8", newline="\n")

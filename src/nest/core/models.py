@@ -172,35 +172,54 @@ class SyncResult(BaseModel):
     skipped_orphan_cleanup: bool = False
     user_curated_count: int = 0
     enrichment_needed: int = 0
-    glossary_terms_discovered: int = 0
+    ai_prompt_tokens: int = 0
+    ai_completion_tokens: int = 0
+    ai_files_enriched: int = 0
+    ai_glossary_terms_added: int = 0
+    ai_glossary_prompt_tokens: int = 0
+    ai_glossary_completion_tokens: int = 0
 
 
-class CandidateTerm(BaseModel):
-    """A candidate glossary term extracted from project documents.
-
-    Attributes:
-        term: The term or phrase detected.
-        category: Classification of the term type.
-        occurrences: Total count across all source files.
-        source_files: Relative paths of files where the term appears.
-        context_snippets: Surrounding text snippets for context (up to 3, max 100 chars each).
-    """
-
-    term: str
-    category: Literal["abbreviation", "proper_noun", "domain_term"]
-    occurrences: int
-    source_files: list[str]
-    context_snippets: list[str]
-
-
-class GlossaryHints(BaseModel):
-    """Collection of candidate glossary terms for the glossary agent.
+class AIEnrichmentResult(BaseModel):
+    """Result of AI index enrichment.
 
     Attributes:
-        terms: List of candidate terms extracted from project documents.
+        descriptions: Dict mapping file path to generated description.
+        prompt_tokens: Total prompt tokens used across all LLM calls.
+        completion_tokens: Total completion tokens used across all LLM calls.
+        files_enriched: Number of files that received AI descriptions.
+        files_skipped: Number of files that carried forward existing descriptions.
+        files_failed: Number of files where LLM call failed.
     """
 
-    terms: list[CandidateTerm] = Field(default_factory=lambda: list[CandidateTerm]())
+    descriptions: dict[str, str] = Field(default_factory=dict)
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    files_enriched: int = 0
+    files_skipped: int = 0
+    files_failed: int = 0
+
+
+class AIGlossaryResult(BaseModel):
+    """Result of AI glossary generation.
+
+    Attributes:
+        terms_added: Number of new terms added to glossary.
+        terms_skipped_existing: Number of terms already defined in glossary.
+        terms_failed: Number of terms where LLM call or parsing failed.
+        files_processed: Number of files sent to the LLM.
+        chunks_processed: Number of chunks sent to the LLM.
+        prompt_tokens: Total prompt tokens used across all LLM calls.
+        completion_tokens: Total completion tokens used across all LLM calls.
+    """
+
+    terms_added: int = 0
+    terms_skipped_existing: int = 0
+    terms_failed: int = 0
+    files_processed: int = 0
+    chunks_processed: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 
 class InstallConfig(BaseModel):
@@ -315,6 +334,20 @@ class HeadingInfo(BaseModel):
 
     level: int
     text: str
+
+
+class LLMCompletionResult(BaseModel):
+    """Result of an LLM chat completion call.
+
+    Attributes:
+        text: The generated response text.
+        prompt_tokens: Number of tokens in the prompt.
+        completion_tokens: Number of tokens in the completion.
+    """
+
+    text: str
+    prompt_tokens: int
+    completion_tokens: int
 
 
 class FileMetadata(BaseModel):

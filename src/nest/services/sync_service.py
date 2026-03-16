@@ -1,26 +1,33 @@
+from __future__ import annotations
+
 import logging
 from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from nest.core.exceptions import ProcessingError
 from nest.core.models import DiscoveredFile, DiscoveryResult, DryRunResult, SyncResult
 from nest.core.paths import (
     CONTEXT_DIR,
-    GLOSSARY_HINTS_FILE,
+    GLOSSARY_FILE,
     INDEX_HINTS_FILE,
     NEST_META_DIR,
     SOURCES_DIR,
     is_passthrough_extension,
 )
 from nest.services.discovery_service import DiscoveryService
-from nest.services.glossary_hints_service import GlossaryHintsService
 from nest.services.index_service import IndexService, parse_index_descriptions
 from nest.services.manifest_service import ManifestService
 from nest.services.metadata_service import MetadataExtractorService
 from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
 from nest.ui.logger import log_processing_error
+
+if TYPE_CHECKING:
+    from nest.core.models import AIEnrichmentResult, AIGlossaryResult
+    from nest.services.ai_enrichment_service import AIEnrichmentService
+    from nest.services.ai_glossary_service import AIGlossaryService
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +49,10 @@ class SyncService:
         orphan: OrphanService,
         index: IndexService,
         metadata: MetadataExtractorService,
-        glossary: GlossaryHintsService,
         project_root: Path,
         error_logger: logging.Logger | logging.LoggerAdapter[logging.Logger] | None = None,
+        ai_enrichment: AIEnrichmentService | None = None,
+        ai_glossary: AIGlossaryService | None = None,
     ) -> None:
         """Initialize SyncService.
 
@@ -55,9 +63,10 @@ class SyncService:
             orphan: Service for orphan file cleanup.
             index: Service for master index generation.
             metadata: Service for metadata extraction and hints.
-            glossary: Service for glossary term extraction and hints.
             project_root: Root directory of the project.
             error_logger: Logger for writing errors to .nest/errors.log (AC5).
+            ai_enrichment: Optional AI enrichment service for generating descriptions.
+            ai_glossary: Optional AI glossary service for generating glossary definitions.
         """
         self._discovery = discovery
         self._output = output
@@ -65,9 +74,10 @@ class SyncService:
         self._orphan = orphan
         self._index = index
         self._metadata = metadata
-        self._glossary = glossary
         self._project_root = project_root
         self._error_logger = error_logger
+        self._ai_enrichment = ai_enrichment
+        self._ai_glossary = ai_glossary
 
     def discover(self, force: bool = False) -> DiscoveryResult:
         """Run file discovery.
@@ -87,6 +97,7 @@ class SyncService:
         dry_run: bool = False,
         force: bool = False,
         progress_callback: ProgressCallback | None = None,
+        ai_progress_callback: Callable[[str], None] | None = None,
         changes: DiscoveryResult | None = None,
     ) -> SyncResult | DryRunResult:
         """Execute the sync process.
@@ -99,6 +110,9 @@ class SyncService:
             dry_run: If True, analyze files but don't process/modify anything.
             force: If True, reprocess all files regardless of checksum.
             progress_callback: Optional callback called with filename after each file.
+            ai_progress_callback: Optional callback for AI phase progress. Receives
+                ``"start"`` when the AI phase begins and a summary string
+                (e.g., ``"4 descriptions, 3 glossary terms"``) when it completes.
             changes: Optional pre-calculated discovery result. If None, discovery is performed.
 
         Returns:
@@ -142,6 +156,7 @@ class SyncService:
                 skipped_file.checksum,
                 skipped_file.collision_reason or "Output path collision with passthrough file",
             )
+            skipped_count += 1
 
         if files_to_process:
             logger.info("Processing %d files...", len(files_to_process))
@@ -236,33 +251,102 @@ class SyncService:
         # 8. Write new hints file
         self._metadata.write_hints(new_metadata, hints_path)
 
-        # 9. Load old glossary hints
-        glossary_hints_path = meta_dir / GLOSSARY_HINTS_FILE
-        old_glossary_hints = self._glossary.load_previous_hints(glossary_hints_path)
+        # 9. Determine changed context files for glossary
+        changed_context_files: list[Path] = []
+        for file_meta in new_metadata:
+            old_hash = old_hints.get(file_meta.path)
+            if old_hash is None or old_hash != file_meta.content_hash:
+                changed_context_files.append(context_dir / file_meta.path)
 
-        # 10. Determine changed context files for glossary extraction
-        # Map discovery results to context-dir-relative paths
-        changed_context_files: set[str] | None = None
-        if old_glossary_hints is not None:
-            # Incremental: only scan changed/new context files
-            changed_context_files = set()
+        # 10. Legacy hints cleanup — delete 00_GLOSSARY_HINTS.yaml if it exists
+        legacy_hints_path = meta_dir / "00_GLOSSARY_HINTS.yaml"
+        if legacy_hints_path.exists():
+            try:
+                legacy_hints_path.unlink()
+            except OSError:
+                logger.warning("Failed to delete legacy glossary hints: %s", legacy_hints_path)
+
+        # Parallel AI execution (after glossary hints, before index generation)
+        ai_prompt_tokens = 0
+        ai_completion_tokens = 0
+        ai_files_enriched = 0
+        ai_glossary_terms_added = 0
+        ai_glossary_prompt_tokens = 0
+        ai_glossary_completion_tokens = 0
+
+        has_enrichment_work = self._ai_enrichment is not None
+        has_glossary_work = self._ai_glossary is not None and len(changed_context_files) > 0
+
+        # Signal AI phase start
+        if ai_progress_callback is not None and (has_enrichment_work or has_glossary_work):
+            ai_progress_callback("start")
+
+        if has_enrichment_work and has_glossary_work:
+            # Both tasks have work — run in parallel
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                enrichment_future = executor.submit(
+                    self._ai_enrichment.enrich,  # type: ignore[union-attr]
+                    new_metadata,
+                    old_descriptions,
+                    old_hints,
+                )
+                glossary_future = executor.submit(
+                    self._run_glossary,
+                    changed_context_files,
+                    context_dir,
+                )
+                # Collect results (exceptions caught per-task)
+                ai_result = self._collect_enrichment_result(enrichment_future)
+                glossary_result = self._collect_glossary_result(glossary_future)
+        elif has_enrichment_work:
+            # Only enrichment — run directly (no thread overhead)
+            try:
+                ai_result = self._ai_enrichment.enrich(  # type: ignore[union-attr]
+                    new_metadata,
+                    old_descriptions,
+                    old_hints,
+                )
+            except Exception:
+                logger.exception("AI enrichment failed during sequential execution")
+                ai_result = None
+            glossary_result = None
+        elif has_glossary_work:
+            # Only glossary — run directly
+            ai_result = None
+            try:
+                glossary_result = self._run_glossary(changed_context_files, context_dir)
+            except Exception:
+                logger.exception("AI glossary generation failed during sequential execution")
+                glossary_result = None
+        else:
+            ai_result = None
+            glossary_result = None
+
+        # Apply enrichment results
+        if ai_result is not None:
+            old_descriptions.update(ai_result.descriptions)
             for file_meta in new_metadata:
-                # Check if this file changed vs old index hints
-                old_hash = old_hints.get(file_meta.path)
-                if old_hash is None or old_hash != file_meta.content_hash:
-                    changed_context_files.add(file_meta.path)
+                if file_meta.path in ai_result.descriptions:
+                    old_hints[file_meta.path] = file_meta.content_hash
+            ai_prompt_tokens = ai_result.prompt_tokens
+            ai_completion_tokens = ai_result.completion_tokens
+            ai_files_enriched = ai_result.files_enriched
 
-        # 11. Extract candidate glossary terms from changed/new files
-        new_glossary = self._glossary.extract_all(context_dir, changed_context_files)
+        # Apply glossary results
+        if glossary_result is not None:
+            ai_glossary_terms_added = glossary_result.terms_added
+            ai_glossary_prompt_tokens = glossary_result.prompt_tokens
+            ai_glossary_completion_tokens = glossary_result.completion_tokens
 
-        # 12. Merge with previous glossary hints
-        removed_context_files = set(orphan_result.orphans_removed)
-        merged_glossary = self._glossary.merge_with_previous(
-            new_glossary, old_glossary_hints, removed_context_files
-        )
-
-        # 13. Write new glossary hints
-        self._glossary.write_hints(merged_glossary, glossary_hints_path)
+        # Signal AI phase completion
+        if ai_progress_callback is not None and (has_enrichment_work or has_glossary_work):
+            parts: list[str] = []
+            if ai_files_enriched > 0:
+                parts.append(f"{ai_files_enriched} descriptions")
+            if ai_glossary_terms_added > 0:
+                parts.append(f"{ai_glossary_terms_added} glossary terms")
+            summary = ", ".join(parts) if parts else "cached"
+            ai_progress_callback(summary)
 
         # 14. Generate index (table format, with description carry-forward)
         project_name = self._project_root.name
@@ -278,9 +362,6 @@ class SyncService:
         generated_descriptions = parse_index_descriptions(index_content)
         enrichment_needed = sum(1 for desc in generated_descriptions.values() if not desc.strip())
 
-        # 17. Count candidate glossary terms
-        glossary_terms_discovered = len(merged_glossary.terms)
-
         # Count user-curated files
         user_curated_count = self._orphan.count_user_curated_files()
 
@@ -293,8 +374,83 @@ class SyncService:
             skipped_orphan_cleanup=orphan_result.skipped,
             user_curated_count=user_curated_count,
             enrichment_needed=enrichment_needed,
-            glossary_terms_discovered=glossary_terms_discovered,
+            ai_prompt_tokens=ai_prompt_tokens,
+            ai_completion_tokens=ai_completion_tokens,
+            ai_files_enriched=ai_files_enriched,
+            ai_glossary_terms_added=ai_glossary_terms_added,
+            ai_glossary_prompt_tokens=ai_glossary_prompt_tokens,
+            ai_glossary_completion_tokens=ai_glossary_completion_tokens,
         )
+
+    def _run_glossary(self, changed_files: list[Path], context_dir: Path) -> AIGlossaryResult:
+        """Run AI glossary generation.
+
+        Extracted to a method for ThreadPoolExecutor.submit() compatibility.
+
+        Args:
+            changed_files: List of changed/new file paths.
+            context_dir: Path to _nest_context directory.
+
+        Returns:
+            AIGlossaryResult with counts and token usage.
+        """
+        glossary_file_path = context_dir / GLOSSARY_FILE
+        project_context = self._load_project_context(context_dir)
+        return self._ai_glossary.generate(  # type: ignore[union-attr]
+            changed_files,
+            context_dir,
+            glossary_file_path,
+            project_context,
+        )
+
+    def _load_project_context(self, context_dir: Path) -> str | None:
+        """Load optional project context text for glossary prompting."""
+        candidates = [
+            self._project_root / "_bmad-output" / "project-context.md",
+            self._project_root / "docs" / "project-context.md",
+            context_dir / "project-context.md",
+        ]
+        for path in candidates:
+            try:
+                if path.exists():
+                    text = path.read_text(encoding="utf-8").strip()
+                    if text:
+                        return text
+            except OSError:
+                continue
+        return None
+
+    def _collect_enrichment_result(
+        self, future: Future[AIEnrichmentResult]
+    ) -> AIEnrichmentResult | None:
+        """Safely collect enrichment result from a future.
+
+        Args:
+            future: Future from ThreadPoolExecutor.
+
+        Returns:
+            AIEnrichmentResult or None if the task raised an exception.
+        """
+        try:
+            return future.result()
+        except Exception:
+            logger.exception("AI enrichment failed during parallel execution")
+            return None
+
+    def _collect_glossary_result(self, future: Future[AIGlossaryResult]) -> AIGlossaryResult | None:
+        """Safely collect glossary result from a future.
+
+        Args:
+            future: Future from ThreadPoolExecutor.
+
+        Returns:
+            AIGlossaryResult or None if the task raised an exception.
+        """
+        try:
+            return future.result()
+        except Exception:
+            logger.exception("AI glossary generation failed during parallel execution")
+            return None
 
     def _resolve_collisions(
         self,
@@ -364,13 +520,14 @@ class SyncService:
                     # Both same type — last one wins (unlikely but possible,
                     # e.g., report.pdf + report.docx both → report.md)
                     existing_file, _ = output_map[output_key]
-                    logger.warning(
-                        "Output path collision: %s and %s both produce %s — keeping %s",
-                        existing_file.path.name,
-                        file_info.path.name,
-                        output_key,
-                        file_info.path.name,
+                    reason = (
+                        f"Output path collision: {existing_file.path.name} and "
+                        f"{file_info.path.name} both produce {output_key} "
+                        f"— keeping {file_info.path.name}"
                     )
+                    logger.warning(reason)
+                    existing_file.collision_reason = reason
+                    collision_skipped.append(existing_file)
                     output_map[output_key] = (file_info, is_pt)
             else:
                 output_map[output_key] = (file_info, is_pt)

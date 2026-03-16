@@ -213,6 +213,34 @@ class TestComputeOutputPath:
 
         assert result.suffix == ".md"
 
+
+class TestWriteTextLF:
+    """Tests for write_text LF line ending normalization — AC3."""
+
+    def test_write_text_produces_lf_line_endings(self, tmp_path: Path) -> None:
+        """AC3: write_text produces LF-only output, no CRLF."""
+        adapter = FileSystemAdapter()
+        file_path = tmp_path / "test.txt"
+        content = "line1\nline2\nline3\n"
+
+        adapter.write_text(file_path, content)
+
+        # Read in binary mode to verify actual bytes
+        raw = file_path.read_bytes()
+        assert b"\r\n" not in raw
+        assert b"\n" in raw
+
+    def test_write_text_does_not_add_cr_on_any_platform(self, tmp_path: Path) -> None:
+        """AC3: write_text with LF content never introduces CR bytes."""
+        adapter = FileSystemAdapter()
+        file_path = tmp_path / "test.txt"
+        content = "line1\nline2\n"
+
+        adapter.write_text(file_path, content)
+
+        raw = file_path.read_bytes()
+        assert raw == b"line1\nline2\n"
+
     def test_file_at_raw_inbox_root(self) -> None:
         """Edge case: file at root of raw_inbox."""
         adapter = FileSystemAdapter()
