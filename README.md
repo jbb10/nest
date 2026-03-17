@@ -81,12 +81,17 @@ my-project/
 
 Processes new and changed documents.
 
+AI description generation and glossary creation run automatically only when AI is configured.
+Use `nest config ai` or set `NEST_AI_API_KEY` or `OPENAI_API_KEY` before running `nest sync`.
+Without AI configuration, sync still completes, but index descriptions may be blank and `glossary.md` will not be created.
+
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--on-error` | `skip` | `skip` = continue on errors, `fail` = abort on first error |
 | `--no-clean` | clean ON | Disable orphan cleanup (keeps output when source is deleted) |
 | `--dry-run` | off | Preview what would be processed without making changes |
 | `--force` | off | Re-process all files, ignoring checksums |
+| `--no-ai` | off | Skip AI enrichment even when AI credentials are configured |
 
 ```bash
 nest sync                    # Normal incremental sync
