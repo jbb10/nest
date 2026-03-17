@@ -46,7 +46,7 @@ class TestAIGlossaryE2E:
         result = run_cli(["sync"], cwd=project_dir, timeout=120, env=ai_env_vars())
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
-        glossary_path = project_dir / "_nest_context" / "glossary.md"
+        glossary_path = project_dir / ".nest" / "glossary.md"
         assert glossary_path.exists(), "glossary.md should be created by AI sync"
 
         glossary_content = glossary_path.read_text()
@@ -89,5 +89,5 @@ class TestAIGlossaryE2E:
         result = run_cli(["sync", "--no-ai"], cwd=project_dir, timeout=120, env=ai_env_vars())
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
-        glossary_path = project_dir / "_nest_context" / "glossary.md"
+        glossary_path = project_dir / ".nest" / "glossary.md"
         assert not glossary_path.exists(), "glossary.md should NOT exist with --no-ai"

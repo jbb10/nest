@@ -265,18 +265,6 @@ class TestExtractAll:
         assert len(results) == 1
         assert results[0].path == "doc.md"
 
-    def test_glossary_md_excluded_from_metadata_scan(self):
-        """glossary.md should be excluded to prevent self-trigger AI loops."""
-        fs = Mock(spec=FileSystemProtocol)
-        fs.list_files.return_value = [
-            Path("/app/_nest_context/glossary.md"),
-        ]
-        fs.read_text.return_value = "# Glossary\n"
-        service = MetadataExtractorService(filesystem=fs, project_root=Path("/app"))
-
-        results = service.extract_all(Path("/app/_nest_context"))
-        assert results == []
-
     def test_filters_to_supported_extensions(self):
         """Should only process files with supported text extensions."""
         fs = Mock(spec=FileSystemProtocol)

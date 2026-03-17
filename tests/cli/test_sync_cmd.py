@@ -47,6 +47,7 @@ class TestSyncCommandHelp:
         assert "--dry-run" in result.output
         assert "--force" in result.output
         assert "--no-clean" in result.output
+        assert "--no-ai" in result.output
         assert "--dir" in result.output
 
 
@@ -169,6 +170,38 @@ class TestDisplaySyncSummaryAggregatedTokens:
         glossary_lines = [line for line in lines if "AI glossary:" in line]
         assert len(glossary_lines) == 1
         assert "5 terms defined" in glossary_lines[0]
+
+    def test_display_sync_summary_shows_ai_not_configured_note(self) -> None:
+        """Users should see why AI enrichment did not run."""
+        console, lines = self._make_console()
+        result = SyncResult()
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/tmp/errors.log"),
+            ai_status_note="not configured (run 'nest config ai' or set NEST_AI_API_KEY / OPENAI_API_KEY)",
+        )
+
+        status_lines = [line for line in lines if "AI:" in line]
+        assert len(status_lines) == 1
+        assert "not configured" in status_lines[0]
+
+    def test_display_sync_summary_shows_ai_disabled_note(self) -> None:
+        """Users should see when AI was explicitly disabled."""
+        console, lines = self._make_console()
+        result = SyncResult()
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/tmp/errors.log"),
+            ai_status_note="disabled (--no-ai)",
+        )
+
+        status_lines = [line for line in lines if "AI:" in line]
+        assert len(status_lines) == 1
+        assert "disabled (--no-ai)" in status_lines[0]
 
 
 class TestDisplaySyncSummaryFirstRun:

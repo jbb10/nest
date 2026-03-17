@@ -1262,6 +1262,42 @@ class TestSyncAIGlossary:
         ai_glossary_mock.generate.assert_not_called()
         assert result.ai_glossary_terms_added == 0
 
+    def test_sync_backfills_glossary_when_missing_and_files_unchanged(self, tmp_path: Path, mock_deps):
+        """Missing glossary.md should trigger glossary generation for existing files."""
+        from nest.core.models import AIGlossaryResult, FileMetadata
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(terms_added=2)
+
+        file_meta = FileMetadata(path="doc.md", content_hash="same_hash", lines=10)
+        mock_deps["project_root"] = tmp_path
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["metadata"].load_previous_hints.return_value = {"doc.md": "same_hash"}
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        mock_deps["manifest"].load_current_manifest.return_value = _empty_manifest()
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=mock_deps["project_root"],
+            ai_glossary=ai_glossary_mock,
+        )
+
+        result = service.sync()
+
+        ai_glossary_mock.generate.assert_called_once()
+        changed_files = ai_glossary_mock.generate.call_args.args[0]
+        assert changed_files == [tmp_path / "_nest_context" / "doc.md"]
+        # Glossary path should be in .nest/ not _nest_context/
+        glossary_path_arg = ai_glossary_mock.generate.call_args.args[2]
+        assert glossary_path_arg == tmp_path / ".nest" / "glossary.md"
+        assert result.ai_glossary_terms_added == 2
+
     def test_sync_passes_project_context_to_glossary(self, mock_deps):
         """Glossary call includes optional project context when available."""
         from nest.core.models import AIGlossaryResult, FileMetadata

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 ENRICHMENT_SYSTEM_PROMPT = (
     "You are a technical documentation assistant. "
-    "Write a concise description of the given document in at most 15 words. "
+    "Write a concise description of the given document in at most 10 words. "
     "Output ONLY the description text, nothing else. "
     "Do NOT use pipe characters (|) in your output. "
     "Do NOT include quotes around the description."
@@ -29,7 +29,7 @@ ENRICHMENT_SYSTEM_PROMPT = (
 class AIEnrichmentService:
     """Generates AI-powered descriptions for index files.
 
-    Uses an LLM provider to generate ≤15-word descriptions for each file.
+    Uses an LLM provider to generate ≤10-word descriptions for each file.
     Operates incrementally: unchanged files with existing descriptions
     are skipped to avoid wasting tokens.
     """
@@ -134,7 +134,7 @@ class AIEnrichmentService:
     def _sanitize_description(self, text: str) -> str:
         """Sanitize LLM output for Markdown table safety.
 
-        Strips pipe characters, quotes, whitespace, and truncates to 15 words.
+        Strips pipe characters, quotes, whitespace, and truncates to 10 words.
 
         Args:
             text: Raw LLM output.
@@ -144,6 +144,6 @@ class AIEnrichmentService:
         """
         sanitized = text.replace("\n", " ").replace("|", "-").strip().strip('"').strip("'").strip()
         words = sanitized.split()
-        if len(words) > 15:
-            sanitized = " ".join(words[:15])
+        if len(words) > 10:
+            sanitized = " ".join(words[:10])
         return sanitized

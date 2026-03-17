@@ -274,13 +274,22 @@ def sync_command(
         # Calculate total for progress using discovered changes
         files_to_process_count = len(changes.new_files) + len(changes.modified_files)
 
-        # Detect AI env var key for first-run message
+        # Detect AI env var key for first-run message and summary status.
         ai_detected_key = ""
         if not no_ai:
             if os.environ.get("NEST_AI_API_KEY"):
                 ai_detected_key = "NEST_AI_API_KEY"
             elif os.environ.get("OPENAI_API_KEY"):
                 ai_detected_key = "OPENAI_API_KEY"
+
+        ai_status_note = ""
+        if no_ai:
+            ai_status_note = "disabled (--no-ai)"
+        elif not ai_detected_key:
+            ai_status_note = (
+                "not configured (run 'nest config ai' or set "
+                "NEST_AI_API_KEY / OPENAI_API_KEY)"
+            )
 
         # AI progress callback for console display
         def ai_progress_callback(message: str) -> None:
@@ -309,6 +318,7 @@ def sync_command(
             console,
             error_log_path,
             ai_detected_key=ai_detected_key,
+            ai_status_note=ai_status_note,
             project_root=project_root,
         )
 
@@ -347,6 +357,7 @@ def _display_sync_summary(
     console: "Console",
     error_log_path: Path,
     ai_detected_key: str = "",
+    ai_status_note: str = "",
     project_root: Path | None = None,
 ) -> None:
     """Display sync completion summary.
@@ -366,6 +377,7 @@ def _display_sync_summary(
         console: Rich console for output.
         error_log_path: Path to error log file.
         ai_detected_key: Name of the env var that triggered AI (e.g., ``"OPENAI_API_KEY"``).
+        ai_status_note: Optional human-readable AI status note for disabled or unconfigured cases.
         project_root: Project root directory for marker file operations.
     """
     success("Sync complete")
@@ -396,6 +408,9 @@ def _display_sync_summary(
 
     console.print()
     console.print("  Index updated: .nest/00_MASTER_INDEX.md")
+
+    if ai_status_note:
+        console.print(f"  AI:          {ai_status_note}")
 
     # Aggregated AI token display
     total_prompt = result.ai_prompt_tokens + result.ai_glossary_prompt_tokens

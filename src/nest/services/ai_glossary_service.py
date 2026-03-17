@@ -37,7 +37,7 @@ GLOSSARY_SYSTEM_PROMPT = (
     "- EXCLUDE: universally known technical terms (e.g., API, HTTP, JSON, Agile, "
     "CI/CD). The test: would a senior technical consultant already know this "
     "without project context? If yes, exclude it.\n"
-    "- Definitions must be one sentence, referencing the project context where possible.\n"
+    "- Definitions must be at most 10 words, referencing the project context where possible.\n"
     "- For acronyms, include the expansion in the definition.\n"
     "- Do NOT use pipe characters (|) within any cell value.\n"
     "- If no glossary-worthy terms are found, output nothing."
@@ -61,7 +61,7 @@ GLOSSARY_HEADER = (
 )
 
 GLOSSARY_TABLE_HEADER = (
-    "| Term | Category | Definition | Source(s) |\n|------|----------|------------|-----------|"
+    "| Term | Category | Definition |\n|------|----------|------------|"
 )
 
 # Default chunk size: ~40K tokens ~ 160K characters
@@ -135,7 +135,7 @@ class AIGlossaryService:
             chunks = self._chunk_content(content)
             files_processed += 1
 
-            # Derive filename for Source(s) column
+            # Derive filename for logging
             try:
                 filename = str(file_path.relative_to(context_dir))
             except ValueError:
@@ -161,7 +161,7 @@ class AIGlossaryService:
                         terms_skipped_existing += 1
                         continue
 
-                    row = f"| {term} | {category} | {definition} | {filename} |"
+                    row = f"| {term} | {category} | {definition} |"
                     new_rows.append(row)
                     already_extracted.add(term_lower)
                     terms_added += 1
@@ -262,8 +262,9 @@ class AIGlossaryService:
             if category not in VALID_CATEGORIES:
                 category = "Domain Term"
 
-            # Sanitize definition
+            # Sanitize and truncate definition
             definition = AIGlossaryService._sanitize_definition(definition)
+            definition = AIGlossaryService._truncate_definition(definition)
 
             if definition:
                 results.append((term, category, definition))
@@ -281,6 +282,22 @@ class AIGlossaryService:
             Sanitized definition string.
         """
         return text.replace("\n", " ").replace("|", "-").strip().strip('"').strip("'").strip()
+
+    @staticmethod
+    def _truncate_definition(text: str, max_words: int = 10) -> str:
+        """Truncate definition to max_words.
+
+        Args:
+            text: Sanitized definition text.
+            max_words: Maximum number of words.
+
+        Returns:
+            Truncated definition string.
+        """
+        words = text.split()
+        if len(words) > max_words:
+            return " ".join(words[:max_words])
+        return text
 
     def _load_existing_glossary(self, glossary_path: Path) -> tuple[list[str], set[str]]:
         """Load existing glossary.md and parse defined terms.

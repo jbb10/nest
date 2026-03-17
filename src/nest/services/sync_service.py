@@ -251,12 +251,18 @@ class SyncService:
         # 8. Write new hints file
         self._metadata.write_hints(new_metadata, hints_path)
 
-        # 9. Determine changed context files for glossary
-        changed_context_files: list[Path] = []
-        for file_meta in new_metadata:
-            old_hash = old_hints.get(file_meta.path)
-            if old_hash is None or old_hash != file_meta.content_hash:
-                changed_context_files.append(context_dir / file_meta.path)
+        # 9. Determine which context files need glossary processing.
+        # If glossary.md is missing, process all current files so AI can backfill it
+        # after AI is configured on a previously-synced project.
+        glossary_path = meta_dir / GLOSSARY_FILE
+        if force or (new_metadata and not glossary_path.exists()):
+            changed_context_files = [context_dir / file_meta.path for file_meta in new_metadata]
+        else:
+            changed_context_files = []
+            for file_meta in new_metadata:
+                old_hash = old_hints.get(file_meta.path)
+                if old_hash is None or old_hash != file_meta.content_hash:
+                    changed_context_files.append(context_dir / file_meta.path)
 
         # 10. Legacy hints cleanup — delete 00_GLOSSARY_HINTS.yaml if it exists
         legacy_hints_path = meta_dir / "00_GLOSSARY_HINTS.yaml"
@@ -394,7 +400,7 @@ class SyncService:
         Returns:
             AIGlossaryResult with counts and token usage.
         """
-        glossary_file_path = context_dir / GLOSSARY_FILE
+        glossary_file_path = self._project_root / NEST_META_DIR / GLOSSARY_FILE
         project_context = self._load_project_context(context_dir)
         return self._ai_glossary.generate(  # type: ignore[union-attr]
             changed_files,

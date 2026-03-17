@@ -17,7 +17,6 @@ from nest.adapters.protocols import FileSystemProtocol
 from nest.core.models import FileMetadata, HeadingInfo
 from nest.core.paths import (
     CONTEXT_TEXT_EXTENSIONS,
-    GLOSSARY_FILE,
     INDEX_HINTS_FILE,
     MASTER_INDEX_FILE,
 )
@@ -187,7 +186,7 @@ class MetadataExtractorService:
         """
         all_files = self._fs.list_files(context_dir)
         supported = {ext.lower() for ext in CONTEXT_TEXT_EXTENSIONS}
-        excluded = {MASTER_INDEX_FILE, INDEX_HINTS_FILE, GLOSSARY_FILE}
+        excluded = {MASTER_INDEX_FILE, INDEX_HINTS_FILE}
 
         results: list[FileMetadata] = []
         for file_path in all_files:

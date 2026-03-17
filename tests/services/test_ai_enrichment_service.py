@@ -291,14 +291,14 @@ class TestSanitization:
         assert "|" not in result
         assert "Alpha - Beta - Gamma overview" == result
 
-    def test_sanitize_truncates_to_15_words(self) -> None:
-        """Descriptions longer than 15 words should be truncated."""
+    def test_sanitize_truncates_to_10_words(self) -> None:
+        """Descriptions longer than 10 words should be truncated."""
         service = AIEnrichmentService(llm_provider=MockLLMProvider())
         long_text = " ".join(f"word{i}" for i in range(20))
 
         result = service._sanitize_description(long_text)
 
-        assert len(result.split()) == 15
+        assert len(result.split()) == 10
 
     def test_sanitize_strips_quotes(self) -> None:
         """Leading/trailing quotes should be removed."""

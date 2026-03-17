@@ -73,7 +73,7 @@ def _make_llm_table_response(
     )
 
 
-GLOSSARY_PATH = Path("/project/_nest_context/glossary.md")
+GLOSSARY_PATH = Path("/project/.nest/glossary.md")
 CONTEXT_DIR = Path("/project/_nest_context")
 
 
@@ -127,7 +127,6 @@ class TestGenerateNewTerms:
         assert len(provider.calls) == 1
         content = fs.get_content(GLOSSARY_PATH)
         assert "PDC" in content
-        assert "doc.md" in content  # Source(s) column
 
     def test_multiple_files(self) -> None:
         """Multiple files -> separate LLM calls, all terms merged."""
@@ -183,7 +182,7 @@ class TestIncrementalLogic:
     def test_existing_terms_skipped(self) -> None:
         """Terms already in glossary.md -> skipped."""
         existing_content = _existing_glossary_content(
-            "| PDC | Abbreviation | Existing definition. | a.md |"
+            "| PDC | Abbreviation | Existing definition. |"
         )
         fs = MockFileSystem({str(GLOSSARY_PATH): existing_content})
         f1 = _make_file(fs, "doc.md", "The PDC board meets.")
@@ -221,7 +220,7 @@ class TestIncrementalLogic:
 
     def test_case_insensitive_dedup(self) -> None:
         """Dedup is case-insensitive."""
-        existing_content = _existing_glossary_content("| pdc | Abbreviation | Existing. | a.md |")
+        existing_content = _existing_glossary_content("| pdc | Abbreviation | Existing. |")
         fs = MockFileSystem({str(GLOSSARY_PATH): existing_content})
         f1 = _make_file(fs, "doc.md", "The PDC board.")
         responses = [
@@ -306,7 +305,7 @@ class TestHumanEditPreservation:
 
     def test_preserves_existing_definitions(self) -> None:
         """Existing rows untouched after adding new terms."""
-        existing_row = "| Alpha | Domain Term | Human-written definition. | alpha.md |"
+        existing_row = "| Alpha | Domain Term | Human-written definition. |"
         existing_content = _existing_glossary_content(existing_row)
         fs = MockFileSystem({str(GLOSSARY_PATH): existing_content})
         f1 = _make_file(fs, "doc.md", "Bravo protocol")
@@ -324,7 +323,7 @@ class TestHumanEditPreservation:
 
     def test_sorts_terms_alphabetically(self) -> None:
         """Merged output sorted by term."""
-        existing_row = "| Charlie | Domain Term | Charlie def. | c.md |"
+        existing_row = "| Charlie | Domain Term | Charlie def. |"
         existing_content = _existing_glossary_content(existing_row)
         fs = MockFileSystem({str(GLOSSARY_PATH): existing_content})
         f1 = _make_file(fs, "doc.md", "Alpha and Echo")
@@ -370,7 +369,7 @@ class TestFirstRunCreation:
         assert "# Project Glossary" in content
         assert "<!-- nest:glossary-start -->" in content
         assert "<!-- nest:glossary-end -->" in content
-        assert "| Term | Category | Definition | Source(s) |" in content
+        assert "| Term | Category | Definition |" in content
         assert "PDC" in content
 
 
@@ -387,25 +386,6 @@ class TestNoOpConditions:
 
         assert result == AIGlossaryResult()
         assert len(provider.calls) == 0
-
-
-class TestSourceColumn:
-    """Tests for Source(s) column population (AC2)."""
-
-    def test_source_populated_with_filename(self) -> None:
-        """Source(s) column populated with relative filename."""
-        fs = MockFileSystem()
-        f1 = _make_file(fs, "contracts/alpha.md", "PDC content")
-        responses = [
-            _make_llm_table_response(["| PDC | Acronym | Def. |"]),
-        ]
-        provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
-
-        service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
-
-        content = fs.get_content(GLOSSARY_PATH)
-        assert "contracts/alpha.md" in content
 
 
 class TestCategoryValidation:
@@ -610,5 +590,5 @@ class TestGlossaryFileIO:
         assert content.startswith("# Project Glossary")
         assert "<!-- nest:glossary-start -->" in content
         assert "<!-- nest:glossary-end -->" in content
-        assert "| Term | Category | Definition | Source(s) |" in content
-        assert "|------|----------|------------|-----------|" in content
+        assert "| Term | Category | Definition |" in content
+        assert "|------|----------|------------|" in content
