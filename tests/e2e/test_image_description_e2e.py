@@ -66,9 +66,31 @@ class _MockOpenAIHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         """Handle POST /v1/chat/completions with a canned response."""
         content_length = int(self.headers.get("Content-Length", 0))
-        self.rfile.read(content_length)  # consume request body
+        raw_body = self.rfile.read(content_length)
 
         _MockOpenAIHandler.call_counter[0] += 1
+
+        # Use the handler *subclass* response_body so that per-test responses
+        # configured via MockVisionServer(response=...) are actually applied.
+        response_content = type(self).response_body
+
+        # Glossary calls require a valid pipe-table row so that glossary.md
+        # is written after the first sync and subsequent unchanged-file syncs
+        # are correctly skipped (AC7).
+        try:
+            req = json.loads(raw_body)
+            for msg in req.get("messages", []):
+                if (
+                    msg.get("role") == "system"
+                    and "glossary" in msg.get("content", "").lower()
+                ):
+                    response_content = (
+                        "| Vision Pipeline | Technical | "
+                        "AI-based image description subsystem |"
+                    )
+                    break
+        except Exception:  # noqa: BLE001
+            pass  # malformed JSON — fall back to subclass response_body
 
         body = json.dumps(
             {
@@ -81,7 +103,7 @@ class _MockOpenAIHandler(BaseHTTPRequestHandler):
                         "index": 0,
                         "message": {
                             "role": "assistant",
-                            "content": _MockOpenAIHandler.response_body,
+                            "content": response_content,
                         },
                         "finish_reason": "stop",
                         "logprobs": None,

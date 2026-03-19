@@ -1,6 +1,6 @@
 # Story 7.5: E2E Tests for Image Description
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -81,23 +81,23 @@ This is **story 5 of 5 in Epic 7** (Image Description via Vision LLM), which del
 
 ### Task 1: Extend `generate_fixtures.py` with `create_image_pdf()` (AC: 1)
 
-- [ ] 1.1: Add `create_image_pdf(output_path: Path) -> None` function to `tests/e2e/fixtures/generate_fixtures.py`
+- [x] 1.1: Add `create_image_pdf(output_path: Path) -> None` function to `tests/e2e/fixtures/generate_fixtures.py`
   - Uses **PIL** (available as Docling transitive dep) + **reportlab** (existing dev dep)
   - Creates a 400×280 px bar-chart image with PIL and embeds it in a PDF via `reportlab.lib.utils.ImageReader`
   - Output must be under 200 KB
-- [ ] 1.2: Call `create_image_pdf(fixtures_dir / "image_doc.pdf")` from `main()` in `generate_fixtures.py`
-- [ ] 1.3: Run `python tests/e2e/fixtures/generate_fixtures.py` to generate `image_doc.pdf`
-- [ ] 1.4: Verify `.gitattributes` already covers `*.pdf` as binary — it does: `tests/e2e/fixtures/*.pdf binary`
+- [x] 1.2: Call `create_image_pdf(fixtures_dir / "image_doc.pdf")` from `main()` in `generate_fixtures.py`
+- [x] 1.3: Run `python tests/e2e/fixtures/generate_fixtures.py` to generate `image_doc.pdf`
+- [x] 1.4: Verify `.gitattributes` already covers `*.pdf` as binary — it does: `tests/e2e/fixtures/*.pdf binary`
 - **File:** `tests/e2e/fixtures/generate_fixtures.py`, `tests/e2e/fixtures/image_doc.pdf`
 
 ### Task 2: Create `MockVisionServer` helper in `test_image_description_e2e.py` (AC: 2–7)
 
-- [ ] 2.1: Define `_MockOpenAIHandler(BaseHTTPRequestHandler)` with:
+- [x] 2.1: Define `_MockOpenAIHandler(BaseHTTPRequestHandler)` with:
   - Class-level `response_body: str` (set per-session by `MockVisionServer`)
   - Class-level `call_counter: list[int] = [0]` (mutable list for shared state)
   - `do_POST()`: reads + discards request body, increments `call_counter[0]`, returns OpenAI-format JSON with configurable `response_body`
   - `log_message()`: no-op (suppress HTTP logging)
-- [ ] 2.2: Define `MockVisionServer` context manager with:
+- [x] 2.2: Define `MockVisionServer` context manager with:
   - `__init__(response: str)` stores response body
   - `__enter__()`: resets `call_counter[0]` to 0, creates `HTTPServer(("127.0.0.1", 0), handler_cls)` (port 0 = OS picks free port), starts `serve_forever()` in daemon thread
   - `__exit__()`: calls `self._server.shutdown()`
@@ -108,19 +108,19 @@ This is **story 5 of 5 in Epic 7** (Image Description via Vision LLM), which del
 
 ### Task 3: Implement test class `TestImageDescriptionE2E` (AC: 2–7)
 
-- [ ] 3.1: `test_image_description_produces_canned_description_in_output` — AC2
+- [x] 3.1: `test_image_description_produces_canned_description_in_output` — AC2
   - Gate: `@skip_without_docling`
   - Copy fixture, start MockVisionServer, run `sync`, assert markdown contains `CANNED_DESCRIPTION` and stdout has `"Images described:"`
-- [ ] 3.2: `test_mermaid_response_appears_as_mermaid_block_in_output` — AC3
+- [x] 3.2: `test_mermaid_response_appears_as_mermaid_block_in_output` — AC3
   - Start MockVisionServer with `response=CANNED_MERMAID`, assert ` ```mermaid` and `flowchart TD` in output
-- [ ] 3.3: `test_no_ai_env_vars_produces_image_placeholder` — AC4
+- [x] 3.3: `test_no_ai_env_vars_produces_image_placeholder` — AC4
   - Pass `env={"NEST_AI_API_KEY": "", "OPENAI_API_KEY": ""}` to override ambient API keys with empty strings
   - Assert `<!-- image -->` in output, no canned description, no `"Images described:"`
-- [ ] 3.4: `test_no_ai_flag_produces_image_placeholder_and_no_vision_calls` — AC5
+- [x] 3.4: `test_no_ai_flag_produces_image_placeholder_and_no_vision_calls` — AC5
   - Start MockVisionServer, run `sync --no-ai`, assert `<!-- image -->` in output, `calls_with_no_ai_flag == 0`
-- [ ] 3.5: `test_token_reporting_includes_vision_tokens` — AC6
+- [x] 3.5: `test_token_reporting_includes_vision_tokens` — AC6
   - Assert `"AI tokens:"` in stdout
-- [ ] 3.6: `test_incremental_sync_skips_unchanged_file_and_makes_no_vision_calls` — AC7
+- [x] 3.6: `test_incremental_sync_skips_unchanged_file_and_makes_no_vision_calls` — AC7
   - Run two syncs in the same `MockVisionServer` context, assert `calls_after_second == calls_after_first`
 - **File:** `tests/e2e/test_image_description_e2e.py`
 
@@ -208,10 +208,29 @@ Files to NOT touch:
 
 ### Agent Model Used
 
-Claude Sonnet 4.6 (SM Agent, create-story workflow)
+Claude Sonnet 4.6 (Dev Agent, dev-story workflow)
 
 ### Debug Log References
 
+**Bug 1 — Mermaid test failure**: `_MockOpenAIHandler.do_POST()` read `_MockOpenAIHandler.response_body` (always `CANNED_DESCRIPTION`) instead of `type(self).response_body`. Fixed by using `type(self).response_body` so per-test subclass overrides set via `MockVisionServer(response=...)` are applied.
+
+**Bug 2 — Incremental sync extra call**: The mock LLM returns plain text, which `AIGlossaryService._parse_table_rows()` cannot parse as a valid pipe-table entry. Result: `new_rows = []` → `glossary.md` never written → every subsequent sync sees `glossary_path.exists() == False` → runs glossary for all files again. Fixed by detecting glossary calls via `msg["role"] == "system" and "glossary" in msg["content"]` in `do_POST()` and returning a valid pipe-table row, ensuring `glossary.md` is created after the first sync.
+
 ### Completion Notes List
 
+- All 6 E2E tests in `TestImageDescriptionE2E` pass: 887 unit/integration tests also pass (0 regressions).
+- Task 1 (fixture + gitattributes) was pre-scaffolded in the story commit; verified correct.
+- Task 2 (`_MockOpenAIHandler`, `MockVisionServer`) was pre-scaffolded; both bugs found and fixed in `do_POST()`.
+- Task 3 (6 test methods) was pre-scaffolded; all assertions correct per AC1–AC7.
+- Dev Notes critical cases verified:
+  - `<!-- image -->` placeholder always present in output (AC4 no-AI, AC5 --no-ai)
+  - Description + placeholder both appear for described images (AC2)
+  - Second sync skips unchanged PDF (checksum match) and makes zero extra server calls (AC7, after bug fix)
+
 ### File List
+
+| File | Change |
+|------|--------|
+| `tests/e2e/fixtures/generate_fixtures.py` | Pre-existing: `create_image_pdf()` + call in `main()` |
+| `tests/e2e/fixtures/image_doc.pdf` | Pre-existing: generated 7924-byte binary fixture |
+| `tests/e2e/test_image_description_e2e.py` | Modified: fixed `do_POST()` — use `type(self).response_body` + glossary-aware dispatch |
