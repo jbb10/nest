@@ -263,6 +263,8 @@ class SyncService:
                     failed_count += 1
                     if self._error_logger:
                         log_processing_error(self._error_logger, file_info.path, error_msg)
+                    if progress_callback is not None:
+                        progress_callback(file_info.path.name)
                     if on_error == "fail":
                         raise ProcessingError(
                             f"Docling convert failed: {error_msg}",

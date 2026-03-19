@@ -2230,3 +2230,93 @@ class TestSyncVisionPipeline:
         assert result.images_described == 0
         assert result.images_mermaid == 0
         assert result.images_skipped == 0
+
+    def test_vision_phase1_convert_failure_counted_as_failed(self, mock_deps, tmp_path):
+        """When vision_docling_processor.convert() raises, file is counted as failed, describe never called."""
+        from nest.adapters.docling_processor import DoclingProcessor
+        from nest.services.picture_description_service import PictureDescriptionService
+
+        pds_mock = Mock(spec=PictureDescriptionService)
+        vision_processor_mock = Mock(spec=DoclingProcessor)
+        vision_processor_mock.convert.side_effect = RuntimeError("Docling crashed")
+
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        output_dir = project_root / "_nest_context"
+        output_dir.mkdir(parents=True)
+        source_file = raw_inbox / "broken.pdf"
+        source_file.touch()
+
+        mock_deps["project_root"] = project_root
+
+        changes = DiscoveryResult(
+            new_files=[DiscoveredFile(path=source_file, checksum="abc", status="new")],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=pds_mock,
+            vision_docling_processor=vision_processor_mock,
+        )
+
+        result = service.sync(on_error="skip", changes=changes)
+
+        assert result.failed_count == 1
+        assert result.processed_count == 0
+        mock_deps["manifest"].record_failure.assert_called_once()
+        # PDS.describe should NOT be called — file never reached Phase 2
+        pds_mock.describe.assert_not_called()
+
+    def test_vision_describe_failure_raises_on_fail_mode(self, mock_deps, tmp_path):
+        """When PDS.describe() raises and on_error='fail', ProcessingError is propagated."""
+        from nest.adapters.docling_processor import DoclingProcessor
+        from nest.core.exceptions import ProcessingError
+        from nest.services.picture_description_service import PictureDescriptionService
+
+        pds_mock = Mock(spec=PictureDescriptionService)
+        pds_mock.describe.side_effect = RuntimeError("Vision LLM unavailable")
+
+        conv_result = self._make_conv_result()
+        vision_processor_mock = Mock(spec=DoclingProcessor)
+        vision_processor_mock.convert.return_value = conv_result
+
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        output_dir = project_root / "_nest_context"
+        output_dir.mkdir(parents=True)
+        source_file = raw_inbox / "fail.pdf"
+        source_file.touch()
+
+        mock_deps["project_root"] = project_root
+        mock_deps["output"].compute_docling_output_path.return_value = output_dir / "fail.md"
+
+        changes = DiscoveryResult(
+            new_files=[DiscoveredFile(path=source_file, checksum="abc", status="new")],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=pds_mock,
+            vision_docling_processor=vision_processor_mock,
+        )
+
+        with pytest.raises(ProcessingError):
+            service.sync(on_error="fail", changes=changes)

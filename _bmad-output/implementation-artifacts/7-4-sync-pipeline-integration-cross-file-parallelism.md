@@ -4,6 +4,29 @@ Status: done
 
 ## Dev Agent Record
 
+### Code Review Record
+
+**Reviewer:** Amelia (Dev Agent, adversarial mode) | **Date:** 2026-03-19
+
+#### Findings & Fixes
+
+| # | Severity | Finding | Resolution |
+|---|----------|---------|------------|
+| 1 | HIGH | Missing test: Phase 1 `convert()` failure (task 2.6 implemented but untested — no test validated `failed_count` increment, manifest failure, and `describe()` never called) | Fixed: added `test_vision_phase1_convert_failure_counted_as_failed` |
+| 2 | HIGH | Missing test: `on_error="fail"` with Phase 2 describe failure (task 2.5 fail-mode code path existed but had zero test coverage) | Fixed: added `test_vision_describe_failure_raises_on_fail_mode` |
+| 3 | MEDIUM | `progress_callback` not called on Phase 1 `convert()` failure — standard docling and passthrough failure paths both call it; vision convert exception handler did not | Fixed: added `progress_callback` call in Phase 1 exception handler before the `on_error=="fail"` raise |
+| 4 | MEDIUM | `ThreadPoolExecutor()` in Phase 2 has no `max_workers` bound (sibling AI executor uses `max_workers=2`); many vision files could spawn 32+ threads and trigger API rate-limiting | Action item added below |
+| 5 | LOW | Single commit `71ee67f` bundles all of Epic 7 source files (7.1–7.4); per-story `git blame`/`git bisect` granularity lost | Noted — no code change required |
+
+#### Review Action Items
+
+- [ ] [AI-Review][MEDIUM] Consider adding `max_workers` cap to Phase 2 `ThreadPoolExecutor` in `SyncService.sync()` to prevent API rate-limiting on large syncs. Suggested: `max_workers=min(4, len(deferred_vision))` or a configurable constant. [`src/nest/services/sync_service.py`]
+
+#### Test Results After Fixes
+
+- Vision pipeline tests: **18 passed** (16 original + 2 new)
+- Full non-E2E suite: **887 passed**, 59 deselected (baseline was 885 — +2 new tests)
+
 ### Implementation Summary
 
 **Agent:** Amelia (Dev Agent) | **Date:** 2026-03-19 | **Branch:** `feat/7-4-sync-pipeline-integration-cross-file-parallelism`
@@ -40,10 +63,10 @@ Status: done
 | File | Change |
 |------|--------|
 | `src/nest/core/models.py` | Added 5 vision fields to `SyncResult` |
-| `src/nest/services/sync_service.py` | Two-phase loop, 2 new init params, vision stats |
+| `src/nest/services/sync_service.py` | Two-phase loop, 2 new init params, vision stats; +`progress_callback` call in Phase 1 convert() failure handler (code review fix) |
 | `src/nest/services/output_service.py` | Added `compute_docling_output_path()` |
 | `src/nest/cli/sync_cmd.py` | Vision wiring in `create_sync_service()` + summary display |
-| `tests/services/test_sync_service.py` | Added `TestSyncVisionPipeline` (7 tests) |
+| `tests/services/test_sync_service.py` | Added `TestSyncVisionPipeline` (7 tests); +2 tests for Phase 1 convert failure and on_error="fail" describe failure (code review additions) |
 | `tests/cli/test_sync_cmd.py` | Added `TestDisplaySyncSummaryVisionStats` (9 tests) |
 
 ## Story
