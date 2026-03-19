@@ -1,6 +1,6 @@
 # Story 7.5: E2E Tests for Image Description
 
-Status: review
+Status: done
 
 ## Story
 
@@ -234,3 +234,34 @@ Claude Sonnet 4.6 (Dev Agent, dev-story workflow)
 | `tests/e2e/fixtures/generate_fixtures.py` | Pre-existing: `create_image_pdf()` + call in `main()` |
 | `tests/e2e/fixtures/image_doc.pdf` | Pre-existing: generated 7924-byte binary fixture |
 | `tests/e2e/test_image_description_e2e.py` | Modified: fixed `do_POST()` — use `type(self).response_body` + glossary-aware dispatch |
+
+---
+
+## Senior Developer Review (AI)
+
+**Reviewer:** Claude Sonnet 4.6 (code-review workflow)  
+**Date:** 2026-03-19  
+**Verdict:** ✅ APPROVED
+
+### Review Summary
+
+- 6/6 E2E tests pass (`pytest tests/e2e/test_image_description_e2e.py -v -m e2e`)
+- 887/887 unit/integration tests pass (0 regressions)
+- All ACs (AC1–AC7) verified implemented and passing
+- All tasks marked `[x]` confirmed actually done
+- Git/story File List: 1 MEDIUM discrepancy found and fixed
+
+### Issues Found and Resolved
+
+#### 🟡 MEDIUM (Fixed)
+
+**[M1] Unstaged binary fixture regeneration** — `git status --porcelain` showed `M` on `tests/e2e/fixtures/data.xlsx`, `deck.pptx`, `quarterly.pdf`, `summary.docx`. Running `generate_fixtures.py` for Task 1.3 regenerated all fixtures as a side-effect, leaving the working tree dirty. These files were not part of this story's changes and were not documented in the story File List.  
+→ **Fixed:** Reset all 4 files to HEAD via `git checkout HEAD -- tests/e2e/fixtures/{data.xlsx,deck.pptx,quarterly.pdf,summary.docx}`. Working tree is now clean.
+
+### Action Items (Low Severity — Future Cleanup)
+
+- [ ] [AI-Review][LOW] `_MockOpenAIHandler.call_counter` increments at base-class level but `response_body` reads at subclass level — inconsistency. If `pytest-xdist` parallelism is ever enabled, call counts across concurrent `MockVisionServer` instances would interfere. Align by using `type(self).call_counter` in `do_POST()`. [`tests/e2e/test_image_description_e2e.py`]
+- [ ] [AI-Review][LOW] `_put_image_fixture_in_project()` raises opaque `FileNotFoundError` if `image_doc.pdf` is missing. Add `assert (_FIXTURES_DIR / "image_doc.pdf").exists(), "Run tests/e2e/fixtures/generate_fixtures.py first"` guard. [`tests/e2e/test_image_description_e2e.py:201`]
+- [ ] [AI-Review][LOW] `except Exception` in `do_POST()` JSON glossary-detection block is too broad — swallows Python bugs inside the try block. Narrow to `except (json.JSONDecodeError, KeyError, TypeError)`. [`tests/e2e/test_image_description_e2e.py`]
+- [ ] [AI-Review][LOW] `test_incremental_sync_skips_unchanged_file_and_makes_no_vision_calls` does not assert that the second sync stdout lacks `"Images described:"` — weakens the "file was skipped" contract. [`tests/e2e/test_image_description_e2e.py`]
+- [ ] [AI-Review][LOW] Mermaid backtick fencing preservation is only tested via string search in markdown, not by verifying the three-backtick fence survived Docling's `PictureItem.meta.description` → `export_to_markdown()` round-trip. [`tests/e2e/test_image_description_e2e.py`]
