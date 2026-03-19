@@ -136,6 +136,6 @@ development_status:
   7-1-vision-capable-llm-adapters: done
   7-2-docling-two-pass-image-pipeline: done
   7-3-picture-description-service: done
-  7-4-sync-pipeline-integration-cross-file-parallelism: ready-for-dev
+  7-4-sync-pipeline-integration-cross-file-parallelism: done
   7-5-e2e-tests-for-image-description: backlog
   epic-7-retrospective: optional

@@ -1,6 +1,50 @@
 # Story 7.4: Sync Pipeline Integration & Cross-File Parallelism
 
-Status: ready-for-dev
+Status: done
+
+## Dev Agent Record
+
+### Implementation Summary
+
+**Agent:** Amelia (Dev Agent) | **Date:** 2026-03-19 | **Branch:** `feat/7-4-sync-pipeline-integration-cross-file-parallelism`
+
+#### What was implemented
+
+- **Task 1 — `SyncResult` vision fields** (`src/nest/core/models.py`): Added 5 new fields: `vision_prompt_tokens`, `vision_completion_tokens`, `images_described`, `images_mermaid`, `images_skipped`.
+
+- **Task 2 — Two-phase sync loop** (`src/nest/services/sync_service.py`): Added `picture_description_service` and `vision_docling_processor` parameters to `__init__()` with TYPE_CHECKING guards. Replaced single-path processing loop with a three-branch Phase 1 (passthrough / vision-eligible / standard docling) + Phase 2 concurrent `ThreadPoolExecutor` for `PictureDescriptionService.describe()` across deferred files. Vision stats accumulated per future result.
+
+- **Task 3 — Vision wiring** (`src/nest/cli/sync_cmd.py`): Extended `create_sync_service()` to call `create_vision_provider()` when `not no_ai`, create `ClassificationProcessor(enable_classification=True)` and `PictureDescriptionService`, passing both to `SyncService`.
+
+- **Task 4 — Summary display** (`src/nest/cli/sync_cmd.py`): Updated `_display_sync_summary()` to aggregate `vision_prompt_tokens`/`vision_completion_tokens` into the existing `AI tokens:` line, added "Images described: N (M as Mermaid diagrams)" and "Images skipped: N" lines, and extended `ai_was_used` check to include vision activity.
+
+- **Helper** (`src/nest/services/output_service.py`): Added public `compute_docling_output_path()` to `OutputMirrorService` to expose filesystem path computation without breaking encapsulation.
+
+- **Task 5 — `test_sync_service.py`**: Added `TestSyncVisionPipeline` class (7 tests) covering vision pipeline triggered, standard path fallback, passthrough unaffected, token aggregation across files, describe failure handling, cross-file parallelism manifest recording, zero fields when no vision.
+
+- **Task 6 — `test_sync_cmd.py`**: Added `TestDisplaySyncSummaryVisionStats` class (9 tests) covering mermaid note display, no-mermaid display, no images, skipped shown/hidden, vision tokens in total, vision-only tokens, vision triggers first-run message, no_ai disables vision.
+
+#### Decisions
+
+- Used **Option A** (public `compute_docling_output_path()` on `OutputMirrorService`) over Option B (inline replication) to preserve encapsulation.
+- Fixed a structural bug during implementation where the `else:` (standard docling) try-except block was accidentally nested inside the vision path's `except Exception as e:` block. Detected via ruff B025/B904 — corrected before commit.
+- Pre-existing ruff `F841` in `ai_glossary_service.py` and pyright `reportUnknownMemberType` in `sync_service.py` confirmed pre-existing via git stash test; not this story's scope.
+
+#### Test Results
+
+- `tests/services/test_sync_service.py tests/cli/test_sync_cmd.py`: **96 passed** (16 new)
+- Full non-E2E suite: **885 passed**, 59 deselected (baseline was 869 — +16 new tests)
+
+### File List
+
+| File | Change |
+|------|--------|
+| `src/nest/core/models.py` | Added 5 vision fields to `SyncResult` |
+| `src/nest/services/sync_service.py` | Two-phase loop, 2 new init params, vision stats |
+| `src/nest/services/output_service.py` | Added `compute_docling_output_path()` |
+| `src/nest/cli/sync_cmd.py` | Vision wiring in `create_sync_service()` + summary display |
+| `tests/services/test_sync_service.py` | Added `TestSyncVisionPipeline` (7 tests) |
+| `tests/cli/test_sync_cmd.py` | Added `TestDisplaySyncSummaryVisionStats` (9 tests) |
 
 ## Story
 
@@ -89,7 +133,7 @@ This is **story 4 of 5 in Epic 7** (Image Description via Vision LLM). Epic 7 de
 
 ### Task 1: Extend `SyncResult` with vision fields in `models.py` (AC: 5, 6)
 
-- [ ] 1.1: Add the following fields to `SyncResult` after `ai_glossary_completion_tokens`:
+- [x] 1.1: Add the following fields to `SyncResult` after `ai_glossary_completion_tokens`:
   ```python
   vision_prompt_tokens: int = 0
   vision_completion_tokens: int = 0
@@ -97,15 +141,15 @@ This is **story 4 of 5 in Epic 7** (Image Description via Vision LLM). Epic 7 de
   images_mermaid: int = 0
   images_skipped: int = 0
   ```
-- [ ] 1.2: No new imports needed in `models.py` (all types already present)
+- [x] 1.2: No new imports needed in `models.py` (all types already present)
 - **File:** `src/nest/core/models.py`
 
 ### Task 2: Extend `SyncService` to orchestrate vision pipeline (AC: 1, 2, 3, 4, 6)
 
-- [ ] 2.1: Add `picture_description_service: PictureDescriptionService | None = None` parameter to `SyncService.__init__()` (use `TYPE_CHECKING` guard — see Dev Notes)
-- [ ] 2.2: Store as `self._picture_description_service` (typed as `PictureDescriptionService | None`)
-- [ ] 2.3: Add `_vision_docling_processor: DoclingProcessor | None = None` parameter to `__init__()` for the classification-enabled processor (used when vision is active; TYPE_CHECKING guard)
-- [ ] 2.4: In `SyncService.sync()`, replace the sequential processing loop with a **two-phase approach** when vision is active:
+- [x] 2.1: Add `picture_description_service: PictureDescriptionService | None = None` parameter to `SyncService.__init__()` (use `TYPE_CHECKING` guard — see Dev Notes)
+- [x] 2.2: Store as `self._picture_description_service` (typed as `PictureDescriptionService | None`)
+- [x] 2.3: Add `_vision_docling_processor: DoclingProcessor | None = None` parameter to `__init__()` for the classification-enabled processor (used when vision is active; TYPE_CHECKING guard)
+- [x] 2.4: In `SyncService.sync()`, replace the sequential processing loop with a **two-phase approach** when vision is active:
   - **Phase 1 (sequential):** For each file in `files_to_process`:
     - If it's a passthrough file: process immediately via `self._output.process_file()` (unchanged path)
     - If it's a docling file AND vision is active: call `self._vision_docling_processor.convert(file_info.path)` — collect `(file_info, ConversionResult, output_path)` into a deferred list
@@ -115,11 +159,11 @@ This is **story 4 of 5 in Epic 7** (Image Description via Vision LLM). Epic 7 de
     - Write markdown to output path (ensure parent dir exists first)
     - Record success in manifest
     - Accumulate vision token and image count totals
-- [ ] 2.5: Handle errors in Phase 2 (description exceptions): catch, log, count as `failed_count`, call `manifest.record_failure()`, continue with other files (respect `on_error` flag: raise `ProcessingError` on `fail` mode)
-- [ ] 2.6: Handle errors in Phase 1 Docling convert (exceptions from `convert()`): catch, log, count as `failed_count`, call `manifest.record_failure()`, continue
-- [ ] 2.7: Compute output path for vision-converted files using the existing output path computation. Use `self._output._filesystem.compute_output_path(source, raw_inbox, output_dir)` — or extract path logic consistently with how `OutputMirrorService` does it (see Dev Notes for exact pattern)
-- [ ] 2.8: Accumulate `images_described`, `images_mermaid`, `images_skipped`, `vision_prompt_tokens`, `vision_completion_tokens` from each `PictureDescriptionResult`
-- [ ] 2.9: Include accumulated vision fields in the returned `SyncResult`:
+- [x] 2.5: Handle errors in Phase 2 (description exceptions): catch, log, count as `failed_count`, call `manifest.record_failure()`, continue with other files (respect `on_error` flag: raise `ProcessingError` on `fail` mode)
+- [x] 2.6: Handle errors in Phase 1 Docling convert (exceptions from `convert()`): catch, log, count as `failed_count`, call `manifest.record_failure()`, continue
+- [x] 2.7: Compute output path for vision-converted files using the existing output path computation. Use `self._output._filesystem.compute_output_path(source, raw_inbox, output_dir)` — or extract path logic consistently with how `OutputMirrorService` does it (see Dev Notes for exact pattern)
+- [x] 2.8: Accumulate `images_described`, `images_mermaid`, `images_skipped`, `vision_prompt_tokens`, `vision_completion_tokens` from each `PictureDescriptionResult`
+- [x] 2.9: Include accumulated vision fields in the returned `SyncResult`:
   ```python
   return SyncResult(
       ...  # existing fields
@@ -130,12 +174,12 @@ This is **story 4 of 5 in Epic 7** (Image Description via Vision LLM). Epic 7 de
       images_skipped=images_skipped,
   )
   ```
-- [ ] 2.10: Progress callback still works — call `progress_callback(file_info.path.name)` after each file completes in either phase (passthrough immediately, vision files as their description future resolves)
+- [x] 2.10: Progress callback still works — call `progress_callback(file_info.path.name)` after each file completes in either phase (passthrough immediately, vision files as their description future resolves)
 - **File:** `src/nest/services/sync_service.py`
 
 ### Task 3: Update `create_sync_service()` in `sync_cmd.py` to wire vision (AC: 3, 4)
 
-- [ ] 3.1: In `create_sync_service()`, after existing AI enrichment setup, add vision setup:
+- [x] 3.1: In `create_sync_service()`, after existing AI enrichment setup, add vision setup:
   ```python
   vision_provider = None
   picture_description_service = None
@@ -146,7 +190,7 @@ This is **story 4 of 5 in Epic 7** (Image Description via Vision LLM). Epic 7 de
           from nest.services.picture_description_service import PictureDescriptionService
           picture_description_service = PictureDescriptionService(vision_provider=vision_provider)
   ```
-- [ ] 3.2: Create the classification-enabled `DoclingProcessor` when vision is configured:
+- [x] 3.2: Create the classification-enabled `DoclingProcessor` when vision is configured:
   ```python
   if vision_provider is not None:
       from nest.adapters.docling_processor import DoclingProcessor as VisionDoclingProcessor
@@ -154,13 +198,13 @@ This is **story 4 of 5 in Epic 7** (Image Description via Vision LLM). Epic 7 de
   else:
       vision_docling_processor = None
   ```
-- [ ] 3.3: Pass `picture_description_service=picture_description_service` and `vision_docling_processor=vision_docling_processor` to the `SyncService(...)` constructor
-- [ ] 3.4: The existing `DoclingProcessor()` (used in `OutputMirrorService`) remains (`enable_classification=False` — standard pipeline for non-vision files). When vision IS active, vision-eligible docling files bypass `OutputMirrorService` entirely (handled in `SyncService` Phase 2). Passthrough files still go through `OutputMirrorService`.
+- [x] 3.3: Pass `picture_description_service=picture_description_service` and `vision_docling_processor=vision_docling_processor` to the `SyncService(...)` constructor
+- [x] 3.4: The existing `DoclingProcessor()` (used in `OutputMirrorService`) remains (`enable_classification=False` — standard pipeline for non-vision files). When vision IS active, vision-eligible docling files bypass `OutputMirrorService` entirely (handled in `SyncService` Phase 2). Passthrough files still go through `OutputMirrorService`.
 - **File:** `src/nest/cli/sync_cmd.py`
 
 ### Task 4: Update `_display_sync_summary()` in `sync_cmd.py` (AC: 5, 6)
 
-- [ ] 4.1: Include vision tokens in the existing aggregated token total:
+- [x] 4.1: Include vision tokens in the existing aggregated token total:
   ```python
   total_prompt = (
       result.ai_prompt_tokens
@@ -173,7 +217,7 @@ This is **story 4 of 5 in Epic 7** (Image Description via Vision LLM). Epic 7 de
       + result.vision_completion_tokens
   )
   ```
-- [ ] 4.2: After the existing `"AI enriched:"` and `"AI glossary:"` lines, add image description summary:
+- [x] 4.2: After the existing `"AI enriched:"` and `"AI glossary:"` lines, add image description summary:
   ```python
   if result.images_described > 0:
       mermaid_note = f" ({result.images_mermaid} as Mermaid diagrams)" if result.images_mermaid > 0 else ""
@@ -181,36 +225,36 @@ This is **story 4 of 5 in Epic 7** (Image Description via Vision LLM). Epic 7 de
   if result.images_skipped > 0:
       console.print(f"  Images skipped:  {result.images_skipped} (logos/signatures)")
   ```
-- [ ] 4.3: `ai_was_used` check: add `images_described > 0` or `vision_prompt_tokens > 0` to the `ai_was_used` boolean so the first-run AI discovery marker is shown when vision is used even if text enrichment has no work
+- [x] 4.3: `ai_was_used` check: add `images_described > 0` or `vision_prompt_tokens > 0` to the `ai_was_used` boolean so the first-run AI discovery marker is shown when vision is used even if text enrichment has no work
 - **File:** `src/nest/cli/sync_cmd.py`
 
 ### Task 5: Write tests in `tests/services/test_sync_service.py` (AC: 1, 2, 6, 7)
 
-- [ ] 5.1: Add mock fixture for `PictureDescriptionService` and a mock `DoclingProcessor` that can `convert()`
-- [ ] 5.2: **Vision pipeline triggered** — when `picture_description_service` and `vision_docling_processor` are set AND a docling file is present: verify `vision_docling_processor.convert()` is called, then `pds.describe()` is called, `SyncResult.images_described > 0`, `SyncResult.vision_prompt_tokens > 0`
-- [ ] 5.3: **Token aggregation** — multiple docling files with images → `vision_prompt_tokens` and `vision_completion_tokens` are summed across all described files
-- [ ] 5.4: **No vision → existing path** — when `picture_description_service is None`: `output.process_file()` is called (unchanged path), `SyncResult.images_described == 0`
-- [ ] 5.5: **Passthrough files unaffected** — passthrough files always go through `output.process_file()` even when vision is active
-- [ ] 5.6: **Vision describe failure → file counted as failed** — when `pds.describe()` raises an exception: file counted in `failed_count`, manifest recorded as failure, other files continue
-- [ ] 5.7: **Cross-file parallelism** — two docling files: both description futures submitted to executor, their results aggregated correctly (verify by checking both files appear in manifest success calls)
+- [x] 5.1: Add mock fixture for `PictureDescriptionService` and a mock `DoclingProcessor` that can `convert()`
+- [x] 5.2: **Vision pipeline triggered** — when `picture_description_service` and `vision_docling_processor` are set AND a docling file is present: verify `vision_docling_processor.convert()` is called, then `pds.describe()` is called, `SyncResult.images_described > 0`, `SyncResult.vision_prompt_tokens > 0`
+- [x] 5.3: **Token aggregation** — multiple docling files with images → `vision_prompt_tokens` and `vision_completion_tokens` are summed across all described files
+- [x] 5.4: **No vision → existing path** — when `picture_description_service is None`: `output.process_file()` is called (unchanged path), `SyncResult.images_described == 0`
+- [x] 5.5: **Passthrough files unaffected** — passthrough files always go through `output.process_file()` even when vision is active
+- [x] 5.6: **Vision describe failure → file counted as failed** — when `pds.describe()` raises an exception: file counted in `failed_count`, manifest recorded as failure, other files continue
+- [x] 5.7: **Cross-file parallelism** — two docling files: both description futures submitted to executor, their results aggregated correctly (verify by checking both files appear in manifest success calls)
 - **File:** `tests/services/test_sync_service.py`
 
 ### Task 6: Write tests in `tests/cli/test_sync_cmd.py` (AC: 5, 6)
 
-- [ ] 6.1: **Summary shows "Images described"** — `_display_sync_summary()` with `images_described=3, images_mermaid=1` prints `"Images described: 3 (1 as Mermaid diagrams)"`
-- [ ] 6.2: **Summary shows "Images described" (no mermaid)** — `images_described=2, images_mermaid=0` prints `"Images described: 2"` (no Mermaid note)
-- [ ] 6.3: **No images → no image line** — `images_described=0, images_skipped=0` → no "Images described" line
-- [ ] 6.4: **Skipped images shown** — `images_skipped=4` → `"Images skipped:  4 (logos/signatures)"`
-- [ ] 6.5: **Vision tokens in total** — `vision_prompt_tokens=100, vision_completion_tokens=50` + existing AI tokens → `"AI tokens: N"` total includes vision
-- [ ] 6.6: **`create_sync_service` with no_ai=True** — vision provider NOT created, PDS NOT created, `picture_description_service` is `None`
+- [x] 6.1: **Summary shows "Images described"** — `_display_sync_summary()` with `images_described=3, images_mermaid=1` prints `"Images described: 3 (1 as Mermaid diagrams)"`
+- [x] 6.2: **Summary shows "Images described" (no mermaid)** — `images_described=2, images_mermaid=0` prints `"Images described: 2"` (no Mermaid note)
+- [x] 6.3: **No images → no image line** — `images_described=0, images_skipped=0` → no "Images described" line
+- [x] 6.4: **Skipped images shown** — `images_skipped=4` → `"Images skipped:  4 (logos/signatures)"`
+- [x] 6.5: **Vision tokens in total** — `vision_prompt_tokens=100, vision_completion_tokens=50` + existing AI tokens → `"AI tokens: N"` total includes vision
+- [x] 6.6: **`create_sync_service` with no_ai=True** — vision provider NOT created, PDS NOT created, `picture_description_service` is `None`
 - **File:** `tests/cli/test_sync_cmd.py`
 
 ### Task 7: CI checks
 
-- [ ] 7.1: `ruff check src/ tests/ --fix` — zero lint errors
-- [ ] 7.2: `pyright src/nest/services/sync_service.py src/nest/cli/sync_cmd.py src/nest/core/models.py` — zero type errors (strict mode)
-- [ ] 7.3: `pytest tests/services/test_sync_service.py tests/cli/test_sync_cmd.py -v` — all new tests green
-- [ ] 7.4: `pytest -m "not e2e" -v` — full non-E2E suite green (≥869 passed, no regressions)
+- [x] 7.1: `ruff check src/ tests/ --fix` — zero lint errors (pre-existing F841 in ai_glossary_service.py excluded)
+- [x] 7.2: `pyright src/nest/services/sync_service.py src/nest/cli/sync_cmd.py src/nest/core/models.py` — zero type errors (pre-existing reportUnknownMemberType excluded) (strict mode)
+- [x] 7.3: `pytest tests/services/test_sync_service.py tests/cli/test_sync_cmd.py -v` — all 96 tests green (16 new)
+- [x] 7.4: `pytest -m "not e2e" -v` — full non-E2E suite green (885 passed, no regressions)
 
 ## Dev Notes
 
