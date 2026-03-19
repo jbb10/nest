@@ -103,9 +103,7 @@ class TestAITransitionE2E:
         assert second.exit_code == 0, f"Second sync failed: {second.stderr}\n{second.stdout}"
 
         # Glossary should now exist in .nest/
-        assert glossary_path.exists(), (
-            "Glossary should be created after enabling AI on second sync"
-        )
+        assert glossary_path.exists(), "Glossary should be created after enabling AI on second sync"
         glossary_content = glossary_path.read_text()
         assert "<!-- nest:glossary-start -->" in glossary_content
         assert "<!-- nest:glossary-end -->" in glossary_content
@@ -133,9 +131,7 @@ class TestAITransitionE2E:
         assert "AI tokens:" in second.stdout
 
     @skip_without_ai
-    def test_enable_ai_after_no_ai_flag_backfills(
-        self, initialized_project: Path
-    ) -> None:
+    def test_enable_ai_after_no_ai_flag_backfills(self, initialized_project: Path) -> None:
         """Using --no-ai then running without it produces glossary and descriptions.
 
         Exercises the same backfill path but the first sync explicitly uses --no-ai
@@ -147,28 +143,20 @@ class TestAITransitionE2E:
         (sources_dir / "overview.md").write_text(_SAMPLE_CONTENT)
 
         # First sync with --no-ai (credentials present but disabled)
-        first = run_cli(
-            ["sync", "--no-ai"], cwd=project_dir, timeout=120, env=ai_env_vars()
-        )
+        first = run_cli(["sync", "--no-ai"], cwd=project_dir, timeout=120, env=ai_env_vars())
         assert first.exit_code == 0, f"First sync failed: {first.stderr}\n{first.stdout}"
 
         glossary_path = project_dir / ".nest" / "glossary.md"
-        assert not glossary_path.exists(), (
-            "Glossary should NOT exist after --no-ai sync"
-        )
+        assert not glossary_path.exists(), "Glossary should NOT exist after --no-ai sync"
 
         # Second sync with AI enabled (no --no-ai flag)
         second = run_cli(["sync"], cwd=project_dir, timeout=120, env=ai_env_vars())
         assert second.exit_code == 0, f"Second sync failed: {second.stderr}\n{second.stdout}"
 
-        assert glossary_path.exists(), (
-            "Glossary should be created when AI is re-enabled"
-        )
+        assert glossary_path.exists(), "Glossary should be created when AI is re-enabled"
 
         # Index description should be populated
         index_path = project_dir / ".nest" / "00_MASTER_INDEX.md"
         descriptions = _index_descriptions_by_file(index_path.read_text())
         assert "overview.md" in descriptions
-        assert descriptions["overview.md"], (
-            "Expected non-empty description after AI re-enabled"
-        )
+        assert descriptions["overview.md"], "Expected non-empty description after AI re-enabled"

@@ -122,6 +122,22 @@ def create_sync_service(
                 filesystem=filesystem,
             )
 
+    # Vision provider (independent of text enrichment)
+    vision_docling_processor = None
+    picture_description_service = None
+    if not no_ai:
+        from nest.adapters.llm_provider import create_vision_provider
+
+        vision_provider = create_vision_provider()
+        if vision_provider is not None:
+            from nest.adapters.docling_processor import DoclingProcessor as ClassificationProcessor
+
+            vision_docling_processor = ClassificationProcessor(enable_classification=True)
+
+            from nest.services.picture_description_service import PictureDescriptionService
+
+            picture_description_service = PictureDescriptionService(vision_provider=vision_provider)
+
     # Wire up services with their dependencies
     return SyncService(
         discovery=DiscoveryService(
@@ -156,6 +172,8 @@ def create_sync_service(
         error_logger=error_logger,
         ai_enrichment=ai_enrichment,
         ai_glossary=ai_glossary,
+        picture_description_service=picture_description_service,
+        vision_docling_processor=vision_docling_processor,
     )
 
 
@@ -287,8 +305,7 @@ def sync_command(
             ai_status_note = "disabled (--no-ai)"
         elif not ai_detected_key:
             ai_status_note = (
-                "not configured (run 'nest config ai' or set "
-                "NEST_AI_API_KEY / OPENAI_API_KEY)"
+                "not configured (run 'nest config ai' or set NEST_AI_API_KEY / OPENAI_API_KEY)"
             )
 
         # AI progress callback for console display
@@ -413,8 +430,14 @@ def _display_sync_summary(
         console.print(f"  AI:          {ai_status_note}")
 
     # Aggregated AI token display
-    total_prompt = result.ai_prompt_tokens + result.ai_glossary_prompt_tokens
-    total_completion = result.ai_completion_tokens + result.ai_glossary_completion_tokens
+    total_prompt = (
+        result.ai_prompt_tokens + result.ai_glossary_prompt_tokens + result.vision_prompt_tokens
+    )
+    total_completion = (
+        result.ai_completion_tokens
+        + result.ai_glossary_completion_tokens
+        + result.vision_completion_tokens
+    )
     total_tokens = total_prompt + total_completion
 
     if total_tokens > 0:
@@ -430,11 +453,22 @@ def _display_sync_summary(
     if result.ai_glossary_terms_added > 0:
         console.print(f"  AI glossary:  {result.ai_glossary_terms_added} terms defined")
 
+    # Show image description counts
+    if result.images_described > 0:
+        mermaid_note = (
+            f" ({result.images_mermaid} as Mermaid diagrams)" if result.images_mermaid > 0 else ""
+        )
+        console.print(f"  Images described: {result.images_described}{mermaid_note}")
+    if result.images_skipped > 0:
+        console.print(f"  Images skipped:  {result.images_skipped} (logos/signatures)")
+
     # First-run AI discovery message
     ai_was_used = (
         result.ai_files_enriched > 0
         or result.ai_glossary_terms_added > 0
         or (result.ai_prompt_tokens + result.ai_glossary_prompt_tokens) > 0
+        or result.images_described > 0
+        or result.vision_prompt_tokens > 0
     )
 
     if ai_was_used and ai_detected_key and project_root is not None:

@@ -306,7 +306,7 @@ nest init "Nike"
 ### 6.1 Docling Implementation Details
 * **Tables:** Enable `TableFormer` mode in Docling to ensure Excel/PDF tables are converted to Markdown tables, not just raw text.
 * **Chunking:** For V1, do **not** chunk files. Save 1 Source File = 1 Markdown File. Rely on Gemini/Copilot's long context window (128k+) to read the full file.
-* **Images:** Ignore images for V1 to keep speed high. (Roadmap Item: Use GPT-4o to caption images).
+* **Images:** When AI is configured, Docling classifies images locally (diagrams, charts, photos, logos, etc.) then sends them to a vision-capable LLM with type-specific prompts: flowcharts and block diagrams produce Mermaid code blocks, charts/photos get concise descriptions, logos and signatures are skipped. Descriptions are embedded inline in the output Markdown via Docling's `PictureDescriptionData`. When AI is not configured, images produce `[Image: ...]` placeholder markers. Implementation follows the two-pass approach documented in `docs/docling-picture-description-guide.md`.
 
 ### 6.2 Agent File Naming
 * **Must use:** `.github/agents/*.agent.md`
@@ -421,6 +421,6 @@ policies/hr_handbook.md
 ## 7. Roadmap (Post-V1)
 * **`nest doctor` Command:** Validate environment, ML models, manifest integrity, and agent file presence. Offer to fix detected issues.
 * **`nest upgrade` Command:** Run `uv tool upgrade nest`, check for agent template updates, and handle manifest migrations.
-* **Image Captioning:** Use a local VLM or API to describe charts in PDFs.
+* ~~**Image Captioning:** Use a local VLM or API to describe charts in PDFs.~~ *(Implemented — see Epic 7: Image Description via Vision LLM)*
 * **Recursive Sync:** Watch the folder for changes automatically (Daemon mode).
 * **Semantic Search:** Generate a local vector index (ChromaDB) for projects with >1000 files where linear scanning of `MASTER_INDEX` fails.

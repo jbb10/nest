@@ -1262,7 +1262,9 @@ class TestSyncAIGlossary:
         ai_glossary_mock.generate.assert_not_called()
         assert result.ai_glossary_terms_added == 0
 
-    def test_sync_backfills_glossary_when_missing_and_files_unchanged(self, tmp_path: Path, mock_deps):
+    def test_sync_backfills_glossary_when_missing_and_files_unchanged(
+        self, tmp_path: Path, mock_deps
+    ):
         """Missing glossary.md should trigger glossary generation for existing files."""
         from nest.core.models import AIGlossaryResult, FileMetadata
         from nest.services.ai_glossary_service import AIGlossaryService
@@ -1837,3 +1839,394 @@ class TestSyncParallelAI:
         service.sync(ai_progress_callback=lambda msg: callback_calls.append(msg))
 
         assert callback_calls == []
+
+
+class TestSyncVisionPipeline:
+    """Tests for vision pipeline integration in SyncService (Story 7.4)."""
+
+    def _make_pds_result(
+        self,
+        images_described: int = 2,
+        images_mermaid: int = 0,
+        images_skipped: int = 0,
+        prompt_tokens: int = 100,
+        completion_tokens: int = 50,
+    ):
+        """Build a PictureDescriptionResult with given values."""
+        from nest.core.models import PictureDescriptionResult
+
+        return PictureDescriptionResult(
+            images_described=images_described,
+            images_mermaid=images_mermaid,
+            images_skipped=images_skipped,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+        )
+
+    def _make_conv_result(self):
+        """Build a minimal mock ConversionResult with an exportable document."""
+        conv = Mock()
+        conv.document.export_to_markdown.return_value = "# Converted\n\nSome text\n"
+        return conv
+
+    def test_vision_pipeline_triggered_for_docling_file(self, mock_deps, tmp_path):
+        """When PDS and vision processor set, docling file goes through vision path."""
+        from nest.adapters.docling_processor import DoclingProcessor
+        from nest.services.picture_description_service import PictureDescriptionService
+
+        pds_mock = Mock(spec=PictureDescriptionService)
+        pds_mock.describe.return_value = self._make_pds_result(
+            images_described=3, images_mermaid=1, prompt_tokens=200, completion_tokens=80
+        )
+
+        conv_result = self._make_conv_result()
+        vision_processor_mock = Mock(spec=DoclingProcessor)
+        vision_processor_mock.convert.return_value = conv_result
+
+        # Set up paths: source must be under _nest_sources
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        output_dir = project_root / "_nest_context"
+        output_dir.mkdir(parents=True)
+        source_file = raw_inbox / "report.pdf"
+        source_file.touch()
+
+        mock_deps["project_root"] = project_root
+        mock_deps["output"].compute_docling_output_path.return_value = output_dir / "report.md"
+
+        changes = DiscoveryResult(
+            new_files=[DiscoveredFile(path=source_file, checksum="abc", status="new")],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=pds_mock,
+            vision_docling_processor=vision_processor_mock,
+        )
+
+        result = service.sync(changes=changes)
+
+        # Vision processor should have been called
+        vision_processor_mock.convert.assert_called_once_with(source_file)
+        # PDS describe should have been called
+        pds_mock.describe.assert_called_once_with(conv_result)
+        # Vision stats should propagate to SyncResult
+        assert result.images_described == 3
+        assert result.images_mermaid == 1
+        assert result.vision_prompt_tokens == 200
+        assert result.vision_completion_tokens == 80
+        # Standard process_file should NOT be called for this file
+        mock_deps["output"].process_file.assert_not_called()
+
+    def test_no_vision_uses_standard_path(self, mock_deps, tmp_path):
+        """Without vision services, docling files use the standard output.process_file() path."""
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        output_dir = project_root / "_nest_context"
+        output_dir.mkdir(parents=True)
+        source_file = raw_inbox / "report.pdf"
+        source_file.touch()
+
+        mock_deps["project_root"] = project_root
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=source_file,
+            status="success",
+            output_path=output_dir / "report.md",
+        )
+
+        changes = DiscoveryResult(
+            new_files=[DiscoveredFile(path=source_file, checksum="abc", status="new")],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=None,
+            vision_docling_processor=None,
+        )
+
+        result = service.sync(changes=changes)
+
+        mock_deps["output"].process_file.assert_called_once()
+        assert result.images_described == 0
+        assert result.vision_prompt_tokens == 0
+
+    def test_passthrough_files_unaffected_by_vision(self, mock_deps, tmp_path):
+        """Passthrough files always go through output.process_file() even when vision active."""
+        from nest.adapters.docling_processor import DoclingProcessor
+        from nest.services.picture_description_service import PictureDescriptionService
+
+        pds_mock = Mock(spec=PictureDescriptionService)
+        vision_processor_mock = Mock(spec=DoclingProcessor)
+
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        output_dir = project_root / "_nest_context"
+        output_dir.mkdir(parents=True)
+        source_file = raw_inbox / "notes.md"
+        source_file.touch()
+
+        mock_deps["project_root"] = project_root
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=source_file,
+            status="success",
+            output_path=output_dir / "notes.md",
+        )
+
+        changes = DiscoveryResult(
+            new_files=[DiscoveredFile(path=source_file, checksum="bbb", status="new")],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=pds_mock,
+            vision_docling_processor=vision_processor_mock,
+        )
+
+        result = service.sync(changes=changes)
+
+        # Passthrough file should go through process_file (not vision path)
+        mock_deps["output"].process_file.assert_called_once_with(source_file, raw_inbox, output_dir)
+        # Vision processor and PDS should NOT be called for passthrough files
+        vision_processor_mock.convert.assert_not_called()
+        pds_mock.describe.assert_not_called()
+        assert result.processed_count == 1
+
+    def test_vision_token_aggregation_across_multiple_files(self, mock_deps, tmp_path):
+        """Tokens and counts are summed across all vision-described files."""
+        from nest.adapters.docling_processor import DoclingProcessor
+        from nest.services.picture_description_service import PictureDescriptionService
+
+        pds_mock = Mock(spec=PictureDescriptionService)
+        pds_mock.describe.side_effect = [
+            self._make_pds_result(
+                images_described=3,
+                images_mermaid=1,
+                images_skipped=1,
+                prompt_tokens=150,
+                completion_tokens=60,
+            ),
+            self._make_pds_result(
+                images_described=2,
+                images_mermaid=0,
+                images_skipped=0,
+                prompt_tokens=100,
+                completion_tokens=40,
+            ),
+        ]
+
+        conv_result_a = self._make_conv_result()
+        conv_result_b = self._make_conv_result()
+        vision_processor_mock = Mock(spec=DoclingProcessor)
+        vision_processor_mock.convert.side_effect = [conv_result_a, conv_result_b]
+
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        output_dir = project_root / "_nest_context"
+        output_dir.mkdir(parents=True)
+        file_a = raw_inbox / "a.pdf"
+        file_b = raw_inbox / "b.pdf"
+        file_a.touch()
+        file_b.touch()
+
+        mock_deps["project_root"] = project_root
+        mock_deps["output"].compute_docling_output_path.side_effect = [
+            output_dir / "a.md",
+            output_dir / "b.md",
+        ]
+
+        changes = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=file_a, checksum="aaa", status="new"),
+                DiscoveredFile(path=file_b, checksum="bbb", status="new"),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=pds_mock,
+            vision_docling_processor=vision_processor_mock,
+        )
+
+        result = service.sync(changes=changes)
+
+        assert result.images_described == 5
+        assert result.images_mermaid == 1
+        assert result.images_skipped == 1
+        assert result.vision_prompt_tokens == 250
+        assert result.vision_completion_tokens == 100
+        assert result.processed_count == 2
+
+    def test_vision_describe_failure_counted_as_failed(self, mock_deps, tmp_path):
+        """When PDS.describe() raises, file is counted as failed, others continue."""
+        from nest.adapters.docling_processor import DoclingProcessor
+        from nest.services.picture_description_service import PictureDescriptionService
+
+        pds_mock = Mock(spec=PictureDescriptionService)
+        pds_mock.describe.side_effect = [
+            RuntimeError("Vision LLM unavailable"),
+            self._make_pds_result(images_described=2, prompt_tokens=80, completion_tokens=30),
+        ]
+
+        conv_result_a = self._make_conv_result()
+        conv_result_b = self._make_conv_result()
+        vision_processor_mock = Mock(spec=DoclingProcessor)
+        vision_processor_mock.convert.side_effect = [conv_result_a, conv_result_b]
+
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        output_dir = project_root / "_nest_context"
+        output_dir.mkdir(parents=True)
+        file_a = raw_inbox / "fail.pdf"
+        file_b = raw_inbox / "ok.pdf"
+        file_a.touch()
+        file_b.touch()
+
+        mock_deps["project_root"] = project_root
+        mock_deps["output"].compute_docling_output_path.side_effect = [
+            output_dir / "fail.md",
+            output_dir / "ok.md",
+        ]
+
+        changes = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=file_a, checksum="aaa", status="new"),
+                DiscoveredFile(path=file_b, checksum="bbb", status="new"),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=pds_mock,
+            vision_docling_processor=vision_processor_mock,
+        )
+
+        result = service.sync(on_error="skip", changes=changes)
+
+        assert result.failed_count == 1
+        assert result.processed_count == 1
+        # Failed file recorded in manifest
+        assert mock_deps["manifest"].record_failure.call_count == 1
+        # Successful file recorded in manifest
+        assert mock_deps["manifest"].record_success.call_count == 1
+
+    def test_cross_file_parallelism_both_files_in_manifest(self, mock_deps, tmp_path):
+        """Two docling files: both submitted concurrently, both appear in manifest success."""
+        from nest.adapters.docling_processor import DoclingProcessor
+        from nest.services.picture_description_service import PictureDescriptionService
+
+        pds_mock = Mock(spec=PictureDescriptionService)
+        pds_mock.describe.return_value = self._make_pds_result(
+            images_described=1, prompt_tokens=50, completion_tokens=20
+        )
+
+        conv_result = self._make_conv_result()
+        vision_processor_mock = Mock(spec=DoclingProcessor)
+        vision_processor_mock.convert.return_value = conv_result
+
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        output_dir = project_root / "_nest_context"
+        output_dir.mkdir(parents=True)
+        file_a = raw_inbox / "doc_a.pdf"
+        file_b = raw_inbox / "doc_b.pdf"
+        file_a.touch()
+        file_b.touch()
+
+        mock_deps["project_root"] = project_root
+        mock_deps["output"].compute_docling_output_path.side_effect = [
+            output_dir / "doc_a.md",
+            output_dir / "doc_b.md",
+        ]
+
+        changes = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=file_a, checksum="aaa", status="new"),
+                DiscoveredFile(path=file_b, checksum="bbb", status="new"),
+            ],
+            modified_files=[],
+            unchanged_files=[],
+        )
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=pds_mock,
+            vision_docling_processor=vision_processor_mock,
+        )
+
+        result = service.sync(changes=changes)
+
+        # Both files should appear in manifest success calls
+        assert mock_deps["manifest"].record_success.call_count == 2
+        success_paths = {
+            call.args[0] for call in mock_deps["manifest"].record_success.call_args_list
+        }
+        assert file_a in success_paths
+        assert file_b in success_paths
+        assert result.processed_count == 2
+        assert result.images_described == 2  # 1 per file, summed
+
+    def test_vision_zero_fields_when_no_vision_configured(self, mock_deps):
+        """SyncResult vision fields are 0 when no vision is configured."""
+        service = _create_sync_service(mock_deps)
+
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+
+        result = service.sync()
+
+        assert result.vision_prompt_tokens == 0
+        assert result.vision_completion_tokens == 0
+        assert result.images_described == 0
+        assert result.images_mermaid == 0
+        assert result.images_skipped == 0

@@ -15,12 +15,16 @@ from nest.adapters.llm_provider import (
     DEFAULT_AZURE_API_VERSION,
     DEFAULT_ENDPOINT,
     DEFAULT_MODEL,
+    DEFAULT_VISION_MODEL,
     AzureOpenAIAdapter,
+    AzureOpenAIVisionAdapter,
     OpenAIAdapter,
+    OpenAIVisionAdapter,
     _is_azure_endpoint,
     create_llm_provider,
+    create_vision_provider,
 )
-from nest.adapters.protocols import LLMProviderProtocol
+from nest.adapters.protocols import LLMProviderProtocol, VisionLLMProviderProtocol
 from nest.core.models import LLMCompletionResult
 
 # ---------------------------------------------------------------------------
@@ -498,3 +502,314 @@ class TestAzureOpenAIAdapterComplete:
         """model_name property returns deployment name."""
         adapter = self._make_adapter()
         assert adapter.model_name == "gpt-4o"
+
+
+# ---------------------------------------------------------------------------
+# Vision adapters: protocol compliance
+# ---------------------------------------------------------------------------
+
+
+class TestVisionProtocolCompliance:
+    """Tests for VisionLLMProviderProtocol compliance."""
+
+    def test_openai_vision_adapter_satisfies_protocol(self) -> None:
+        """isinstance(OpenAIVisionAdapter(...), VisionLLMProviderProtocol) is True."""
+        with patch("nest.adapters.llm_provider.openai.OpenAI"):
+            adapter = OpenAIVisionAdapter(
+                api_key="key", endpoint="https://api.test.com/v1", model="gpt-4.1"
+            )
+        assert isinstance(adapter, VisionLLMProviderProtocol)
+
+    def test_azure_vision_adapter_satisfies_protocol(self) -> None:
+        """isinstance(AzureOpenAIVisionAdapter(...), VisionLLMProviderProtocol) is True."""
+        with patch("nest.adapters.llm_provider.openai.AzureOpenAI"):
+            adapter = AzureOpenAIVisionAdapter(
+                api_key="key",
+                endpoint="https://myorg.openai.azure.com",
+                deployment="gpt-4.1",
+                api_version="2024-12-01-preview",
+            )
+        assert isinstance(adapter, VisionLLMProviderProtocol)
+
+
+# ---------------------------------------------------------------------------
+# Vision adapters: OpenAIVisionAdapter.complete_with_image()
+# ---------------------------------------------------------------------------
+
+
+class TestVisionAdapters:
+    """Tests for OpenAIVisionAdapter and AzureOpenAIVisionAdapter."""
+
+    def _make_openai_adapter(self) -> OpenAIVisionAdapter:
+        with patch("nest.adapters.llm_provider.openai.OpenAI"):
+            return OpenAIVisionAdapter(
+                api_key="test-key",
+                endpoint="https://api.test.com/v1",
+                model="gpt-4.1",
+            )
+
+    def _make_azure_adapter(self) -> AzureOpenAIVisionAdapter:
+        with patch("nest.adapters.llm_provider.openai.AzureOpenAI"):
+            return AzureOpenAIVisionAdapter(
+                api_key="test-key",
+                endpoint="https://myorg.openai.azure.com",
+                deployment="gpt-4.1",
+                api_version="2024-12-01-preview",
+            )
+
+    # 6.3 — success (OpenAI)
+    def test_complete_with_image_success_openai(self) -> None:
+        """Mock client returns valid response — LLMCompletionResult with correct fields."""
+        adapter = self._make_openai_adapter()
+        mock_response = _make_mock_response(
+            content="A dog in a park", prompt_tokens=20, completion_tokens=8
+        )
+        adapter._client.chat.completions.create = MagicMock(return_value=mock_response)
+
+        result = adapter.complete_with_image("Describe this image", "abc123", "image/png")
+
+        assert result is not None
+        assert isinstance(result, LLMCompletionResult)
+        assert result.text == "A dog in a park"
+        assert result.prompt_tokens == 20
+        assert result.completion_tokens == 8
+
+    # 6.4 — correct payload structure
+    def test_complete_with_image_correct_payload(self) -> None:
+        """Verify exact multi-modal message payload sent to API."""
+        adapter = self._make_openai_adapter()
+        mock_response = _make_mock_response(content="ok")
+        mock_create = MagicMock(return_value=mock_response)
+        adapter._client.chat.completions.create = mock_create
+
+        adapter.complete_with_image("Describe this", "base64data", "image/jpeg")
+
+        # Extract messages from keyword args
+        messages = mock_create.call_args.kwargs["messages"]
+        assert len(messages) == 1
+        msg = messages[0]
+        assert msg["role"] == "user"
+        content_blocks = msg["content"]
+        assert len(content_blocks) == 2
+        assert content_blocks[0] == {"type": "text", "text": "Describe this"}
+        assert content_blocks[1] == {
+            "type": "image_url",
+            "image_url": {"url": "data:image/jpeg;base64,base64data"},
+        }
+
+    # 6.5 — default mime_type
+    def test_complete_with_image_default_mime_type(self) -> None:
+        """Calling without mime_type → image/png appears in the URL."""
+        adapter = self._make_openai_adapter()
+        mock_response = _make_mock_response(content="ok")
+        mock_create = MagicMock(return_value=mock_response)
+        adapter._client.chat.completions.create = mock_create
+
+        adapter.complete_with_image("Describe this", "imgdata")
+
+        messages = mock_create.call_args.kwargs["messages"]
+        url = messages[0]["content"][1]["image_url"]["url"]
+        assert "image/png" in url
+
+    # 6.6 — API exception
+    def test_complete_with_image_api_exception(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Exception raised by API → returns None, logs 'Vision LLM call failed'."""
+        adapter = self._make_openai_adapter()
+        adapter._client.chat.completions.create = MagicMock(side_effect=Exception("boom"))
+
+        with caplog.at_level(logging.WARNING, logger="nest.adapters.llm_provider"):
+            result = adapter.complete_with_image("prompt", "data")
+
+        assert result is None
+        assert "Vision LLM call failed" in caplog.text
+
+    # 6.7 — empty choices
+    def test_complete_with_image_empty_choices(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Empty choices → returns None, logs warning."""
+        adapter = self._make_openai_adapter()
+        mock_response = _make_mock_response(empty_choices=True)
+        adapter._client.chat.completions.create = MagicMock(return_value=mock_response)
+
+        with caplog.at_level(logging.WARNING, logger="nest.adapters.llm_provider"):
+            result = adapter.complete_with_image("prompt", "data")
+
+        assert result is None
+        assert "empty choices" in caplog.text
+
+    # 6.8 — None content
+    def test_complete_with_image_none_content(self, caplog: pytest.LogCaptureFixture) -> None:
+        """None content → returns None, logs warning."""
+        adapter = self._make_openai_adapter()
+        mock_response = _make_mock_response(content=None)
+        adapter._client.chat.completions.create = MagicMock(return_value=mock_response)
+
+        with caplog.at_level(logging.WARNING, logger="nest.adapters.llm_provider"):
+            result = adapter.complete_with_image("prompt", "data")
+
+        assert result is None
+        assert "None content" in caplog.text
+
+    # 6.9 — None usage
+    def test_complete_with_image_none_usage(self) -> None:
+        """None usage → returns result with prompt_tokens=0, completion_tokens=0."""
+        adapter = self._make_openai_adapter()
+        mock_response = _make_mock_response(none_usage=True)
+        adapter._client.chat.completions.create = MagicMock(return_value=mock_response)
+
+        result = adapter.complete_with_image("prompt", "data")
+
+        assert result is not None
+        assert result.prompt_tokens == 0
+        assert result.completion_tokens == 0
+
+    # 6.9.1 — model_name property (OpenAI)
+    def test_openai_vision_adapter_model_name(self) -> None:
+        """OpenAIVisionAdapter.model_name returns the configured model."""
+        adapter = self._make_openai_adapter()
+        assert adapter.model_name == "gpt-4.1"
+
+    # 6.10 — Azure success
+    def test_complete_with_image_azure_success(self) -> None:
+        """AzureOpenAIVisionAdapter — same scenario passes correctly."""
+        adapter = self._make_azure_adapter()
+        mock_response = _make_mock_response(
+            content="Azure vision response", prompt_tokens=30, completion_tokens=12
+        )
+        adapter._client.chat.completions.create = MagicMock(return_value=mock_response)
+
+        result = adapter.complete_with_image("Describe this image", "abc123", "image/png")
+
+        assert result is not None
+        assert isinstance(result, LLMCompletionResult)
+        assert result.text == "Azure vision response"
+        assert result.prompt_tokens == 30
+        assert result.completion_tokens == 12
+
+    # 6.10.1 — Azure payload structure (AC2 parity)
+    def test_complete_with_image_azure_correct_payload(self) -> None:
+        """AzureOpenAIVisionAdapter — exact multi-modal message payload sent to API."""
+        adapter = self._make_azure_adapter()
+        mock_response = _make_mock_response(content="ok")
+        mock_create = MagicMock(return_value=mock_response)
+        adapter._client.chat.completions.create = mock_create
+
+        adapter.complete_with_image("Describe this", "base64data", "image/jpeg")
+
+        messages = mock_create.call_args.kwargs["messages"]
+        assert len(messages) == 1
+        msg = messages[0]
+        assert msg["role"] == "user"
+        content_blocks = msg["content"]
+        assert len(content_blocks) == 2
+        assert content_blocks[0] == {"type": "text", "text": "Describe this"}
+        assert content_blocks[1] == {
+            "type": "image_url",
+            "image_url": {"url": "data:image/jpeg;base64,base64data"},
+        }
+
+
+# ---------------------------------------------------------------------------
+# Factory: create_vision_provider()
+# ---------------------------------------------------------------------------
+
+
+class TestCreateVisionProvider:
+    """Tests for create_vision_provider() factory function."""
+
+    # 6.11 — no API key
+    def test_no_api_key_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Both key env vars unset → returns None."""
+        monkeypatch.delenv("NEST_AI_API_KEY", raising=False)
+        monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
+        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
+
+        result = create_vision_provider()
+
+        assert result is None
+
+    # 6.12 — NEST_AI_VISION_MODEL wins
+    def test_nest_ai_vision_model_wins(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """NEST_AI_VISION_MODEL set → adapter uses that model."""
+        monkeypatch.setenv("NEST_AI_API_KEY", "key")
+        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
+        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.setenv("NEST_AI_VISION_MODEL", "gpt-4-vision-preview")
+        monkeypatch.setenv("OPENAI_VISION_MODEL", "other-model")
+
+        with patch("nest.adapters.llm_provider.openai.OpenAI"):
+            result = create_vision_provider()
+
+        assert result is not None
+        assert result.model_name == "gpt-4-vision-preview"
+
+    # 6.13 — OPENAI_VISION_MODEL fallback
+    def test_openai_vision_model_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """NEST_AI_VISION_MODEL unset, OPENAI_VISION_MODEL set → uses OPENAI value."""
+        monkeypatch.setenv("NEST_AI_API_KEY", "key")
+        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
+        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        monkeypatch.setenv("OPENAI_VISION_MODEL", "gpt-4o-vision")
+
+        with patch("nest.adapters.llm_provider.openai.OpenAI"):
+            result = create_vision_provider()
+
+        assert result is not None
+        assert result.model_name == "gpt-4o-vision"
+
+    # 6.14 — default model
+    def test_default_vision_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Both vision model vars unset → model_name == 'gpt-4.1'."""
+        monkeypatch.setenv("NEST_AI_API_KEY", "key")
+        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
+        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
+
+        with patch("nest.adapters.llm_provider.openai.OpenAI"):
+            result = create_vision_provider()
+
+        assert result is not None
+        assert result.model_name == DEFAULT_VISION_MODEL
+        assert result.model_name == "gpt-4.1"
+
+    # 6.15 — Azure routing
+    def test_azure_endpoint_returns_azure_adapter(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Azure endpoint → returns AzureOpenAIVisionAdapter."""
+        monkeypatch.setenv("NEST_AI_API_KEY", "azure-key")
+        monkeypatch.setenv("NEST_AI_ENDPOINT", "https://myorg.openai.azure.com")
+        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
+
+        with patch("nest.adapters.llm_provider.openai.AzureOpenAI") as mock_azure:
+            result = create_vision_provider()
+
+        assert result is not None
+        assert isinstance(result, AzureOpenAIVisionAdapter)
+        mock_azure.assert_called_once_with(
+            api_key="azure-key",
+            azure_endpoint="https://myorg.openai.azure.com",
+            api_version=DEFAULT_AZURE_API_VERSION,
+        )
+
+    # 6.16 — NEST_AI_ENDPOINT influences vision adapter endpoint
+    def test_nest_ai_endpoint_propagates_to_vision_adapter(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """NEST_AI_ENDPOINT → vision adapter uses same endpoint."""
+        monkeypatch.setenv("NEST_AI_API_KEY", "key")
+        monkeypatch.setenv("NEST_AI_ENDPOINT", "https://custom-vision.api/v1")
+        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
+
+        with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
+            result = create_vision_provider()
+
+        assert result is not None
+        assert isinstance(result, OpenAIVisionAdapter)
+        mock_openai.assert_called_once_with(api_key="key", base_url="https://custom-vision.api/v1")

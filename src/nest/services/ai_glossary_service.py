@@ -60,9 +60,7 @@ GLOSSARY_HEADER = (
     "\n"
 )
 
-GLOSSARY_TABLE_HEADER = (
-    "| Term | Category | Definition |\n|------|----------|------------|"
-)
+GLOSSARY_TABLE_HEADER = "| Term | Category | Definition |\n|------|----------|------------|"
 
 # Default chunk size: ~40K tokens ~ 160K characters
 DEFAULT_MAX_CHARS = 160_000

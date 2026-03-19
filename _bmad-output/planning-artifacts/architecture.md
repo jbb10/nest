@@ -580,12 +580,13 @@ src/nest/
 │   ├── sync_service.py
 │   ├── update_service.py
 │   ├── status_service.py
-│   └── doctor_service.py
+│   ├── doctor_service.py
+│   └── picture_description_service.py  # Parallel image description via vision LLM
 ├── adapters/                # External dependencies (injectable)
 │   ├── __init__.py
 │   ├── protocols.py         # Protocol definitions (interfaces)
 │   ├── filesystem.py        # File I/O wrapper
-│   ├── docling_processor.py # Docling integration
+│   ├── docling_processor.py # Docling integration (two-pass: classify + describe)
 │   ├── git_client.py        # Git tag queries for update
 │   └── user_config.py       # ~/.config/nest/config.toml
 ├── agents/                  # Agent file generation (extensible)
@@ -1503,6 +1504,15 @@ class UserConfigProtocol(Protocol):
 
 class AgentWriterProtocol(Protocol):
     def write(self, project_name: str, output_dir: Path) -> Path: ...
+
+class VisionLLMProviderProtocol(Protocol):
+    """Protocol for vision-capable LLM operations (image + text)."""
+    def complete_with_image(
+        self,
+        prompt: str,
+        image_base64: str,
+        mime_type: str = "image/png",
+    ) -> LLMCompletionResult | None: ...
 ```
 
 ### PRD Command to Module Mapping
@@ -1554,6 +1564,10 @@ Service Layer (sync_service.py)
     │     │
     │     ├─ If changed/new:
     │     │     ├─ processor.process(file) → markdown
+    │     │     ├─ If vision LLM available and images found:
+    │     │     │     ├─ PictureDescriptionService.describe(result)
+    │     │     │     │   (classify → route → parallel LLM calls → store PictureDescriptionData)
+    │     │     │     └─ export_to_markdown() embeds descriptions inline
     │     │     ├─ filesystem.write_text(_nest_context/...)
     │     │     └─ Add to results
     │     │
@@ -1703,6 +1717,50 @@ Project structure fully supports architectural decisions:
 - Multi-platform agent support (architecture supports, implementation deferred)
 - Performance optimization for very large document sets
 - Watch mode for automatic sync (PRD roadmap item)
+
+### Image Description Architecture (Epic 7)
+
+**Two-Pass Approach** (see `docs/docling-picture-description-guide.md`):
+
+```
+Pass 1: Docling Conversion (local, no API calls)
+    PdfPipelineOptions:
+      - do_table_structure=True
+      - do_picture_classification=True   ← local classifier model
+      - do_picture_description=False     ← we handle this in pass 2
+      - generate_picture_images=True
+      - images_scale=2.0
+    Result: ConversionResult with classified PictureItems
+
+Pass 2: PictureDescriptionService (parallel API calls)
+    For each PictureItem:
+      ├─ Read classification label + confidence
+      ├─ flow_chart / block_diagram (≥0.5) → MERMAID_PROMPT
+      ├─ logo / signature (≥0.5)           → SKIP
+      └─ all others                        → DESCRIPTION_PROMPT
+    ThreadPoolExecutor(max_workers=50) fires LLM calls
+    Store result: element.meta.description = PictureDescriptionData(...)
+    Cap: 50 describable images per document
+
+Export: result.document.export_to_markdown()
+    Docling embeds descriptions/Mermaid blocks inline automatically
+```
+
+**Vision Model Configuration:**
+```
+NEST_AI_VISION_MODEL → OPENAI_VISION_MODEL → default: "gpt-4.1"
+```
+Uses same API key and endpoint as text enrichment adapter.
+
+**Cross-File Parallelism:**
+Image descriptions for file A do not block file B. Each file's pass 2
+runs independently, and markdown is written as soon as that file's
+descriptions complete.
+
+**Graceful Degradation:**
+When AI is not configured or `--no-ai` is passed, classification and
+image extraction are disabled. Docling exports with
+`ImageRefMode.PLACEHOLDER` (existing `[Image: ...]` behavior).
 
 ### Implementation Handoff
 

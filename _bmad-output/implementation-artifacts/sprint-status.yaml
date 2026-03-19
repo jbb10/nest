@@ -1,4 +1,4 @@
-# generated: 2026-01-13
+# generated: 2026-03-17
 # project: nest
 # project_key: nest
 # tracking_system: file-system
@@ -33,7 +33,7 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-03-05
+generated: 2026-03-17
 project: nest
 project_key: nest
 tracking_system: file-system
@@ -126,3 +126,16 @@ development_status:
   6-7-azure-openai-support-and-ai-e2e-tests: done
   6-8-unified-llm-glossary-pipeline: done
   epic-6-retrospective: optional
+
+  # ============================================================
+  # Epic 7: Image Description via Vision LLM
+  # FR34-FR38 - vision adapters, image classification,
+  # picture description service, sync integration, E2E tests
+  # ============================================================
+  epic-7: in-progress
+  7-1-vision-capable-llm-adapters: done
+  7-2-docling-two-pass-image-pipeline: done
+  7-3-picture-description-service: done
+  7-4-sync-pipeline-integration-cross-file-parallelism: ready-for-dev
+  7-5-e2e-tests-for-image-description: backlog
+  epic-7-retrospective: optional

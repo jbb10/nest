@@ -581,3 +581,38 @@ class LLMProviderProtocol(Protocol):
     def model_name(self) -> str:
         """Return the configured model name."""
         ...
+
+
+@runtime_checkable
+class VisionLLMProviderProtocol(Protocol):
+    """Protocol for vision-capable LLM completion operations.
+
+    Implementations handle sending multi-modal (image + text) completion
+    requests to vision-capable LLM APIs.
+    Kept separate from LLMProviderProtocol to allow the vision adapter
+    to be None independently of the text adapter.
+    """
+
+    @property
+    def model_name(self) -> str:
+        """Return the configured model name."""
+        ...
+
+    def complete_with_image(
+        self,
+        prompt: str,
+        image_base64: str,
+        mime_type: str = "image/png",
+    ) -> LLMCompletionResult | None:
+        """Send a multi-modal completion request with an image.
+
+        Args:
+            prompt: User prompt text accompanying the image.
+            image_base64: Base64-encoded image bytes.
+            mime_type: MIME type of the image (e.g. "image/png", "image/jpeg").
+
+        Returns:
+            LLMCompletionResult with response text and token usage,
+            or None if the call failed (error is logged internally).
+        """
+        ...

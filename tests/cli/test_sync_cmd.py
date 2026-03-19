@@ -310,3 +310,140 @@ class TestDisplaySyncSummaryFirstRun:
         assert "AI enrichment enabled" not in full_output
         # Marker should NOT be created
         assert not (meta_dir / AI_SEEN_MARKER).exists()
+
+
+class TestDisplaySyncSummaryVisionStats:
+    """Tests for vision image description display in _display_sync_summary() (Story 7.4)."""
+
+    def _make_console(self) -> tuple["Mock", list[str]]:
+        from rich.console import Console
+
+        output_lines: list[str] = []
+        console = Mock(spec=Console)
+        console.print.side_effect = lambda *args, **kwargs: output_lines.append(
+            " ".join(str(a) for a in args)
+        )
+        return console, output_lines
+
+    def test_images_described_with_mermaid(self) -> None:
+        """images_described=3, images_mermaid=1 → 'Images described: 3 (1 as Mermaid diagrams)'."""
+        console, lines = self._make_console()
+        result = SyncResult(images_described=3, images_mermaid=1, vision_prompt_tokens=100)
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        image_lines = [line for line in lines if "Images described:" in line]
+        assert len(image_lines) == 1
+        assert "3" in image_lines[0]
+        assert "1 as Mermaid diagrams" in image_lines[0]
+
+    def test_images_described_no_mermaid(self) -> None:
+        """images_described=2, images_mermaid=0 → 'Images described: 2' (no Mermaid note)."""
+        console, lines = self._make_console()
+        result = SyncResult(images_described=2, images_mermaid=0, vision_prompt_tokens=80)
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        image_lines = [line for line in lines if "Images described:" in line]
+        assert len(image_lines) == 1
+        assert "2" in image_lines[0]
+        assert "Mermaid" not in image_lines[0]
+
+    def test_no_images_no_image_line(self) -> None:
+        """images_described=0 → no 'Images described' line."""
+        console, lines = self._make_console()
+        result = SyncResult(images_described=0, images_skipped=0)
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        image_lines = [line for line in lines if "Images described:" in line]
+        assert len(image_lines) == 0
+
+    def test_images_skipped_shown(self) -> None:
+        """images_skipped=4 → 'Images skipped:  4 (logos/signatures)'."""
+        console, lines = self._make_console()
+        result = SyncResult(images_skipped=4)
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        skipped_lines = [line for line in lines if "Images skipped:" in line]
+        assert len(skipped_lines) == 1
+        assert "4" in skipped_lines[0]
+        assert "logos/signatures" in skipped_lines[0]
+
+    def test_images_skipped_zero_not_shown(self) -> None:
+        """images_skipped=0 → no skipped line."""
+        console, lines = self._make_console()
+        result = SyncResult(images_skipped=0)
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        skipped_lines = [line for line in lines if "Images skipped:" in line]
+        assert len(skipped_lines) == 0
+
+    def test_vision_tokens_included_in_total(self) -> None:
+        """Vision tokens aggregated into the 'AI tokens:' line with text enrichment tokens."""
+        console, lines = self._make_console()
+        result = SyncResult(
+            ai_prompt_tokens=200,
+            ai_completion_tokens=50,
+            ai_glossary_prompt_tokens=100,
+            ai_glossary_completion_tokens=25,
+            vision_prompt_tokens=100,
+            vision_completion_tokens=50,
+        )
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        token_lines = [line for line in lines if "AI tokens:" in line]
+        assert len(token_lines) == 1
+        # Total = (200+100+100) prompt + (50+25+50) completion = 400 + 125 = 525
+        assert "525" in token_lines[0]
+        assert "prompt: 400" in token_lines[0]
+        assert "completion: 125" in token_lines[0]
+
+    def test_vision_tokens_only_no_text_enrichment(self) -> None:
+        """Vision-only tokens still show the 'AI tokens:' line."""
+        console, lines = self._make_console()
+        result = SyncResult(
+            vision_prompt_tokens=100,
+            vision_completion_tokens=50,
+            images_described=5,
+        )
+
+        _display_sync_summary(result, console, Path("/tmp/errors.log"))
+
+        token_lines = [line for line in lines if "AI tokens:" in line]
+        assert len(token_lines) == 1
+        assert "150" in token_lines[0]
+
+    def test_vision_triggers_ai_was_used_for_first_run_message(self, tmp_path: Path) -> None:
+        """images_described > 0 triggers first-run AI discovery message."""
+        meta_dir = tmp_path / NEST_META_DIR
+        meta_dir.mkdir()
+
+        console, lines = self._make_console()
+        result = SyncResult(images_described=3, vision_prompt_tokens=100)
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/tmp/errors.log"),
+            ai_detected_key="OPENAI_API_KEY",
+            project_root=tmp_path,
+        )
+
+        full_output = "\n".join(lines)
+        assert "AI enrichment enabled" in full_output
+
+    def test_create_sync_service_no_ai_disables_vision(self, tmp_path: Path) -> None:
+        """create_sync_service with no_ai=True creates no vision provider or PDS."""
+        from nest.cli.sync_cmd import create_sync_service
+
+        project_root = tmp_path
+        (project_root / ".nest").mkdir()
+
+        service = create_sync_service(project_root, no_ai=True)
+
+        assert service._picture_description_service is None
+        assert service._vision_docling_processor is None

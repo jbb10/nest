@@ -178,6 +178,11 @@ class SyncResult(BaseModel):
     ai_glossary_terms_added: int = 0
     ai_glossary_prompt_tokens: int = 0
     ai_glossary_completion_tokens: int = 0
+    vision_prompt_tokens: int = 0
+    vision_completion_tokens: int = 0
+    images_described: int = 0
+    images_mermaid: int = 0
+    images_skipped: int = 0
 
 
 class AIEnrichmentResult(BaseModel):
@@ -368,3 +373,23 @@ class FileMetadata(BaseModel):
     headings: list[HeadingInfo] = Field(default_factory=lambda: list[HeadingInfo]())
     first_paragraph: str = ""
     table_columns: list[str] = Field(default_factory=list)
+
+
+class PictureDescriptionResult(BaseModel):
+    """Result of a PictureDescriptionService.describe() call.
+
+    Attributes:
+        images_described: Number of images successfully described (mermaid + prose).
+        images_mermaid: Subset of described images that used the Mermaid prompt.
+        images_skipped: Logos and signatures intentionally skipped.
+        images_failed: Images where LLM returned None or image extraction failed.
+        prompt_tokens: Total prompt tokens across all successful LLM calls.
+        completion_tokens: Total completion tokens across all successful LLM calls.
+    """
+
+    images_described: int = 0
+    images_mermaid: int = 0
+    images_skipped: int = 0
+    images_failed: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0

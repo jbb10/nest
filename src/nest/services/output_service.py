@@ -73,3 +73,24 @@ class OutputMirrorService:
             # Docling conversion: change suffix to .md
             output_path = self._filesystem.compute_output_path(source, raw_dir, output_dir)
             return self._processor.process(source, output_path)
+
+    def compute_docling_output_path(
+        self,
+        source: Path,
+        raw_dir: Path,
+        output_dir: Path,
+    ) -> Path:
+        """Compute the output path for a Docling-converted file.
+
+        Delegates to the filesystem adapter, mirroring directory structure
+        and replacing the source suffix with .md.
+
+        Args:
+            source: Path to source document.
+            raw_dir: Root of sources directory.
+            output_dir: Root of context directory.
+
+        Returns:
+            Path where the converted Markdown file would be written.
+        """
+        return self._filesystem.compute_output_path(source, raw_dir, output_dir)

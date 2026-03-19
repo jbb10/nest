@@ -49,6 +49,11 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 **FR31:** `nest config ai` command writes AI configuration (`NEST_AI_ENDPOINT`, `NEST_AI_MODEL`, `NEST_AI_API_KEY`) as `export` statements to the user's shell RC file (`.zshrc`, `.bashrc`, `.bash_profile`, or `.profile`), with idempotent updates via comment-delimited blocks
 **FR32:** `nest init` no longer generates `nest-enricher.agent.md` or `nest-glossary.agent.md`; only the primary `nest.agent.md` is generated. The enricher and glossary agent templates are removed from the codebase
 **FR33:** AI configuration uses a fallback chain: `NEST_AI_API_KEY` → `OPENAI_API_KEY`, `NEST_AI_ENDPOINT` → `OPENAI_API_BASE` (default: `https://api.openai.com/v1`), `NEST_AI_MODEL` → `OPENAI_MODEL` (default: `gpt-4o-mini`). AI is enabled when an API key is found; otherwise sync completes without AI enrichment
+**FR34:** `nest sync` uses Docling's local picture classifier to categorize images, then sends classified images to a vision LLM with type-specific prompts: Mermaid for diagrams (flow_chart, block_diagram), prose descriptions for charts and photos, skip for logos and signatures. Descriptions are stored back into Docling's document model via `PictureDescriptionData` and embedded in the exported Markdown automatically
+**FR35:** Image description uses a dedicated vision model configured via `NEST_AI_VISION_MODEL` env var (fallback: `OPENAI_VISION_MODEL`, default: `gpt-4.1`), independent of the text enrichment model
+**FR36:** Image descriptions within a single document are processed in parallel (up to 50 concurrent LLM calls), and image processing for one document does not block image processing for other documents
+**FR37:** When AI is not configured or vision model is unavailable, images produce `[Image: ...]` placeholder markers in the output Markdown (existing behavior preserved)
+**FR38:** Image description token usage is included in the sync summary token usage reporting (FR30)
 
 ### Non-Functional Requirements
 
@@ -135,6 +140,11 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 | FR31 | Epic 6 | `nest config ai` writes to shell RC file |
 | FR32 | Epic 6 | Remove enricher/glossary agent templates from init and codebase |
 | FR33 | Epic 6 | Env var fallback chain for AI configuration |
+| FR34 | Epic 7 | Two-pass image classification + description with type-specific prompts |
+| FR35 | Epic 7 | Vision model configuration (NEST_AI_VISION_MODEL) |
+| FR36 | Epic 7 | Parallel image description (50 concurrent per doc, cross-file) |
+| FR37 | Epic 7 | Graceful degradation to placeholders |
+| FR38 | Epic 7 | Token usage reporting for image descriptions |
 
 ## Epic List
 
@@ -234,6 +244,27 @@ As a user who syncs documents, I want Nest to automatically generate file descri
 - Graceful degradation: no AI config = unenriched index, no glossary, no error
 
 **Dependencies:** Epic 5 (metadata extraction and glossary hints infrastructure)
+
+---
+
+### Epic 7: Image Description via Vision LLM
+As a user syncing documents that contain images and diagrams, I want those images automatically described by a vision-capable LLM, so that the @nest agent can understand and reference visual content — not just text.
+
+**FRs covered:** FR34, FR35, FR36, FR37, FR38
+
+**Dependencies:** Epic 2 (DoclingProcessor), Epic 6 (LLM adapter infrastructure)
+
+**Scope:**
+- Enable Docling image extraction and local classification (two-pass approach)
+- VisionLLMProviderProtocol and vision adapters (OpenAI + Azure) with `complete_with_image()`
+- `NEST_AI_VISION_MODEL` env var with fallback chain (default: `gpt-4.1`)
+- PictureDescriptionService with parallel processing (ThreadPoolExecutor, max_workers=50)
+- Type-specific prompts: Mermaid for diagrams (flow_chart, block_diagram), prose for charts/photos, skip logos/signatures
+- Descriptions stored via Docling's `PictureDescriptionData` — `export_to_markdown()` embeds them automatically
+- Cross-document parallelism (file A's images don't block file B)
+- Graceful degradation to `[Image: ...]` placeholders when AI is not configured
+- Vision token usage aggregated into sync summary reporting
+- Reference: `docs/docling-picture-description-guide.md`
 
 ---
 
@@ -1905,5 +1936,278 @@ set -gx NEST_AI_API_KEY "sk-..."
 **Then** the file is deleted (legacy cleanup)
 
 **Dependencies:** Story 6.3 (AI Glossary Generation in Sync), Story 5.2 (Glossary Agent Integration)
+
+---
+
+## Epic 7: Image Description via Vision LLM
+
+As a user syncing documents that contain images and diagrams, I want those images automatically described by a vision-capable LLM, so that the @nest agent can understand and reference visual content — not just text.
+
+**Reference:** `docs/docling-picture-description-guide.md`
+
+### Story 7.1: Vision-Capable LLM Adapters
+
+**As a** developer extending the LLM infrastructure,
+**I want** existing LLM adapters to support multi-modal (image + text) messages,
+**So that** images can be sent to vision-capable models for description.
+
+**Acceptance Criteria:**
+
+**Given** `adapters/protocols.py`
+**When** `VisionLLMProviderProtocol` is defined
+**Then** it exposes: `complete_with_image(prompt: str, image_base64: str, mime_type: str) -> LLMCompletionResult | None`
+**And** it is separate from the existing `LLMProviderProtocol`
+
+**Given** `OpenAIAdapter` and `AzureOpenAIAdapter`
+**When** vision variants are created (`OpenAIVisionAdapter`, `AzureOpenAIVisionAdapter`)
+**Then** they construct multi-modal message payloads with `image_url` content blocks:
+```python
+messages = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": prompt},
+            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_base64}"}},
+        ],
+    }
+]
+```
+**And** they use the vision model name (not the text enrichment model)
+**And** they track `prompt_tokens` and `completion_tokens` in `LLMCompletionResult`
+**And** they return `None` on failure (never raise)
+
+**Given** `NEST_AI_VISION_MODEL` env var is set
+**When** `create_llm_provider()` runs
+**Then** a vision adapter is created alongside the text adapter
+**And** fallback chain is: `NEST_AI_VISION_MODEL` → `OPENAI_VISION_MODEL` → default `"gpt-4.1"`
+**And** the vision adapter uses the same API key and endpoint as the text adapter
+
+**Given** no API key is configured
+**When** vision adapter creation is attempted
+**Then** `vision_provider` is `None`
+**And** no error is raised
+
+---
+
+### Story 7.2: Docling Two-Pass Image Pipeline
+
+**As a** developer modifying the document processor,
+**I want** `DoclingProcessor` to classify images locally during conversion,
+**So that** we can send the right prompt to the right image type.
+
+**Acceptance Criteria:**
+
+**Given** AI is configured and vision provider is available
+**When** `DoclingProcessor` initializes `PdfPipelineOptions`
+**Then** options include:
+- `do_picture_classification=True` (local model, no API calls)
+- `do_picture_description=False` (we handle this in pass 2)
+- `generate_picture_images=True`
+- `images_scale=2.0`
+
+**Given** AI is NOT configured (or `--no-ai` flag is set)
+**When** `DoclingProcessor` initializes
+**Then** classification and image extraction are disabled
+**And** export uses `ImageRefMode.PLACEHOLDER` (current behavior)
+
+**Given** `DoclingProcessor`'s `process()` method is refactored
+**When** called with vision support enabled
+**Then** it returns/exposes the `ConversionResult` object
+**So that** the `PictureDescriptionService` can iterate pictures
+
+**Given** conversion completes with classification enabled
+**When** `PictureItem` elements are inspected
+**Then** each has `meta.classification.predictions` with `class_name` + `confidence`
+**And** labels include: `flow_chart`, `block_diagram`, `natural_image`, `bar_chart`, `line_chart`, `pie_chart`, `scatter_plot`, `table`, `map`, `logo`, `signature`
+
+---
+
+### Story 7.3: Picture Description Service
+
+**As a** developer building the image description pipeline,
+**I want** a `PictureDescriptionService` that classifies, routes, and describes images in parallel,
+**So that** diagrams produce Mermaid, photos get descriptions, and logos/signatures are skipped.
+
+**Acceptance Criteria:**
+
+**Given** `PictureDescriptionService` receives a `ConversionResult` with classified `PictureItem` elements
+**When** `describe()` is called
+**Then** it iterates all `PictureItem` elements and categorizes:
+- `flow_chart`, `block_diagram` (confidence ≥ 0.5) → `MERMAID_PROMPT`
+- `logo`, `signature` (confidence ≥ 0.5) → SKIP (no API call)
+- All others (`natural_image`, `bar_chart`, `line_chart`, `pie_chart`, etc.) → `DESCRIPTION_PROMPT`
+
+**Given** prompt templates
+**Then** `MERMAID_PROMPT` instructs the model to produce a fenced ` ```mermaid ` code block with the correct diagram type (flowchart, sequenceDiagram, classDiagram, etc.) capturing all nodes, edges, and labels
+**And** `DESCRIPTION_PROMPT` instructs the model to describe the image concisely, summarize chart data points and trends, and focus on technical document context
+
+**Given** images are categorized for description
+**When** LLM calls are made
+**Then** up to 50 concurrent calls via `ThreadPoolExecutor`
+**And** each call uses `complete_with_image()` on the vision adapter
+
+**Given** LLM calls complete for a `PictureItem`
+**When** result is returned
+**Then** `element.meta.description = PictureDescriptionData(text=response, created_by="azure-{model}")`
+**And** description is stored in-place on the Docling document model
+
+**Given** `export_to_markdown()` is called after description
+**When** markdown is generated
+**Then** descriptions and Mermaid blocks appear inline where images were
+**And** no `[Image: ...]` placeholders remain for described images
+
+**Given** a document has > 50 describable images (excluding skipped logos/signatures)
+**When** the cap is reached
+**Then** only the first 50 describable images get LLM calls
+**And** remaining images produce placeholder markers
+
+**Given** an individual LLM call fails
+**When** `None` is returned
+**Then** that image keeps its placeholder marker
+**And** a warning is logged
+**And** other images are not affected
+
+**Given** `describe()` completes
+**When** results are tallied
+**Then** `PictureDescriptionResult` includes:
+- `images_described: int`
+- `images_mermaid: int`
+- `images_skipped: int` (logos + signatures)
+- `images_failed: int`
+- `prompt_tokens: int`
+- `completion_tokens: int`
+
+---
+
+### Story 7.4: Sync Pipeline Integration & Cross-File Parallelism
+
+**As a** user running `nest sync` on documents with images,
+**I want** image descriptions generated during sync without blocking other files,
+**So that** my sync completes as fast as possible.
+
+**Acceptance Criteria:**
+
+**Given** `nest sync` processes file A (10 images) and file B (5 images)
+**When** both files are converted by Docling
+**Then** image description for file A and file B can run concurrently
+**And** file B's markdown output is written as soon as file B's descriptions complete (does not wait for file A)
+
+**Given** the sync loop processes a file with images
+**When** AI is configured and vision provider is available
+**Then** the flow is:
+1. Docling converts document with classification + image extraction (pass 1)
+2. `PictureDescriptionService.describe()` runs on the `ConversionResult` (pass 2, parallel LLM calls)
+3. Descriptions stored in-place on `PictureItem` elements via `PictureDescriptionData`
+4. `result.document.export_to_markdown()` produces final markdown with descriptions inline
+5. Markdown written to output
+6. Manifest updated
+
+**Given** `--no-ai` flag is passed
+**When** sync runs
+**Then** image extraction and classification are disabled
+**And** `ImageRefMode.PLACEHOLDER` is used (existing behavior)
+**And** no vision LLM calls are made
+
+**Given** sync completes with image descriptions
+**When** summary is displayed
+**Then** output includes: `"Images described: N (M as Mermaid diagrams)"`
+**And** `"Images skipped: N (logos/signatures)"` when applicable
+**And** vision tokens are aggregated into the existing token usage totals
+
+**Given** all existing tests
+**When** this change is integrated
+**Then** all unit, integration, and E2E tests pass
+**And** new tests cover: image extraction, description service, sync integration, parallel behavior
+
+---
+
+### Story 7.5: E2E Tests for Image Description
+
+**As a** developer working on image description,
+**I want** end-to-end tests that validate the full image description pipeline with real Docling processing and CLI invocation,
+**So that** I can catch integration bugs between Docling image extraction, classification, vision LLM calls, and markdown output.
+
+**Background:**
+Following the E2E testing pattern established in Story 2.9. E2E tests use real file I/O, real Docling processing, and subprocess CLI invocation. Vision LLM calls are the only component that MUST be mocked (no real API calls in tests).
+
+**Acceptance Criteria:**
+
+**Test Fixtures:**
+
+**Given** E2E test fixtures are needed for image description
+**When** documents are created in `tests/e2e/fixtures/`
+**Then** a PDF with at least one embedded image (photo/diagram) is included
+**And** the fixture is under 200KB for fast processing
+**And** `.gitattributes` marks the fixture as binary
+
+**Image Description E2E (AI configured with mocked vision LLM):**
+
+**Given** a Nest project is initialized
+**And** a PDF containing images is placed in `_nest_sources/`
+**And** AI environment variables are configured (API key, endpoint, vision model)
+**And** the vision LLM adapter is mocked to return a canned description string
+**When** `nest sync` is run
+**Then** exit code is 0
+**And** the output markdown in `_nest_context/` contains the canned description text
+**And** the output markdown does NOT contain `[Image:` placeholder markers for described images
+**And** stdout includes `"Images described:"` in the sync summary
+
+**Mermaid Diagram E2E:**
+
+**Given** a Nest project is initialized
+**And** a PDF containing a flowchart or block diagram is placed in `_nest_sources/`
+**And** the vision LLM adapter is mocked to return a fenced ` ```mermaid ` code block
+**When** `nest sync` is run
+**Then** exit code is 0
+**And** the output markdown contains a ` ```mermaid ` code block
+**And** the mermaid block includes diagram elements (nodes, edges)
+
+**No-AI Fallback E2E:**
+
+**Given** a Nest project is initialized
+**And** a PDF containing images is placed in `_nest_sources/`
+**And** NO AI environment variables are configured
+**When** `nest sync` is run
+**Then** exit code is 0
+**And** the output markdown contains `[Image:` placeholder markers
+**And** stdout does NOT include `"Images described:"`
+**And** no vision LLM calls were attempted
+
+**--no-ai Flag E2E:**
+
+**Given** a Nest project is initialized
+**And** a PDF containing images is placed in `_nest_sources/`
+**And** AI environment variables ARE configured
+**When** `nest sync --no-ai` is run
+**Then** exit code is 0
+**And** the output markdown contains `[Image:` placeholder markers
+**And** no vision LLM calls were attempted
+
+**Logo/Signature Skip E2E:**
+
+**Given** a Nest project is initialized
+**And** a PDF is placed in `_nest_sources/`
+**And** Docling classifies an image as `logo` with confidence ≥ 0.5
+**And** the vision LLM adapter is mocked
+**When** `nest sync` is run
+**Then** the mocked vision LLM was NOT called for the logo image
+**And** stdout indicates images were skipped
+
+**Token Reporting E2E:**
+
+**Given** a Nest project is initialized
+**And** a PDF containing images is placed in `_nest_sources/`
+**And** the vision LLM adapter is mocked to return results with token counts
+**When** `nest sync` is run
+**Then** stdout sync summary includes token usage numbers
+**And** the reported tokens include vision description tokens
+
+**Incremental Sync E2E (no re-description on unchanged files):**
+
+**Given** a Nest project has already synced a PDF with images (descriptions generated)
+**When** `nest sync` is run again without modifying the source PDF
+**Then** the file is skipped (unchanged checksum)
+**And** no vision LLM calls are made for the already-processed file
+**And** existing descriptions are preserved in the output markdown
 
 ---

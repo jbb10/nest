@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+from docling_core.types.doc.base import ImageRefMode
 
 from nest.core.exceptions import ProcessingError
 from nest.core.models import DiscoveredFile, DiscoveryResult, DryRunResult, SyncResult
@@ -25,9 +27,11 @@ from nest.services.output_service import OutputMirrorService
 from nest.ui.logger import log_processing_error
 
 if TYPE_CHECKING:
+    from nest.adapters.docling_processor import DoclingProcessor
     from nest.core.models import AIEnrichmentResult, AIGlossaryResult
     from nest.services.ai_enrichment_service import AIEnrichmentService
     from nest.services.ai_glossary_service import AIGlossaryService
+    from nest.services.picture_description_service import PictureDescriptionService
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +57,8 @@ class SyncService:
         error_logger: logging.Logger | logging.LoggerAdapter[logging.Logger] | None = None,
         ai_enrichment: AIEnrichmentService | None = None,
         ai_glossary: AIGlossaryService | None = None,
+        picture_description_service: PictureDescriptionService | None = None,
+        vision_docling_processor: DoclingProcessor | None = None,
     ) -> None:
         """Initialize SyncService.
 
@@ -67,6 +73,8 @@ class SyncService:
             error_logger: Logger for writing errors to .nest/errors.log (AC5).
             ai_enrichment: Optional AI enrichment service for generating descriptions.
             ai_glossary: Optional AI glossary service for generating glossary definitions.
+            picture_description_service: Optional service for vision-based image descriptions.
+            vision_docling_processor: Optional DoclingProcessor with enable_classification=True.
         """
         self._discovery = discovery
         self._output = output
@@ -78,6 +86,8 @@ class SyncService:
         self._error_logger = error_logger
         self._ai_enrichment = ai_enrichment
         self._ai_glossary = ai_glossary
+        self._picture_description_service = picture_description_service
+        self._vision_docling_processor = vision_docling_processor
 
     def discover(self, force: bool = False) -> DiscoveryResult:
         """Run file discovery.
@@ -161,71 +171,215 @@ class SyncService:
         if files_to_process:
             logger.info("Processing %d files...", len(files_to_process))
 
+        # Vision stats accumulators
+        images_described = 0
+        images_mermaid = 0
+        images_skipped = 0
+        vision_prompt_tokens = 0
+        vision_completion_tokens = 0
+
+        # Phase 1: Process all files; collect vision-eligible docling files for Phase 2
+        deferred_vision: list[tuple[DiscoveredFile, Any, Path]] = []
+
         for file_info in files_to_process:
-            try:
-                result = self._output.process_file(file_info.path, raw_inbox, output_dir)
+            if is_passthrough_extension(file_info.path.suffix):
+                # Passthrough files always use the standard output path
+                try:
+                    result = self._output.process_file(file_info.path, raw_inbox, output_dir)
 
-                # Report progress after processing each file
-                if progress_callback is not None:
-                    progress_callback(file_info.path.name)
+                    if progress_callback is not None:
+                        progress_callback(file_info.path.name)
 
-                if result.status == "success":
-                    if result.output_path is None:
-                        # Defensive check - should not happen for success status
-                        logger.error(
-                            "Processing succeeded but output_path is None: %s",
-                            file_info.path,
-                        )
+                    if result.status == "success":
+                        if result.output_path is None:
+                            logger.error(
+                                "Processing succeeded but output_path is None: %s",
+                                file_info.path,
+                            )
+                            self._manifest.record_failure(
+                                file_info.path,
+                                file_info.checksum,
+                                "Internal error: output_path missing",
+                            )
+                            failed_count += 1
+                        else:
+                            self._manifest.record_success(
+                                file_info.path,
+                                file_info.checksum,
+                                result.output_path,
+                            )
+                            processed_count += 1
+                    elif result.status == "failed":
+                        error_msg = result.error or "Unknown error"
                         self._manifest.record_failure(
                             file_info.path,
                             file_info.checksum,
-                            "Internal error: output_path missing",
+                            error_msg,
                         )
                         failed_count += 1
+                        if self._error_logger:
+                            log_processing_error(self._error_logger, file_info.path, error_msg)
+                        if on_error == "fail":
+                            raise ProcessingError(
+                                f"Processing failed for {file_info.path.name}: {error_msg}",
+                                source_path=file_info.path,
+                            )
                     else:
-                        self._manifest.record_success(
+                        self._manifest.record_failure(
                             file_info.path,
                             file_info.checksum,
-                            result.output_path,
+                            result.error or "Unknown error",
                         )
-                        processed_count += 1
-                elif result.status == "failed":
-                    error_msg = result.error or "Unknown error"
-                    self._manifest.record_failure(
-                        file_info.path,
-                        file_info.checksum,
-                        error_msg,
-                    )
+                        failed_count += 1
+                except ProcessingError:
+                    raise
+                except Exception as e:
+                    logger.exception("Unexpected error processing %s", file_info.path)
+                    error_msg = str(e)
+                    self._manifest.record_failure(file_info.path, file_info.checksum, error_msg)
                     failed_count += 1
-                    # Log to .nest/errors.log (AC5)
+                    if self._error_logger:
+                        log_processing_error(self._error_logger, file_info.path, error_msg)
+                    if on_error == "fail":
+                        raise
+
+            elif (
+                self._picture_description_service is not None
+                and self._vision_docling_processor is not None
+            ):
+                # Vision-eligible docling file: convert now, describe in Phase 2
+                try:
+                    conv_result = self._vision_docling_processor.convert(file_info.path)
+                    output_path = self._output.compute_docling_output_path(
+                        file_info.path, raw_inbox, output_dir
+                    )
+                    deferred_vision.append((file_info, conv_result, output_path))
+                except ProcessingError:
+                    raise
+                except Exception as e:
+                    logger.exception("Docling convert failed for %s", file_info.path)
+                    error_msg = str(e)
+                    self._manifest.record_failure(file_info.path, file_info.checksum, error_msg)
+                    failed_count += 1
                     if self._error_logger:
                         log_processing_error(self._error_logger, file_info.path, error_msg)
                     if on_error == "fail":
                         raise ProcessingError(
-                            f"Processing failed for {file_info.path.name}: {error_msg}",
+                            f"Docling convert failed: {error_msg}",
                             source_path=file_info.path,
-                        )
-                else:
-                    self._manifest.record_failure(
-                        file_info.path,
-                        file_info.checksum,
-                        result.error or "Unknown error",
-                    )
-                    failed_count += 1
+                        ) from e
 
-            except ProcessingError:
-                # Re-raise ProcessingError (from fail mode) without catching
-                raise
-            except Exception as e:
-                logger.exception("Unexpected error processing %s", file_info.path)
-                error_msg = str(e)
-                self._manifest.record_failure(file_info.path, file_info.checksum, error_msg)
-                failed_count += 1
-                # Log to .nest/errors.log (AC5)
-                if self._error_logger:
-                    log_processing_error(self._error_logger, file_info.path, error_msg)
-                if on_error == "fail":
+            else:
+                # Standard docling path (no vision)
+                try:
+                    result = self._output.process_file(file_info.path, raw_inbox, output_dir)
+
+                    if progress_callback is not None:
+                        progress_callback(file_info.path.name)
+
+                    if result.status == "success":
+                        if result.output_path is None:
+                            logger.error(
+                                "Processing succeeded but output_path is None: %s",
+                                file_info.path,
+                            )
+                            self._manifest.record_failure(
+                                file_info.path,
+                                file_info.checksum,
+                                "Internal error: output_path missing",
+                            )
+                            failed_count += 1
+                        else:
+                            self._manifest.record_success(
+                                file_info.path,
+                                file_info.checksum,
+                                result.output_path,
+                            )
+                            processed_count += 1
+                    elif result.status == "failed":
+                        error_msg = result.error or "Unknown error"
+                        self._manifest.record_failure(
+                            file_info.path,
+                            file_info.checksum,
+                            error_msg,
+                        )
+                        failed_count += 1
+                        if self._error_logger:
+                            log_processing_error(self._error_logger, file_info.path, error_msg)
+                        if on_error == "fail":
+                            raise ProcessingError(
+                                f"Processing failed for {file_info.path.name}: {error_msg}",
+                                source_path=file_info.path,
+                            )
+                    else:
+                        self._manifest.record_failure(
+                            file_info.path,
+                            file_info.checksum,
+                            result.error or "Unknown error",
+                        )
+                        failed_count += 1
+                except ProcessingError:
                     raise
+                except Exception as e:
+                    logger.exception("Unexpected error processing %s", file_info.path)
+                    error_msg = str(e)
+                    self._manifest.record_failure(file_info.path, file_info.checksum, error_msg)
+                    failed_count += 1
+                    if self._error_logger:
+                        log_processing_error(self._error_logger, file_info.path, error_msg)
+                    if on_error == "fail":
+                        raise
+
+        # Phase 2: Run image descriptions concurrently across deferred vision files
+        if deferred_vision:
+            with ThreadPoolExecutor() as executor:
+                future_to_file: dict[Future[Any], tuple[DiscoveredFile, Any, Path]] = {
+                    executor.submit(
+                        self._picture_description_service.describe,  # type: ignore[union-attr]
+                        conv_result,
+                    ): (file_info, conv_result, output_path)
+                    for file_info, conv_result, output_path in deferred_vision
+                }
+                for future in as_completed(future_to_file):
+                    file_info_, conv_result_, output_path_ = future_to_file[future]
+                    try:
+                        pds_result = future.result()
+                    except Exception as e:
+                        logger.exception("Vision describe failed for %s", file_info_.path)
+                        error_msg = str(e)
+                        self._manifest.record_failure(
+                            file_info_.path, file_info_.checksum, error_msg
+                        )
+                        failed_count += 1
+                        if self._error_logger:
+                            log_processing_error(self._error_logger, file_info_.path, error_msg)
+                        if on_error == "fail":
+                            raise ProcessingError(
+                                f"Vision describe failed: {error_msg}",
+                                source_path=file_info_.path,
+                            ) from e
+                        continue
+
+                    # Export markdown with descriptions embedded in-place
+                    markdown = conv_result_.document.export_to_markdown(
+                        image_mode=ImageRefMode.PLACEHOLDER,
+                    )
+                    output_path_.parent.mkdir(parents=True, exist_ok=True)
+                    output_path_.write_text(markdown, encoding="utf-8", newline="\n")
+                    self._manifest.record_success(
+                        file_info_.path, file_info_.checksum, output_path_
+                    )
+                    processed_count += 1
+
+                    # Accumulate vision stats
+                    images_described += pds_result.images_described
+                    images_mermaid += pds_result.images_mermaid
+                    images_skipped += pds_result.images_skipped
+                    vision_prompt_tokens += pds_result.prompt_tokens
+                    vision_completion_tokens += pds_result.completion_tokens
+
+                    if progress_callback is not None:
+                        progress_callback(file_info_.path.name)
 
         # 3. Commit Manifest (before orphan cleanup so orphan detector knows about new files)
         self._manifest.commit()
@@ -386,6 +540,11 @@ class SyncService:
             ai_glossary_terms_added=ai_glossary_terms_added,
             ai_glossary_prompt_tokens=ai_glossary_prompt_tokens,
             ai_glossary_completion_tokens=ai_glossary_completion_tokens,
+            vision_prompt_tokens=vision_prompt_tokens,
+            vision_completion_tokens=vision_completion_tokens,
+            images_described=images_described,
+            images_mermaid=images_mermaid,
+            images_skipped=images_skipped,
         )
 
     def _run_glossary(self, changed_files: list[Path], context_dir: Path) -> AIGlossaryResult:
