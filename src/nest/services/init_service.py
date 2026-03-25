@@ -69,23 +69,18 @@ class InitService:
         self._agent_writer = agent_writer
         self._model_downloader = model_downloader
 
-    def execute(self, project_name: str, target_dir: Path) -> None:
+    def execute(self, target_dir: Path) -> None:
         """Execute project initialization.
 
         Creates the project structure including directories
         and manifest file.
 
         Args:
-            project_name: Human-readable project name (e.g., "Nike").
             target_dir: Path to the project root directory.
 
         Raises:
-            NestError: If project name is missing or project already exists.
+            NestError: If project already exists.
         """
-        # Validate project name
-        if not project_name or not project_name.strip():
-            raise NestError("Project name required. Usage: nest init 'Project Name'")
-
         # Check for existing project
         if self._manifest.exists(target_dir):
             raise NestError("Nest project already exists. Use `nest sync` to process documents.")
@@ -97,7 +92,7 @@ class InitService:
             self._filesystem.create_directory(dir_path)
 
         # Create manifest
-        self._manifest.create(target_dir, project_name.strip())
+        self._manifest.create(target_dir)
         status_done()
 
         # Create/update .gitignore
@@ -109,7 +104,7 @@ class InitService:
         # Generate agent file with progress
         status_start("Generating agent file")
         agent_path = target_dir / ".github" / "agents" / "nest.agent.md"
-        self._agent_writer.generate(project_name.strip(), agent_path)
+        self._agent_writer.generate(agent_path)
         status_done()
 
         # Download ML models if needed

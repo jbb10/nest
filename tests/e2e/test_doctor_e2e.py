@@ -152,7 +152,7 @@ class TestDoctorE2E:
             manifest = json.load(f)
 
         assert "nest_version" in manifest
-        assert "project_name" in manifest
+        assert "files" in manifest
         assert "Manifest rebuilt" in result.stdout or "rebuilt" in result.stdout.lower()
 
     def test_doctor_fix_handles_multiple_issues(self, initialized_project: Path) -> None:

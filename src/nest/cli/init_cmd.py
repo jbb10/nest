@@ -1,6 +1,6 @@
 """Init command for nest CLI.
 
-Handles the `nest init "Project Name"` command.
+Handles the `nest init` command.
 """
 
 import logging
@@ -64,7 +64,6 @@ def create_init_service() -> InitService:
 
 
 def init_command(
-    project_name: Annotated[str, typer.Argument(help="The project name (e.g., 'Nike')")],
     target_dir: Annotated[
         Path | None,
         typer.Option("--dir", "-d", help="Target directory for project initialization"),
@@ -76,16 +75,16 @@ def init_command(
     for processing documents with nest sync.
 
     Example:
-        nest init "Nike"
+        nest init
     """
     console = get_console()
     resolved_dir = (target_dir or Path.cwd()).resolve()
 
     try:
         service = create_init_service()
-        service.execute(project_name, resolved_dir)
+        service.execute(resolved_dir)
 
-        success(f'Project "{project_name}" initialized!')
+        success("Nest project initialized!")
         console.print()
         console.print("[bold]Next steps:[/bold]")
         console.print(f"  1. Drop your documents into {SOURCES_DIR}/")
@@ -114,9 +113,6 @@ def init_command(
             console.print(
                 "  [dim]Action: Use [cyan]nest sync[/cyan] to process documents instead[/dim]"
             )
-        elif "Project name required" in error_msg:
-            console.print("  [dim]Reason: No project name was provided[/dim]")
-            console.print("  [dim]Action: nest init 'Project Name'[/dim]")
         else:
             # Generic action for other errors
             console.print(f"  [dim]Reason: {error_msg}[/dim]")

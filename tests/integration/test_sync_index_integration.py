@@ -33,7 +33,7 @@ def test_sync_generates_index_end_to_end(tmp_path: Path):
     discovery_adapter = FileDiscoveryAdapter()
 
     # Create initial manifest
-    manifest_adapter.create(project_root, project_root.name)
+    manifest_adapter.create(project_root)
 
     manifest_service = ManifestService(
         manifest=manifest_adapter,
@@ -89,7 +89,7 @@ def test_sync_generates_index_end_to_end(tmp_path: Path):
     index_file = project_root / ".nest" / "00_MASTER_INDEX.md"
     assert index_file.exists(), "Index file was not created"
     content = index_file.read_text()
-    assert f"# Nest Project Index: {project_root.name}" in content
+    assert "# Nest Project Index" in content
     # Note: OutputMirrorService typically changes extension to .md.
     # contracts/doc.pdf -> contracts/doc.md
     # Path in index is relative to processed_context

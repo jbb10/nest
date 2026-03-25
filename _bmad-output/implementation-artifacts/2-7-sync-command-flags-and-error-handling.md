@@ -475,6 +475,7 @@ N/A
 
 - 2026-01-16: Code review fixes - AC5 error logging now functional via error_logger injection
 - 2026-01-16: Story 2-7 implemented - all sync command flags and error handling complete
+- 2026-03-23: Story 8-2 added `--verbose` / `-v` flag to `sync_cmd.py` following this story's Typer Annotated pattern
 
 ## Status
 

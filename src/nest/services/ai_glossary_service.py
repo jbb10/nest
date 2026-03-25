@@ -133,12 +133,6 @@ class AIGlossaryService:
             chunks = self._chunk_content(content)
             files_processed += 1
 
-            # Derive filename for logging
-            try:
-                filename = str(file_path.relative_to(context_dir))
-            except ValueError:
-                filename = file_path.name
-
             for chunk in chunks:
                 chunks_processed += 1
                 result = self._llm.complete(system_prompt, chunk)

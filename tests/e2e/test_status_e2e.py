@@ -44,8 +44,7 @@ class TestStatusE2E:
         _write_manifest(
             project_dir,
             {
-                "nest_version": "0.1.1",
-                "project_name": "E2EProject",
+                "nest_version": "0.4.0",
                 "last_sync": None,
                 "files": {},
             },
@@ -58,8 +57,7 @@ class TestStatusE2E:
         result = run_cli(["status"], cwd=project_dir)
 
         assert result.exit_code == 0
-        assert "Project:" in result.stdout
-        assert "E2EProject" in result.stdout
+        assert "Nest Project" in result.stdout
         assert "New:" in result.stdout
         assert "Run `nest sync` to process 2 pending files" in result.stdout
 
@@ -82,8 +80,7 @@ class TestStatusE2E:
         _write_manifest(
             project_dir,
             {
-                "nest_version": "0.1.1",
-                "project_name": "E2EProject",
+                "nest_version": "0.4.0",
                 "last_sync": now.isoformat(),
                 "files": {
                     "report.pdf": {

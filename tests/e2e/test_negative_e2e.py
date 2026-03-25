@@ -37,11 +37,11 @@ class TestNegativePathsE2E:
         AC6: nest init where project exists → exit 1, error message
         """
         # Arrange - first init
-        result1 = run_cli(["init", "FirstProject"], cwd=fresh_temp_dir)
+        result1 = run_cli(["init"], cwd=fresh_temp_dir)
         assert result1.exit_code == 0
 
         # Act - second init
-        result2 = run_cli(["init", "SecondProject"], cwd=fresh_temp_dir)
+        result2 = run_cli(["init"], cwd=fresh_temp_dir)
 
         # Assert
         assert result2.exit_code == 1, f"Expected exit 1, got {result2.exit_code}"
@@ -50,24 +50,16 @@ class TestNegativePathsE2E:
             f"Expected error about existing project: {output}"
         )
 
-    def test_init_without_name(self, fresh_temp_dir: Path):
-        """Test that init without name shows error.
+    def test_init_rejects_positional_argument(self, fresh_temp_dir: Path):
+        """Test that init rejects unexpected positional arguments.
 
-        AC6: nest init without name → exit 1, error message
+        AC6: nest init <name> → exit 2, error about unexpected argument
         """
-        # Act
-        result = run_cli(["init"], cwd=fresh_temp_dir)
+        result = run_cli(["init", "SomeName"], cwd=fresh_temp_dir)
 
-        # Assert - Typer exits with code 2 for missing required arguments
-        assert result.exit_code != 0, f"Expected non-zero exit, got {result.exit_code}"
-        output = result.stdout + result.stderr
-        # Typer shows "Missing argument" for required args
-        assert (
-            "missing" in output.lower()
-            or "required" in output.lower()
-            or "name" in output.lower()
-            or "usage" in output.lower()
-        ), f"Expected error about missing name: {output}"
+        assert result.exit_code == 2, (
+            f"Expected exit code 2 for unexpected arg, got {result.exit_code}"
+        )
 
     def test_sync_empty_inbox(self, fresh_temp_dir: Path):
         """Test that sync with empty inbox succeeds with informative message.
@@ -75,7 +67,7 @@ class TestNegativePathsE2E:
         AC6: Empty inbox → exit 0, no files message
         """
         # Arrange - init project but don't add any files
-        result = run_cli(["init", "EmptyProject"], cwd=fresh_temp_dir)
+        result = run_cli(["init"], cwd=fresh_temp_dir)
         assert result.exit_code == 0
 
         # Act
@@ -103,7 +95,7 @@ class TestNegativePathsWithDocling:
         fixtures_dir = Path(__file__).parent / "fixtures"
 
         # Arrange - init project
-        result = run_cli(["init", "CorruptTestProject"], cwd=fresh_temp_dir)
+        result = run_cli(["init"], cwd=fresh_temp_dir)
         assert result.exit_code == 0
 
         # Add corrupt.pdf and a valid file
@@ -135,7 +127,7 @@ class TestNegativePathsWithDocling:
         fixtures_dir = Path(__file__).parent / "fixtures"
 
         # Arrange - init project
-        result = run_cli(["init", "FailModeProject"], cwd=fresh_temp_dir)
+        result = run_cli(["init"], cwd=fresh_temp_dir)
         assert result.exit_code == 0
 
         # Add corrupt.pdf
@@ -156,7 +148,7 @@ class TestNegativePathsWithDocling:
         via passthrough copy. Only truly unsupported types (.png, .zip) are ignored.
         """
         # Arrange - init project
-        result = run_cli(["init", "UnsupportedProject"], cwd=fresh_temp_dir)
+        result = run_cli(["init"], cwd=fresh_temp_dir)
         assert result.exit_code == 0
 
         # Add a .png file (unsupported binary format)

@@ -98,17 +98,17 @@ class ShellRCService:
         if shell == "fish":
             lines = [
                 BLOCK_START,
-                f'set -gx NEST_AI_ENDPOINT "{safe_endpoint}"',
-                f'set -gx NEST_AI_MODEL "{safe_model}"',
-                f'set -gx NEST_AI_API_KEY "{safe_key}"',
+                f'set -gx NEST_BASE_URL "{safe_endpoint}"',
+                f'set -gx NEST_TEXT_MODEL "{safe_model}"',
+                f'set -gx NEST_API_KEY "{safe_key}"',
                 BLOCK_END,
             ]
         else:
             lines = [
                 BLOCK_START,
-                f'export NEST_AI_ENDPOINT="{safe_endpoint}"',
-                f'export NEST_AI_MODEL="{safe_model}"',
-                f'export NEST_AI_API_KEY="{safe_key}"',
+                f'export NEST_BASE_URL="{safe_endpoint}"',
+                f'export NEST_TEXT_MODEL="{safe_model}"',
+                f'export NEST_API_KEY="{safe_key}"',
                 BLOCK_END,
             ]
         return "\n".join(lines) + "\n"

@@ -230,6 +230,14 @@ def sync_command(
             help="Skip AI enrichment even when API key is configured",
         ),
     ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option(
+            "--verbose",
+            "-v",
+            help="Show detailed processing logs (Docling, HTTP, etc.)",
+        ),
+    ] = False,
     target_dir: Annotated[
         Path | None,
         typer.Option(
@@ -251,6 +259,14 @@ def sync_command(
         nest sync --on-error=fail
     """
     console = get_console()
+
+    if verbose:
+        import logging as _logging
+
+        _logging.getLogger().setLevel(_logging.INFO)
+        for name in ("docling", "httpx", "openai", "nest"):
+            _logging.getLogger(name).setLevel(_logging.INFO)
+
     project_root = (target_dir or Path.cwd()).resolve()
 
     # AC3: Check for Nest project (manifest must exist)
@@ -295,8 +311,8 @@ def sync_command(
         # Detect AI env var key for first-run message and summary status.
         ai_detected_key = ""
         if not no_ai:
-            if os.environ.get("NEST_AI_API_KEY"):
-                ai_detected_key = "NEST_AI_API_KEY"
+            if os.environ.get("NEST_API_KEY"):
+                ai_detected_key = "NEST_API_KEY"
             elif os.environ.get("OPENAI_API_KEY"):
                 ai_detected_key = "OPENAI_API_KEY"
 
@@ -305,7 +321,7 @@ def sync_command(
             ai_status_note = "disabled (--no-ai)"
         elif not ai_detected_key:
             ai_status_note = (
-                "not configured (run 'nest config ai' or set NEST_AI_API_KEY / OPENAI_API_KEY)"
+                "not configured (run 'nest config ai' or set NEST_API_KEY / OPENAI_API_KEY)"
             )
 
         # AI progress callback for console display

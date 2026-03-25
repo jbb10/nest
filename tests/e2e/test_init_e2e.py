@@ -17,15 +17,15 @@ class TestInitE2E:
     def test_init_creates_expected_structure(self, fresh_temp_dir):
         """Test that init creates required directories and manifest.
 
-        AC4: Given nest init "TestProject" is run via subprocess
+        Given nest init is run via subprocess
         When the command completes
         Then exit code is 0
         And _nest_sources/ exists and is empty
-        And processed_context/ exists and is empty
-        And .nest/manifest.json exists with valid JSON containing project name
+        And _nest_context/ exists and is empty
+        And .nest/manifest.json exists with valid JSON
         """
         # Act
-        result = run_cli(["init", "TestProject"], cwd=fresh_temp_dir)
+        result = run_cli(["init"], cwd=fresh_temp_dir)
 
         # Assert exit code
         assert result.exit_code == 0, f"Init failed: {result.stderr}"
@@ -50,16 +50,22 @@ class TestInitE2E:
         manifest_content = manifest_path.read_text()
         manifest = json.loads(manifest_content)
 
-        assert "project_name" in manifest, "Manifest should contain project_name"
-        assert manifest["project_name"] == "TestProject", "Manifest project_name should match"
+        assert "nest_version" in manifest, "Manifest should contain nest_version"
+        assert "files" in manifest, "Manifest should contain files"
 
     def test_init_output_shows_success(self, fresh_temp_dir):
         """Test that init displays success message."""
         # Act
-        result = run_cli(["init", "MyProject"], cwd=fresh_temp_dir)
+        result = run_cli(["init"], cwd=fresh_temp_dir)
 
         # Assert
         assert result.exit_code == 0
-        # Output should show project name and "initialized" (actual: '✓ Project "X" initialized!')
-        assert "MyProject" in result.stdout
         assert "initialized" in result.stdout.lower()
+
+    def test_init_rejects_positional_argument(self, fresh_temp_dir):
+        """Test that init rejects unexpected positional arguments."""
+        result = run_cli(["init", "SomeName"], cwd=fresh_temp_dir)
+
+        assert result.exit_code == 2, (
+            f"Expected exit code 2 for unexpected arg, got {result.exit_code}"
+        )

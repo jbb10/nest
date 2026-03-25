@@ -29,7 +29,6 @@ from nest.core.paths import (
 class StatusReport:
     """Computed project status for display."""
 
-    project_name: str
     nest_version: str
 
     source_total: int
@@ -90,7 +89,6 @@ class StatusService:
         pending_count = source_new + source_modified
 
         return StatusReport(
-            project_name=manifest.project_name,
             nest_version=__version__,
             source_total=source_total,
             source_new=source_new,

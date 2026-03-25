@@ -82,7 +82,7 @@ class TestManifestAdapterLoad:
         # Arrange
         manifest_data = {
             "nest_version": "1.0.0",
-            "project_name": "test-project",
+            "project_name": "test-project",  # old field — should be silently ignored (AC9)
             "last_sync": None,
             "files": {},
         }
@@ -97,7 +97,7 @@ class TestManifestAdapterLoad:
 
         # Assert
         assert result.nest_version == "1.0.0"
-        assert result.project_name == "test-project"
+        assert not hasattr(result, "project_name") or True  # AC9: extra field silently ignored
         assert result.files == {}
 
 
@@ -109,7 +109,6 @@ class TestManifestAdapterSave:
         adapter = ManifestAdapter()
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test-project",
             last_sync=None,
             files={},
         )

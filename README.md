@@ -82,7 +82,7 @@ my-project/
 Processes new and changed documents.
 
 AI description generation and glossary creation run automatically only when AI is configured.
-Use `nest config ai` or set `NEST_AI_API_KEY` or `OPENAI_API_KEY` before running `nest sync`.
+Use `nest config ai` or set `NEST_API_KEY` or `OPENAI_API_KEY` before running `nest sync`.
 Without AI configuration, sync still completes, but index descriptions may be blank and `glossary.md` will not be created.
 
 | Flag | Default | Description |

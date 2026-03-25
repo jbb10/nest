@@ -414,7 +414,7 @@ class SyncService:
         if force or (new_metadata and not glossary_path.exists()):
             changed_context_files = [context_dir / file_meta.path for file_meta in new_metadata]
         else:
-            changed_context_files = []
+            changed_context_files: list[Path] = []
             for file_meta in new_metadata:
                 old_hash = old_hints.get(file_meta.path)
                 if old_hash is None or old_hash != file_meta.content_hash:
@@ -511,10 +511,7 @@ class SyncService:
             ai_progress_callback(summary)
 
         # 14. Generate index (table format, with description carry-forward)
-        project_name = self._project_root.name
-        index_content = self._index.generate_content(
-            new_metadata, old_descriptions, old_hints, project_name
-        )
+        index_content = self._index.generate_content(new_metadata, old_descriptions, old_hints)
 
         # 15. Write new index
         self._index.write_index(index_content)

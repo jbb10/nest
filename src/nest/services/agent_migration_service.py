@@ -58,9 +58,9 @@ class AgentMigrationService:
                 message="Not a Nest project — skipping agent check",
             )
 
-        # Load manifest for project_name (AC8)
+        # Load manifest to verify it is valid (AC8)
         try:
-            manifest_data = self._manifest.load(project_dir)
+            self._manifest.load(project_dir)
         except (ManifestError, FileNotFoundError):
             return AgentMigrationCheckResult(
                 migration_needed=False,
@@ -68,7 +68,6 @@ class AgentMigrationService:
                 message="Manifest is corrupt — skipping agent check",
             )
 
-        project_name = manifest_data.project_name
         agent_path = project_dir / AGENT_FILE_PATH
 
         # AC5: Check if agent file exists
@@ -80,7 +79,7 @@ class AgentMigrationService:
             )
 
         # AC1/AC2: Compare rendered template with local file
-        rendered = self._agent_writer.render(project_name)
+        rendered = self._agent_writer.render()
         local_content = self._filesystem.read_text(agent_path)
 
         if rendered != local_content:
@@ -101,8 +100,7 @@ class AgentMigrationService:
         """Execute agent template migration with backup.
 
         Backs up the existing agent file (if present), then regenerates
-        from the current bundled template using the project name from
-        the manifest.
+        from the current bundled template.
 
         Args:
             project_dir: Path to the project root directory.
@@ -110,15 +108,20 @@ class AgentMigrationService:
         Returns:
             AgentMigrationResult indicating success/failure.
         """
+        # Verify manifest is loadable before attempting migration
+        if not self._manifest.exists(project_dir):
+            return AgentMigrationResult(
+                success=False,
+                error="Failed to load manifest: manifest not found",
+            )
         try:
-            manifest_data = self._manifest.load(project_dir)
+            self._manifest.load(project_dir)
         except (ManifestError, FileNotFoundError) as exc:
             return AgentMigrationResult(
                 success=False,
                 error=f"Failed to load manifest: {exc}",
             )
 
-        project_name = manifest_data.project_name
         agent_path = project_dir / AGENT_FILE_PATH
         backup_path = agent_path.parent / (agent_path.name + AGENT_BACKUP_SUFFIX)
         backed_up = False
@@ -131,7 +134,7 @@ class AgentMigrationService:
                 backed_up = True
 
             # AC3/AC7: Regenerate agent file
-            self._agent_writer.generate(project_name, agent_path)
+            self._agent_writer.generate(agent_path)
 
             return AgentMigrationResult(
                 success=True,

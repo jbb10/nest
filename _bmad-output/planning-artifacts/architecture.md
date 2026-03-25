@@ -109,7 +109,7 @@ CLI experience should follow established tool patterns (git, npm, cargo):
 - **`nest sync`:** Show progress, summarize results, suggest next action
 - **Contextual help:** Commands show relevant guidance based on current state
 - **Error messages:** Actionable, not cryptic (say what to do, not just what failed)
-- **Quiet mode:** `--quiet` flag for scripting, verbose by default for humans
+- **Quiet by default:** Third-party log noise (Docling, httpx, openai) is suppressed at startup; `--verbose` / `-v` restores it for troubleshooting
 
 Example guidance after `nest init`:
 ```
@@ -754,12 +754,13 @@ class Manifest(BaseModel):
 
 ### Logging Strategy
 
-**Two Separate Output Streams:**
+**Three Concerns, Separated:**
 
-| Stream | Purpose | Technology |
-|--------|---------|------------|
+| Concern | Purpose | Technology |
+|---------|---------|------------|
 | Console | User-facing feedback | Rich (not logging) |
-| Error Log | Detailed diagnostics | Python `logging` |
+| Error Log | Detailed diagnostics | Python `logging` to `.nest/errors.log` |
+| Third-party noise | Suppressed by default | Root logger set to WARNING at startup |
 
 **Console Output (Rich):**
 - Progress bars during sync
@@ -767,21 +768,32 @@ class Manifest(BaseModel):
 - User guidance messages
 - Color-coded status indicators
 
+**Third-Party Log Suppression (`cli/main.py`):**
+
+Docling internally calls `logging.basicConfig(level=INFO)` when instantiated, which
+causes pipeline internals, httpx HTTP traces, and openai SDK logs to flood stderr.
+The `main()` entry point pre-configures the root logger at WARNING and silences
+`docling`, `httpx`, `openai`, `PIL`, `urllib3` before any command runs.
+`nest sync --verbose` restores INFO level for troubleshooting.
+
+```python
+# cli/main.py
+def _suppress_third_party_loggers() -> None:
+    logging.basicConfig(level=logging.WARNING, force=True)
+    for name in ("docling", "httpx", "openai", "PIL", "urllib3"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+```
+
 **Error Log (`.nest/errors.log`):**
 
 ```python
 # Format
 2026-01-12T10:30:00 ERROR [sync] contracts/alpha.pdf: Password protected file
 2026-01-12T10:30:01 ERROR [sync] reports/q3.xlsx: Encoding error (tried UTF-8, Latin-1)
-2026-01-12T10:31:00 WARNING [doctor] Model checksum mismatch: TableFormer
-
-# Implementation
-import logging
-
-error_logger = logging.getLogger("nest.errors")
-error_logger.addHandler(logging.FileHandler(".nest/errors.log"))
-error_logger.setLevel(logging.WARNING)
 ```
+
+The error logger (`ui/logger.py`) uses `propagate=False` with its own file handler,
+so it is unaffected by the root logger suppression.
 
 **Rule:** Never use `logging` for console output. Never use Rich for error log.
 

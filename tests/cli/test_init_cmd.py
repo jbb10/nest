@@ -18,7 +18,7 @@ def test_init_command_available_in_main_app(mock_create_service: MagicMock) -> N
     mock_service = MagicMock()
     mock_create_service.return_value = mock_service
 
-    result = runner.invoke(app, ["init", "Nike"])
+    result = runner.invoke(app, ["init"])
 
     # Command should execute (even if it fails, it means it's registered)
     assert result.exit_code in [0, 1]  # 0 = success, 1 = expected error
@@ -32,15 +32,36 @@ def test_init_success_output_format(mock_create_service: MagicMock, tmp_path: Pa
     mock_service = MagicMock()
     mock_create_service.return_value = mock_service
 
-    result = runner.invoke(app, ["init", "Nike", "--dir", str(tmp_path)])
+    result = runner.invoke(app, ["init", "--dir", str(tmp_path)])
 
     # Should show success (AC1)
-    assert 'Project "Nike" initialized!' in result.output
+    assert "Nest project initialized!" in result.output
     assert "Next steps:" in result.output
     assert "Drop your documents into _nest_sources/" in result.output
     assert "nest sync" in result.output
     assert "select 'Nest' from the agent dropdown" in result.output
     assert "Supported formats: PDF, DOCX, PPTX, XLSX, HTML" in result.output
+
+
+def test_init_rejects_positional_argument() -> None:
+    """Verify that passing a positional argument exits with code 2 (AC2)."""
+    result = runner.invoke(app, ["init", "some-name"])
+
+    # Typer/Click should reject the unexpected argument with exit code 2
+    assert result.exit_code == 2
+    assert "unexpected" in result.output.lower() or "got unexpected" in result.output.lower()
+
+
+@patch("nest.cli.init_cmd.create_init_service")
+def test_init_dir_flag_works(mock_create_service: MagicMock, tmp_path: Path) -> None:
+    """Verify --dir flag initializes project in given directory (AC3)."""
+    mock_service = MagicMock()
+    mock_create_service.return_value = mock_service
+
+    result = runner.invoke(app, ["init", "--dir", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "Nest project initialized!" in result.output
 
 
 @patch("nest.cli.init_cmd.create_init_service")
@@ -51,7 +72,7 @@ def test_init_error_already_exists(mock_create_service: MagicMock) -> None:
     mock_service.execute.side_effect = NestError("Nest project already exists")
     mock_create_service.return_value = mock_service
 
-    result = runner.invoke(app, ["init", "Nike"])
+    result = runner.invoke(app, ["init"])
 
     # Should show error in What → Why → Action format
     assert result.exit_code == 1
@@ -69,7 +90,7 @@ def test_init_error_model_download_failure(mock_create_service: MagicMock) -> No
     mock_service.execute.side_effect = ModelError("Network timeout after 3 retries")
     mock_create_service.return_value = mock_service
 
-    result = runner.invoke(app, ["init", "Nike"])
+    result = runner.invoke(app, ["init"])
 
     # Should show error in What → Why → Action format
     assert result.exit_code == 1
@@ -99,30 +120,11 @@ def test_init_completes_all_steps_successfully(
     mock_service = MagicMock()
     mock_create_service.return_value = mock_service
 
-    result = runner.invoke(app, ["init", "Nike", "--dir", str(tmp_path)])
+    result = runner.invoke(app, ["init", "--dir", str(tmp_path)])
 
     # Verify command completed successfully
     assert result.exit_code == 0
     # Verify success message appears (indicates all steps completed)
-    assert 'Project "Nike" initialized!' in result.output
+    assert "Nest project initialized!" in result.output
     # Verify service.execute was called with correct args
     mock_service.execute.assert_called_once()
-
-
-@patch("nest.cli.init_cmd.create_init_service")
-def test_init_error_missing_project_name(mock_create_service: MagicMock) -> None:
-    """Verify error handling for missing project name (AC4)."""
-    # Mock service to raise NestError for empty name
-    mock_service = MagicMock()
-    mock_service.execute.side_effect = NestError(
-        "Project name required. Usage: nest init 'Project Name'"
-    )
-    mock_create_service.return_value = mock_service
-
-    result = runner.invoke(app, ["init", ""])
-
-    # Should show error in What → Why → Action format (AC4)
-    assert result.exit_code == 1
-    assert "project name required" in result.output.lower()
-    assert "reason:" in result.output.lower()
-    assert "action:" in result.output.lower()

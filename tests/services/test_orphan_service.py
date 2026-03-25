@@ -66,7 +66,6 @@ class TestOrphanService:
         # File IS in manifest, but source is missing
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test",
             files={
                 "_nest_sources/orphan.pdf": FileEntry(
                     sha256="abc123",
@@ -105,7 +104,6 @@ class TestOrphanService:
         # File IS in manifest but source is missing
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test",
             files={
                 "_nest_sources/orphan.pdf": FileEntry(
                     sha256="abc123",
@@ -144,7 +142,6 @@ class TestOrphanService:
 
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test",
             files={
                 # This entry's source is missing - should be cleaned
                 "_nest_sources/orphan.pdf": FileEntry(
@@ -192,7 +189,6 @@ class TestOrphanService:
 
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test",
             files={
                 "_nest_sources/source.pdf": FileEntry(
                     sha256="abc123",
@@ -227,7 +223,6 @@ class TestOrphanService:
 
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test",
             files={},
         )
         mock_manifest = MockManifest(manifest)
@@ -254,7 +249,6 @@ class TestOrphanService:
         # Empty manifest - no tracked files
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test",
             files={},
         )
         mock_manifest = MockManifest(manifest)
@@ -283,7 +277,6 @@ class TestCountUserCuratedFiles:
 
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test",
             files={},
         )
         mock_manifest = MockManifest(manifest)
@@ -304,7 +297,6 @@ class TestCountUserCuratedFiles:
 
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test",
             files={},
         )
         mock_manifest = MockManifest(manifest)
@@ -329,7 +321,6 @@ class TestCountUserCuratedFiles:
 
         manifest = Manifest(
             nest_version="1.0.0",
-            project_name="test",
             files={},
         )
         mock_manifest = MockManifest(manifest)

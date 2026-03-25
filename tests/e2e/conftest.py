@@ -32,7 +32,7 @@ skip_without_docling = pytest.mark.skipif(
 
 def ai_available() -> bool:
     """Check if an AI API key is configured in the environment."""
-    return bool(os.environ.get("NEST_AI_API_KEY") or os.environ.get("OPENAI_API_KEY"))
+    return bool(os.environ.get("NEST_API_KEY") or os.environ.get("OPENAI_API_KEY"))
 
 
 skip_without_ai = pytest.mark.skipif(
@@ -45,12 +45,14 @@ def ai_env_vars() -> dict[str, str]:
     """Return AI env vars from current environment for subprocess."""
     env: dict[str, str] = {}
     for key in (
-        "NEST_AI_API_KEY",
-        "NEST_AI_ENDPOINT",
-        "NEST_AI_MODEL",
+        "NEST_API_KEY",
+        "NEST_BASE_URL",
+        "NEST_TEXT_MODEL",
+        "NEST_VISION_MODEL",
         "OPENAI_API_KEY",
-        "OPENAI_API_BASE",
+        "OPENAI_BASE_URL",
         "OPENAI_MODEL",
+        "OPENAI_VISION_MODEL",
     ):
         val = os.environ.get(key)
         if val:
@@ -150,7 +152,7 @@ def initialized_project(fresh_temp_dir: Path) -> Path:
     Returns:
         Path to the project directory (containing _nest_sources/, _nest_context/, etc.).
     """
-    result = run_cli(["init", "E2ETestProject"], cwd=fresh_temp_dir)
+    result = run_cli(["init"], cwd=fresh_temp_dir)
     assert result.exit_code == 0, f"Init failed: {result.stderr}"
     return fresh_temp_dir
 

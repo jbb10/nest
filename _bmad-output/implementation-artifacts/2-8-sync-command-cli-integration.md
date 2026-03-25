@@ -273,3 +273,7 @@ No significant issues encountered during implementation.
 - `src/nest/cli/sync_cmd.py` — Project validation, progress integration, enhanced summary
 - `tests/cli/test_sync_cmd.py` — Project validation tests
 - `tests/services/test_sync_service.py` — SyncResult count tests
+
+## Cross-References
+
+- **Story 8-2** (Suppress Third-Party Log Noise): Added global logger suppression in `main.py` so the progress bar and summary from this story are the *only* console output users see by default.

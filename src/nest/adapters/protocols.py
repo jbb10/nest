@@ -59,12 +59,11 @@ class ManifestProtocol(Protocol):
         """
         ...
 
-    def create(self, project_dir: Path, project_name: str) -> Manifest:
+    def create(self, project_dir: Path) -> Manifest:
         """Create a new manifest file with initial values.
 
         Args:
             project_dir: Path to the project root directory.
-            project_name: Human-readable project name.
 
         Returns:
             The newly created Manifest instance.
@@ -233,22 +232,18 @@ class AgentWriterProtocol(Protocol):
     (VS Code, Cursor, generic Markdown, etc.).
     """
 
-    def render(self, project_name: str) -> str:
+    def render(self) -> str:
         """Render the agent template to a string without writing to disk.
-
-        Args:
-            project_name: Name of the project for interpolation.
 
         Returns:
             Rendered agent file content as string.
         """
         ...
 
-    def generate(self, project_name: str, output_path: Path) -> None:
+    def generate(self, output_path: Path) -> None:
         """Generate agent file at specified path.
 
         Args:
-            project_name: Name of the project for interpolation.
             output_path: Full path where agent file should be written.
 
         Raises:

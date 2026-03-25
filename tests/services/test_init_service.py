@@ -35,12 +35,11 @@ def test_init_service_calls_agent_writer(
     )
     target_dir = Path("/project")
 
-    service.execute("Nike", target_dir)
+    service.execute(target_dir)
 
     # Verify agent writer was called
     assert len(mock_agent_writer.generated_agents) == 1
-    project_name, output_path = mock_agent_writer.generated_agents[0]
-    assert project_name == "Nike"
+    output_path = mock_agent_writer.generated_agents[0]
     assert output_path == target_dir / ".github" / "agents" / "nest.agent.md"
 
 
@@ -54,7 +53,7 @@ def test_init_service_strips_project_name_whitespace(
     mock_agent_writer: MockAgentWriter,
     mock_model_downloader: MockModelDownloader,
 ) -> None:
-    """Test that project name is stripped before passing to agent writer."""
+    """Test that agent file is generated at the correct path."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
@@ -62,49 +61,17 @@ def test_init_service_strips_project_name_whitespace(
         model_downloader=mock_model_downloader,
     )
 
-    service.execute("  Nike  ", Path("/project"))
+    service.execute(Path("/project"))
 
-    project_name, _ = mock_agent_writer.generated_agents[0]
-    assert project_name == "Nike"
-
-
-def test_init_service_rejects_empty_project_name(
-    mock_filesystem: MockFileSystem,
-    mock_manifest: MockManifest,
-    mock_agent_writer: MockAgentWriter,
-    mock_model_downloader: MockModelDownloader,
-) -> None:
-    """Test that empty project name raises NestError."""
-    service = InitService(
-        filesystem=mock_filesystem,
-        manifest=mock_manifest,
-        agent_writer=mock_agent_writer,
-        model_downloader=mock_model_downloader,
-    )
-
-    with pytest.raises(NestError, match="Project name required"):
-        service.execute("", Path("/project"))
+    output_path = mock_agent_writer.generated_agents[0]
+    assert output_path == Path("/project") / ".github" / "agents" / "nest.agent.md"
 
 
-def test_init_service_rejects_whitespace_only_project_name(
-    mock_filesystem: MockFileSystem,
-    mock_manifest: MockManifest,
-    mock_agent_writer: MockAgentWriter,
-    mock_model_downloader: MockModelDownloader,
-) -> None:
-    """Test that whitespace-only project name raises NestError."""
-    service = InitService(
-        filesystem=mock_filesystem,
-        manifest=mock_manifest,
-        agent_writer=mock_agent_writer,
-        model_downloader=mock_model_downloader,
-    )
-
-    with pytest.raises(NestError, match="Project name required"):
-        service.execute("   ", Path("/project"))
-
-
+@patch("nest.services.init_service.InitService._setup_gitattributes")
+@patch("nest.services.init_service.InitService._setup_gitignore")
 def test_init_service_rejects_existing_project(
+    mock_gitignore: MagicMock,
+    mock_gitattributes: MagicMock,
     mock_filesystem: MockFileSystem,
     mock_manifest_exists: MockManifest,
     mock_agent_writer: MockAgentWriter,
@@ -119,7 +86,7 @@ def test_init_service_rejects_existing_project(
     )
 
     with pytest.raises(NestError, match="already exists"):
-        service.execute("Nike", Path("/project"))
+        service.execute(Path("/project"))
 
 
 @patch("nest.services.init_service.InitService._setup_gitattributes")
@@ -141,7 +108,7 @@ def test_init_service_creates_all_directories(
     )
     target_dir = Path("/project")
 
-    service.execute("Nike", target_dir)
+    service.execute(target_dir)
 
     created_dirs = [str(d) for d in mock_filesystem.created_dirs]
     assert str(target_dir / "_nest_sources") in created_dirs
@@ -159,7 +126,7 @@ def test_init_service_creates_manifest(
     mock_agent_writer: MockAgentWriter,
     mock_model_downloader: MockModelDownloader,
 ) -> None:
-    """Test that InitService creates manifest with correct project name."""
+    """Test that InitService creates manifest."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
@@ -167,11 +134,10 @@ def test_init_service_creates_manifest(
         model_downloader=mock_model_downloader,
     )
 
-    service.execute("Nike", Path("/project"))
+    service.execute(Path("/project"))
 
     assert len(mock_manifest.created_manifests) == 1
-    _, project_name = mock_manifest.created_manifests[0]
-    assert project_name == "Nike"
+    assert mock_manifest.created_manifests[0] == Path("/project")
 
 
 @patch("nest.services.init_service.InitService._setup_gitattributes")
@@ -192,7 +158,7 @@ def test_init_service_downloads_models_if_needed(
         model_downloader=mock_model_downloader,
     )
 
-    service.execute("Nike", Path("/project"))
+    service.execute(Path("/project"))
 
     assert mock_model_downloader.download_called is True
     assert mock_model_downloader.download_progress is True
@@ -216,7 +182,7 @@ def test_init_service_skips_download_when_models_cached(
         model_downloader=mock_model_downloader_cached,
     )
 
-    service.execute("Nike", Path("/project"))
+    service.execute(Path("/project"))
 
     # are_models_cached() returns True, so download_if_needed() should not be called
     assert mock_model_downloader_cached.download_called is False
@@ -244,7 +210,7 @@ def test_init_service_progress_output_sequence_cached(
         model_downloader=mock_model_downloader_cached,
     )
 
-    service.execute("Nike", Path("/project"))
+    service.execute(Path("/project"))
 
     # Verify progress calls were made in order (AC2)
     assert mock_status_start.call_count == 3
@@ -285,7 +251,7 @@ def test_init_service_progress_output_sequence_download(
         model_downloader=mock_model_downloader,
     )
 
-    service.execute("Nike", Path("/project"))
+    service.execute(Path("/project"))
 
     # Verify download path shows "downloading" suffix
     done_calls = [call[0] for call in mock_status_done.call_args_list]

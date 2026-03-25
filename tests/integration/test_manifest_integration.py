@@ -24,7 +24,7 @@ class TestManifestIntegration:
 
         # Create initial manifest
         adapter = ManifestAdapter()
-        adapter.create(project_root, "test-project")
+        adapter.create(project_root)
 
         service = ManifestService(
             manifest=adapter,
@@ -70,7 +70,7 @@ class TestManifestIntegration:
         processed.mkdir()
 
         adapter = ManifestAdapter()
-        adapter.create(project_root, "test-project")
+        adapter.create(project_root)
 
         service = ManifestService(
             manifest=adapter,
@@ -109,7 +109,7 @@ class TestManifestIntegration:
         processed.mkdir()
 
         adapter = ManifestAdapter()
-        adapter.create(project_root, "test-project")
+        adapter.create(project_root)
 
         service = ManifestService(
             manifest=adapter,
@@ -163,7 +163,7 @@ class TestManifestIntegration:
         processed.mkdir()
 
         adapter = ManifestAdapter()
-        initial_manifest = adapter.create(project_root, "test-project")
+        initial_manifest = adapter.create(project_root)
         assert initial_manifest.last_sync is None
 
         service = ManifestService(
@@ -199,7 +199,7 @@ class TestManifestIntegration:
         processed.mkdir()
 
         adapter = ManifestAdapter()
-        adapter.create(project_root, "test-project")
+        adapter.create(project_root)
 
         service = ManifestService(
             manifest=adapter,

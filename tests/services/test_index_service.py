@@ -34,11 +34,10 @@ class TestGenerateContent:
             _make_metadata("contracts/alpha.md", lines=100),
         ]
 
-        content = service.generate_content(
-            files, old_descriptions={}, old_hints={}, project_name="Test Project"
-        )
+        content = service.generate_content(files, old_descriptions={}, old_hints={})
 
-        assert "# Nest Project Index: Test Project" in content
+        assert "# Nest Project Index" in content
+        assert "# Nest Project Index:" not in content  # AC6: no project name in header
         assert "Generated:" in content
         assert "Files: 3" in content
         assert "## File Listing" in content
@@ -54,9 +53,7 @@ class TestGenerateContent:
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
         files = [_make_metadata("doc.md")]
-        content = service.generate_content(
-            files, old_descriptions={}, old_hints={}, project_name="Test"
-        )
+        content = service.generate_content(files, old_descriptions={}, old_hints={})
 
         assert "<!-- nest:index-table-start -->" in content
         assert "<!-- nest:index-table-end -->" in content
@@ -67,9 +64,7 @@ class TestGenerateContent:
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
         files = [_make_metadata("doc.md", lines=284)]
-        content = service.generate_content(
-            files, old_descriptions={}, old_hints={}, project_name="Test"
-        )
+        content = service.generate_content(files, old_descriptions={}, old_hints={})
 
         assert "| doc.md | 284 |" in content
 
@@ -84,9 +79,7 @@ class TestGenerateContent:
             _make_metadata("m.md"),
         ]
 
-        content = service.generate_content(
-            files, old_descriptions={}, old_hints={}, project_name="Sort Test"
-        )
+        content = service.generate_content(files, old_descriptions={}, old_hints={})
 
         idx_a = content.index("a.md")
         idx_m = content.index("m.md")
@@ -98,9 +91,7 @@ class TestGenerateContent:
         fs = Mock(spec=FileSystemProtocol)
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
-        content = service.generate_content(
-            [], old_descriptions={}, old_hints={}, project_name="Empty"
-        )
+        content = service.generate_content([], old_descriptions={}, old_hints={})
 
         assert "Files: 0" in content
 
@@ -113,7 +104,6 @@ class TestGenerateContent:
             [_make_metadata("file.md")],
             old_descriptions={},
             old_hints={},
-            project_name="Test",
         )
 
         assert content.endswith("\n")
@@ -129,7 +119,6 @@ class TestGenerateContent:
             [_make_metadata("file.md")],
             old_descriptions={},
             old_hints={},
-            project_name="Test",
         )
 
         iso_pattern = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}"
@@ -141,9 +130,7 @@ class TestGenerateContent:
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
         files = [_make_metadata("new.md", content_hash="newhash")]
-        content = service.generate_content(
-            files, old_descriptions={}, old_hints={}, project_name="Test"
-        )
+        content = service.generate_content(files, old_descriptions={}, old_hints={})
 
         assert "| new.md | 10 |  |" in content
 
@@ -157,7 +144,6 @@ class TestGenerateContent:
             files,
             old_descriptions={"doc.md": "An important document"},
             old_hints={"doc.md": "samehash"},
-            project_name="Test",
         )
 
         assert "| doc.md | 50 | An important document |" in content
@@ -172,7 +158,6 @@ class TestGenerateContent:
             files,
             old_descriptions={"doc.md": "Old description"},
             old_hints={"doc.md": "oldhash"},
-            project_name="Test",
         )
 
         assert "| doc.md | 60 |  |" in content
@@ -183,9 +168,7 @@ class TestGenerateContent:
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
         current_files = [_make_metadata("file_b.md")]
-        content = service.generate_content(
-            current_files, old_descriptions={}, old_hints={}, project_name="Test"
-        )
+        content = service.generate_content(current_files, old_descriptions={}, old_hints={})
 
         assert "file_b.md" in content
         assert "file_a.md" not in content
@@ -331,7 +314,5 @@ class TestParseIndexDescriptions:
         service = IndexService(filesystem=fs, project_root=Path("/app"))
 
         files = [_make_metadata("doc.md")]
-        content = service.generate_content(
-            files, old_descriptions={}, old_hints={}, project_name="Test"
-        )
+        content = service.generate_content(files, old_descriptions={}, old_hints={})
         assert "00_INDEX_HINTS.yaml" not in content

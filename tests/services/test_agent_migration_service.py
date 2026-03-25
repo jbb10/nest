@@ -27,7 +27,7 @@ def _make_service(
     fs = filesystem or MockFileSystem()
     m = manifest or MockManifest(manifest_exists=True)
     if m._manifest is None:
-        m._manifest = Manifest(nest_version="1.0.0", project_name="TestProject")
+        m._manifest = Manifest(nest_version="1.0.0")
     return AgentMigrationService(agent_writer=w, filesystem=fs, manifest=m), w, fs, m
 
 
@@ -57,7 +57,7 @@ class TestCheckMigrationNeeded:
         """AC2: Returns migration_needed=False when content matches."""
         service, writer, fs, _ = _make_service()
         # Render template and set local file to same content
-        rendered = writer.render("TestProject")
+        rendered = writer.render()
         fs.existing_paths.add(AGENT_PATH)
         fs.file_contents[AGENT_PATH] = rendered
 
@@ -88,23 +88,23 @@ class TestCheckMigrationNeeded:
         assert result.skipped is True
         assert result.message == "Not a Nest project — skipping agent check"
 
-    def test_renders_template_with_project_name_from_manifest(self) -> None:
-        """AC8: Uses project_name from manifest when rendering template."""
+    def test_renders_template_with_static_text(self) -> None:
+        """AC8: Rendered template contains static folder-agnostic text."""
         manifest = MockManifest(manifest_exists=True)
-        manifest._manifest = Manifest(nest_version="1.0.0", project_name="Nike")
+        manifest._manifest = Manifest(nest_version="1.0.0")
         writer = MockAgentWriter()
         fs = MockFileSystem()
-        # Set local content to something different so we can verify the rendered name
+        # Set local content to something different
         fs.existing_paths.add(AGENT_PATH)
         fs.file_contents[AGENT_PATH] = "old-content"
 
         service = AgentMigrationService(agent_writer=writer, filesystem=fs, manifest=manifest)
         result = service.check_migration_needed(PROJECT_DIR)
 
-        # The writer renders with "Nike" — and since local differs, migration_needed
+        # Since local differs from static template, migration needed
         assert result.migration_needed is True
-        # Verify that if we match the rendered content, it works
-        fs.file_contents[AGENT_PATH] = writer.render("Nike")
+        # Verify that if we match the rendered content, no migration needed
+        fs.file_contents[AGENT_PATH] = writer.render()
         result2 = service.check_migration_needed(PROJECT_DIR)
         assert result2.migration_needed is False
 
@@ -150,7 +150,7 @@ class TestExecuteMigration:
         assert fs.written_files[BACKUP_PATH] == "old-agent-content"
         # Verify generate was called
         assert len(writer.generated_agents) == 1
-        assert writer.generated_agents[0] == ("TestProject", AGENT_PATH)
+        assert writer.generated_agents[0] == AGENT_PATH
 
     def test_creates_file_without_backup_when_missing(self) -> None:
         """AC7: Creates file fresh without backup when agent file missing."""
@@ -211,10 +211,10 @@ class TestExecuteMigration:
         assert result.error is not None
         assert "manifest" in result.error.lower()
 
-    def test_loads_project_name_from_manifest(self) -> None:
-        """Uses project name from manifest for regeneration."""
+    def test_generates_agent_file_at_correct_path(self) -> None:
+        """Agent file is generated at the correct path."""
         manifest = MockManifest(manifest_exists=True)
-        manifest._manifest = Manifest(nest_version="1.0.0", project_name="Nike")
+        manifest._manifest = Manifest(nest_version="1.0.0")
         writer = MockAgentWriter()
         fs = MockFileSystem()
         service = AgentMigrationService(agent_writer=writer, filesystem=fs, manifest=manifest)
@@ -222,7 +222,7 @@ class TestExecuteMigration:
         result = service.execute_migration(PROJECT_DIR)
 
         assert result.success is True
-        assert writer.generated_agents[0][0] == "Nike"
+        assert writer.generated_agents[0] == AGENT_PATH
 
     def test_generate_error_preserves_backup(self) -> None:
         """AC10: If generate fails after backup, backup still exists."""

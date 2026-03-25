@@ -27,10 +27,10 @@ class TestStatusProjectValidation:
 
     def test_status_succeeds_with_manifest(self, tmp_path: Path) -> None:
         project_root = tmp_path
-        manifest = Manifest(nest_version="0.0.0", project_name="Demo", last_sync=None, files={})
+        manifest = Manifest(nest_version="0.0.0", last_sync=None, files={})
         ManifestAdapter().save(project_root, manifest)
 
         result = runner.invoke(app, ["status", "--dir", str(project_root)])
         assert result.exit_code == 0
-        assert "Project:" in result.output
-        assert "Demo" in result.output
+        assert "Nest Project" in result.output
+        assert "Nest Version:" in result.output

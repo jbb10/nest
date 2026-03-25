@@ -50,15 +50,15 @@ class MockManifest:
     def __init__(self, *, manifest_exists: bool = False) -> None:
         self._exists = manifest_exists
         self._manifest: Manifest | None = None
-        self.created_manifests: list[tuple[Path, str]] = []
+        self.created_manifests: list[Path] = []
         self.saved_manifests: list[tuple[Path, Manifest]] = []
 
     def exists(self, project_dir: Path) -> bool:
         return self._exists
 
-    def create(self, project_dir: Path, project_name: str) -> Manifest:
-        self.created_manifests.append((project_dir, project_name))
-        return Manifest(nest_version="1.0.0", project_name=project_name)
+    def create(self, project_dir: Path) -> Manifest:
+        self.created_manifests.append(project_dir)
+        return Manifest(nest_version="1.0.0")
 
     def load(self, project_dir: Path) -> Manifest:
         if self._manifest is not None:
@@ -93,15 +93,15 @@ class MockAgentWriter:
     Implements AgentWriterProtocol for unit tests without real I/O.
     """
 
-    def __init__(self, template_content: str = "rendered-template-{project_name}") -> None:
+    def __init__(self, template_content: str = "rendered-template") -> None:
         self.template_content = template_content
-        self.generated_agents: list[tuple[str, Path]] = []
+        self.generated_agents: list[Path] = []
 
-    def render(self, project_name: str) -> str:
-        return self.template_content.replace("{project_name}", project_name)
+    def render(self) -> str:
+        return self.template_content
 
-    def generate(self, project_name: str, output_path: Path) -> None:
-        self.generated_agents.append((project_name, output_path))
+    def generate(self, output_path: Path) -> None:
+        self.generated_agents.append(output_path)
 
 
 @pytest.fixture
@@ -112,9 +112,9 @@ def mock_agent_writer() -> MockAgentWriter:
 
 @pytest.fixture
 def mock_manifest_with_project() -> MockManifest:
-    """Provide a MockManifest that exists and returns a manifest with project_name."""
+    """Provide a MockManifest that exists and returns a manifest."""
     mock = MockManifest(manifest_exists=True)
-    mock._manifest = Manifest(nest_version="1.0.0", project_name="TestProject")
+    mock._manifest = Manifest(nest_version="1.0.0")
     return mock
 
 

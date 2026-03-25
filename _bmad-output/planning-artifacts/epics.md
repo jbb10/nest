@@ -46,14 +46,16 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 **FR28:** `nest sync` AI enrichment runs incrementally — only files with changed or missing content hashes trigger LLM calls for descriptions; only new/changed candidate glossary terms trigger LLM calls for definitions
 **FR29:** `nest sync` runs AI index enrichment and AI glossary generation in parallel after document processing completes, using threading for I/O-bound LLM calls
 **FR30:** `nest sync` reports token usage after sync when AI enrichment was active (prompt tokens, completion tokens), and supports `--no-ai` flag to skip AI enrichment entirely
-**FR31:** `nest config ai` command writes AI configuration (`NEST_AI_ENDPOINT`, `NEST_AI_MODEL`, `NEST_AI_API_KEY`) as `export` statements to the user's shell RC file (`.zshrc`, `.bashrc`, `.bash_profile`, or `.profile`), with idempotent updates via comment-delimited blocks
+**FR31:** `nest config ai` command writes AI configuration (`NEST_BASE_URL`, `NEST_TEXT_MODEL`, `NEST_API_KEY`) as `export` statements to the user's shell RC file (`.zshrc`, `.bashrc`, `.bash_profile`, or `.profile`), with idempotent updates via comment-delimited blocks
 **FR32:** `nest init` no longer generates `nest-enricher.agent.md` or `nest-glossary.agent.md`; only the primary `nest.agent.md` is generated. The enricher and glossary agent templates are removed from the codebase
-**FR33:** AI configuration uses a fallback chain: `NEST_AI_API_KEY` → `OPENAI_API_KEY`, `NEST_AI_ENDPOINT` → `OPENAI_API_BASE` (default: `https://api.openai.com/v1`), `NEST_AI_MODEL` → `OPENAI_MODEL` (default: `gpt-4o-mini`). AI is enabled when an API key is found; otherwise sync completes without AI enrichment
+**FR33:** AI configuration uses a fallback chain: `NEST_API_KEY` → `OPENAI_API_KEY`, `NEST_BASE_URL` → `OPENAI_BASE_URL` (default: `https://api.openai.com/v1`), `NEST_TEXT_MODEL` → `OPENAI_MODEL` (default: `gpt-4o-mini`). AI is enabled when an API key is found; otherwise sync completes without AI enrichment
 **FR34:** `nest sync` uses Docling's local picture classifier to categorize images, then sends classified images to a vision LLM with type-specific prompts: Mermaid for diagrams (flow_chart, block_diagram), prose descriptions for charts and photos, skip for logos and signatures. Descriptions are stored back into Docling's document model via `PictureDescriptionData` and embedded in the exported Markdown automatically
-**FR35:** Image description uses a dedicated vision model configured via `NEST_AI_VISION_MODEL` env var (fallback: `OPENAI_VISION_MODEL`, default: `gpt-4.1`), independent of the text enrichment model
+**FR35:** Image description uses a dedicated vision model configured via `NEST_VISION_MODEL` env var (fallback: `OPENAI_VISION_MODEL`, default: `gpt-4.1`), independent of the text enrichment model
 **FR36:** Image descriptions within a single document are processed in parallel (up to 50 concurrent LLM calls), and image processing for one document does not block image processing for other documents
 **FR37:** When AI is not configured or vision model is unavailable, images produce `[Image: ...]` placeholder markers in the output Markdown (existing behavior preserved)
 **FR38:** Image description token usage is included in the sync summary token usage reporting (FR30)
+**FR39:** `nest init` takes no positional arguments; the project name concept is removed from the CLI, manifest, agent template, and all display output
+**FR40:** `nest sync` suppresses third-party log noise (Docling, httpx, openai) by default, showing only the Rich progress bar and summary. `--verbose` / `-v` flag restores detailed logging for troubleshooting
 
 ### Non-Functional Requirements
 
@@ -141,10 +143,12 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 | FR32 | Epic 6 | Remove enricher/glossary agent templates from init and codebase |
 | FR33 | Epic 6 | Env var fallback chain for AI configuration |
 | FR34 | Epic 7 | Two-pass image classification + description with type-specific prompts |
-| FR35 | Epic 7 | Vision model configuration (NEST_AI_VISION_MODEL) |
+| FR35 | Epic 7 | Vision model configuration (NEST_VISION_MODEL) |
 | FR36 | Epic 7 | Parallel image description (50 concurrent per doc, cross-file) |
 | FR37 | Epic 7 | Graceful degradation to placeholders |
 | FR38 | Epic 7 | Token usage reporting for image descriptions |
+| FR39 | Epic 8 | Remove project name concept from nest init |
+| FR40 | Epic 8 | Suppress third-party log noise + --verbose flag |
 
 ## Epic List
 
@@ -257,7 +261,7 @@ As a user syncing documents that contain images and diagrams, I want those image
 **Scope:**
 - Enable Docling image extraction and local classification (two-pass approach)
 - VisionLLMProviderProtocol and vision adapters (OpenAI + Azure) with `complete_with_image()`
-- `NEST_AI_VISION_MODEL` env var with fallback chain (default: `gpt-4.1`)
+- `NEST_VISION_MODEL` env var with fallback chain (default: `gpt-4.1`)
 - PictureDescriptionService with parallel processing (ThreadPoolExecutor, max_workers=50)
 - Type-specific prompts: Mermaid for diagrams (flow_chart, block_diagram), prose for charts/photos, skip logos/signatures
 - Descriptions stored via Docling's `PictureDescriptionData` — `export_to_markdown()` embeds them automatically
@@ -265,6 +269,21 @@ As a user syncing documents that contain images and diagrams, I want those image
 - Graceful degradation to `[Image: ...]` placeholders when AI is not configured
 - Vision token usage aggregated into sync summary reporting
 - Reference: `docs/docling-picture-description-guide.md`
+
+---
+
+### Epic 8: Developer Experience Polish
+As a Nest user, I want the CLI to feel clean and professional, so I can focus on my documents rather than fighting tool friction.
+
+**FRs covered:** FR39, FR40
+
+**Scope:**
+- Remove project name concept from `nest init` (no positional arguments)
+- Suppress noisy third-party logging (Docling, httpx, openai) by default
+- Add `--verbose` / `-v` flag to restore detailed logs for troubleshooting
+- Clean console output: progress bar + summary only
+
+**Dependencies:** Epic 2 (sync CLI), Epic 6 (AI enrichment), Epic 7 (vision pipeline)
 
 ---
 
@@ -1532,19 +1551,19 @@ As a user who syncs documents, I want Nest to automatically generate file descri
 
 **Acceptance Criteria:**
 
-**Given** `NEST_AI_API_KEY` is set in the environment
+**Given** `NEST_API_KEY` is set in the environment
 **When** the LLM provider is initialized
-**Then** it uses `NEST_AI_API_KEY` as the API key
-**And** checks `NEST_AI_ENDPOINT` for the base URL (default: `https://api.openai.com/v1`)
-**And** checks `NEST_AI_MODEL` for the model name (default: `gpt-4o-mini`)
+**Then** it uses `NEST_API_KEY` as the API key
+**And** checks `NEST_BASE_URL` for the base URL (default: `https://api.openai.com/v1`)
+**And** checks `NEST_TEXT_MODEL` for the model name (default: `gpt-4o-mini`)
 
-**Given** `NEST_AI_API_KEY` is NOT set but `OPENAI_API_KEY` IS set
+**Given** `NEST_API_KEY` is NOT set but `OPENAI_API_KEY` IS set
 **When** the LLM provider is initialized
 **Then** it falls back to `OPENAI_API_KEY`
-**And** falls back to `OPENAI_API_BASE` for endpoint
+**And** falls back to `OPENAI_BASE_URL` for endpoint
 **And** falls back to `OPENAI_MODEL` for model name
 
-**Given** neither `NEST_AI_API_KEY` nor `OPENAI_API_KEY` is set
+**Given** neither `NEST_API_KEY` nor `OPENAI_API_KEY` is set
 **When** the LLM provider is initialized
 **Then** it returns `None` (AI is not available)
 **And** no error is raised
@@ -1794,9 +1813,9 @@ As a user who syncs documents, I want Nest to automatically generate file descri
 **Then** the following block is written to the shell RC file:
 ```bash
 # --- Nest AI Configuration (managed by `nest config ai`) ---
-export NEST_AI_ENDPOINT="https://..."
-export NEST_AI_MODEL="gpt-4o-mini"
-export NEST_AI_API_KEY="sk-..."
+export NEST_BASE_URL="https://..."
+export NEST_TEXT_MODEL="gpt-4o-mini"
+export NEST_API_KEY="sk-..."
 # --- End Nest AI Configuration ---
 ```
 **And** a success message is shown: `✓ Added to ~/.zshrc`
@@ -1833,9 +1852,9 @@ export NEST_AI_API_KEY="sk-..."
 **Then** fish-compatible syntax is used:
 ```fish
 # --- Nest AI Configuration (managed by `nest config ai`) ---
-set -gx NEST_AI_ENDPOINT "https://..."
-set -gx NEST_AI_MODEL "gpt-4o-mini"
-set -gx NEST_AI_API_KEY "sk-..."
+set -gx NEST_BASE_URL "https://..."
+set -gx NEST_TEXT_MODEL "gpt-4o-mini"
+set -gx NEST_API_KEY "sk-..."
 # --- End Nest AI Configuration ---
 ```
 
@@ -1976,10 +1995,10 @@ messages = [
 **And** they track `prompt_tokens` and `completion_tokens` in `LLMCompletionResult`
 **And** they return `None` on failure (never raise)
 
-**Given** `NEST_AI_VISION_MODEL` env var is set
+**Given** `NEST_VISION_MODEL` env var is set
 **When** `create_llm_provider()` runs
 **Then** a vision adapter is created alongside the text adapter
-**And** fallback chain is: `NEST_AI_VISION_MODEL` → `OPENAI_VISION_MODEL` → default `"gpt-4.1"`
+**And** fallback chain is: `NEST_VISION_MODEL` → `OPENAI_VISION_MODEL` → default `"gpt-4.1"`
 **And** the vision adapter uses the same API key and endpoint as the text adapter
 
 **Given** no API key is configured
@@ -2209,5 +2228,60 @@ Following the E2E testing pattern established in Story 2.9. E2E tests use real f
 **Then** the file is skipped (unchanged checksum)
 **And** no vision LLM calls are made for the already-processed file
 **And** existing descriptions are preserved in the output markdown
+
+---
+
+## Epic 8: Developer Experience Polish
+
+As a Nest user, I want the CLI to feel clean and professional, so I can focus on my documents rather than fighting tool friction.
+
+**FRs covered:** FR39, FR40
+
+**Scope:**
+- Remove project name concept from `nest init` (no positional arguments)
+- Suppress noisy third-party logging (Docling, httpx, openai) by default
+- Add `--verbose` / `-v` flag to restore detailed logs for troubleshooting
+- Clean console output: progress bar + summary only
+
+**Dependencies:** Epic 2 (sync CLI), Epic 6 (AI enrichment), Epic 7 (vision pipeline)
+
+---
+
+### Story 8.1: Remove Project Name Concept
+
+**As a** developer initialising a Nest project,
+**I want** `nest init` to require no arguments,
+**so that** I can run `nest init` from any folder and get going immediately.
+
+**Acceptance Criteria:**
+
+1. `nest init` takes no positional arguments and initializes successfully (exit 0)
+2. `nest init some-name` exits with error code 2 (unexpected argument)
+3. `--dir` flag still works
+4. Manifest has no `project_name` field
+5. Agent file uses generic description ("Expert analyst for documents in this project folder")
+6. Master index header reads "# Nest Project Index"
+7. `nest status` root label reads "📁 Nest Project"
+8. `nest doctor --fix` rebuilds manifest without `project_name`
+
+---
+
+### Story 8.2: Suppress Third-Party Log Noise
+
+**As a** Nest user running `nest sync`,
+**I want** the terminal output to show only the progress bar and summary,
+**so that** I'm not overwhelmed by hundreds of lines of framework internals.
+
+**Acceptance Criteria:**
+
+1. Third-party loggers (`docling`, `httpx`, `openai`, `PIL`, `urllib3`) suppressed to WARNING at CLI startup
+2. `nest sync` shows only Rich progress bar and summary — no `INFO - Loading plugin`, `INFO - HTTP Request:`, etc.
+3. `nest sync --verbose` (or `-v`) restores INFO-level logging for all namespaces
+4. WARNING and ERROR logs still surface on console (only INFO noise removed)
+5. Error log file (`.nest/errors.log`) unaffected — `setup_error_logger()` uses `propagate=False`
+
+**Files Changed:**
+- `src/nest/cli/main.py` — `_suppress_third_party_loggers()` called from `main()`
+- `src/nest/cli/sync_cmd.py` — `--verbose` / `-v` flag added
 
 ---

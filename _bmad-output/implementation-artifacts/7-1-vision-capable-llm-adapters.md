@@ -56,20 +56,20 @@ messages = [
 **And** `None` is returned on any API failure (never raises)
 **And** a warning is logged on failure
 
-### AC3: Vision Provider Factory with `NEST_AI_VISION_MODEL` Fallback Chain
+### AC3: Vision Provider Factory with `NEST_VISION_MODEL` Fallback Chain
 
 **Given** `create_vision_provider()` factory function in `llm_provider.py`
 **When** invoked
 **Then** it uses the same API key discovery logic as `create_llm_provider()`:
-  - API key: `NEST_AI_API_KEY` → `OPENAI_API_KEY`
-  - Endpoint: `NEST_AI_ENDPOINT` → `OPENAI_API_BASE` → `https://api.openai.com/v1`
-**And** vision model fallback is: `NEST_AI_VISION_MODEL` → `OPENAI_VISION_MODEL` → default `"gpt-4.1"`
+  - API key: `NEST_API_KEY` → `OPENAI_API_KEY`
+  - Endpoint: `NEST_BASE_URL` → `OPENAI_BASE_URL` → `https://api.openai.com/v1`
+**And** vision model fallback is: `NEST_VISION_MODEL` → `OPENAI_VISION_MODEL` → default `"gpt-4.1"`
 **And** if the resolved endpoint contains `.openai.azure.com`, an `AzureOpenAIVisionAdapter` is returned
 **And** otherwise an `OpenAIVisionAdapter` is returned
 
 ### AC4: Graceful Degradation — No API Key
 
-**Given** `NEST_AI_API_KEY` and `OPENAI_API_KEY` are both unset
+**Given** `NEST_API_KEY` and `OPENAI_API_KEY` are both unset
 **When** `create_vision_provider()` is called
 **Then** `None` is returned
 **And** no exception is raised
@@ -114,10 +114,10 @@ messages = [
 
 - [x] 4.1: Define `create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter | None`
 - [x] 4.2: Reuse the same key/endpoint logic as `create_llm_provider()` (do NOT refactor the existing function — just repeat the same 3-line pattern; these will be united later if needed)
-  - `api_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("OPENAI_API_KEY")`
+  - `api_key = os.environ.get("NEST_API_KEY") or os.environ.get("OPENAI_API_KEY")`
   - Return `None` immediately if no API key
-  - `endpoint = os.environ.get("NEST_AI_ENDPOINT") or os.environ.get("OPENAI_API_BASE") or DEFAULT_ENDPOINT`
-- [x] 4.3: Vision model: `vision_model = os.environ.get("NEST_AI_VISION_MODEL") or os.environ.get("OPENAI_VISION_MODEL") or DEFAULT_VISION_MODEL`
+  - `endpoint = os.environ.get("NEST_BASE_URL") or os.environ.get("OPENAI_BASE_URL") or DEFAULT_ENDPOINT`
+- [x] 4.3: Vision model: `vision_model = os.environ.get("NEST_VISION_MODEL") or os.environ.get("OPENAI_VISION_MODEL") or DEFAULT_VISION_MODEL`
 - [x] 4.4: Route based on endpoint: `_is_azure_endpoint(endpoint)` → `AzureOpenAIVisionAdapter` / `OpenAIVisionAdapter`
 - [x] 4.5: For Azure path: `AzureOpenAIVisionAdapter(api_key=api_key, endpoint=endpoint, deployment=vision_model, api_version=DEFAULT_AZURE_API_VERSION)`
 - [x] 4.6: For OpenAI path: `OpenAIVisionAdapter(api_key=api_key, endpoint=endpoint, model=vision_model)`
@@ -144,11 +144,11 @@ Add a new test class `TestVisionAdapters` and extend `TestCreateLLMProviderAzure
 - [x] 6.9: **`complete_with_image` None usage** — assert `LLMCompletionResult` returned with `prompt_tokens=0`, `completion_tokens=0`
 - [x] 6.10: **`complete_with_image` Azure success** — same scenario for `AzureOpenAIVisionAdapter`
 - [x] 6.11: **`create_vision_provider()` no API key** — all key env vars unset → returns `None`
-- [x] 6.12: **`create_vision_provider()` NEST_AI_VISION_MODEL wins** — returns adapter with that model
+- [x] 6.12: **`create_vision_provider()` NEST_VISION_MODEL wins** — returns adapter with that model
 - [x] 6.13: **`create_vision_provider()` OPENAI_VISION_MODEL fallback** — NEST var unset, OPENAI var set → uses OPENAI value
 - [x] 6.14: **`create_vision_provider()` default model** — both vision vars unset → `model_name == "gpt-4.1"`
 - [x] 6.15: **`create_vision_provider()` Azure routing** — Azure endpoint → returns `AzureOpenAIVisionAdapter`
-- [x] 6.16: **`create_vision_provider()` uses same endpoint as text adapter** — `NEST_AI_ENDPOINT` influences vision adapter endpoint too
+- [x] 6.16: **`create_vision_provider()` uses same endpoint as text adapter** — `NEST_BASE_URL` influences vision adapter endpoint too
 - **File:** `tests/adapters/test_llm_provider.py`
 
 ### Task 7: Run CI checks
@@ -202,8 +202,8 @@ This differs from `OpenAIAdapter.complete()` which passes a separate `system` ro
 ### Model Name Isolation
 
 Vision adapters use a **different model name** from the text enrichment adapter:
-- Text: `NEST_AI_MODEL` → `OPENAI_MODEL` → `gpt-4o-mini`
-- Vision: `NEST_AI_VISION_MODEL` → `OPENAI_VISION_MODEL` → `gpt-4.1`
+- Text: `NEST_TEXT_MODEL` → `OPENAI_MODEL` → `gpt-4o-mini`
+- Vision: `NEST_VISION_MODEL` → `OPENAI_VISION_MODEL` → `gpt-4.1`
 
 The same API key and endpoint are shared. The factory function `create_vision_provider()` looks up the vision-model env var, not the text one.
 
@@ -246,11 +246,11 @@ adapter._client.chat.completions.create = MagicMock(return_value=mock_response)
 For env var tests — follow the existing monkeypatch pattern:
 ```python
 def test_create_vision_provider_default_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("NEST_AI_API_KEY", "key")
-    monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+    monkeypatch.setenv("NEST_API_KEY", "key")
+    monkeypatch.delenv("NEST_VISION_MODEL", raising=False)
     monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
-    monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-    monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+    monkeypatch.delenv("NEST_BASE_URL", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
 
     with patch("nest.adapters.llm_provider.openai.OpenAI"):
         result = create_vision_provider()
@@ -288,7 +288,7 @@ None — clean implementation, no debugging required.
 
 - AC1: `VisionLLMProviderProtocol` added to `protocols.py` after `LLMProviderProtocol`; `@runtime_checkable`; `complete_with_image` signature matches spec exactly.
 - AC2: `OpenAIVisionAdapter` and `AzureOpenAIVisionAdapter` implement exact multi-modal payload structure (user-only turn, no system message). Both return `None` on any failure, log "Vision LLM call failed: {e}". Token extraction matches text adapters.
-- AC3: `create_vision_provider()` uses identical key/endpoint discovery as `create_llm_provider()`. Vision model fallback: `NEST_AI_VISION_MODEL` → `OPENAI_VISION_MODEL` → `"gpt-4.1"`. Routes to Azure adapter for `.openai.azure.com` endpoints.
+- AC3: `create_vision_provider()` uses identical key/endpoint discovery as `create_llm_provider()`. Vision model fallback: `NEST_VISION_MODEL` → `OPENAI_VISION_MODEL` → `"gpt-4.1"`. Routes to Azure adapter for `.openai.azure.com` endpoints.
 - AC4: No API key → `None` returned immediately, no exception.
 - 16 new tests added across `TestVisionProtocolCompliance`, `TestVisionAdapters`, `TestCreateVisionProvider`. All pass.
 - Full suite: 836 passed, 0 failures. Ruff: 0 errors. Pyright: 0 errors.

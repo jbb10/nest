@@ -64,7 +64,6 @@ class IndexService:
         files: list[FileMetadata],
         old_descriptions: dict[str, str],
         old_hints: dict[str, str],
-        project_name: str,
     ) -> str:
         """Generate content for the master index file in table format.
 
@@ -72,7 +71,6 @@ class IndexService:
             files: List of FileMetadata for all context files.
             old_descriptions: Dict of path→description from previous index.
             old_hints: Dict of path→content_hash from previous hints.
-            project_name: Name of the project.
 
         Returns:
             Formatted Markdown content for the index.
@@ -83,7 +81,7 @@ class IndexService:
         count = len(sorted_files)
 
         lines = [
-            f"# Nest Project Index: {project_name}",
+            "# Nest Project Index",
             f"Generated: {timestamp} | Files: {count}",
             "",
             "## File Listing",

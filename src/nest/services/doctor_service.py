@@ -446,7 +446,6 @@ class DoctorService:
     def rebuild_manifest(
         self,
         project_dir: Path,
-        project_name: str,
     ) -> RemediationResult:
         """Rebuild manifest from processed files.
 
@@ -456,7 +455,6 @@ class DoctorService:
 
         Args:
             project_dir: Path to the project root directory.
-            project_name: Name of the project.
 
         Returns:
             RemediationResult indicating success or failure.
@@ -480,7 +478,6 @@ class DoctorService:
         try:
             manifest = Manifest(
                 nest_version=nest.__version__,
-                project_name=project_name,
                 last_sync=datetime.now(timezone.utc),
                 files={},
             )
@@ -586,13 +583,11 @@ class DoctorService:
     def regenerate_agent_file(
         self,
         project_dir: Path,
-        project_name: str,
     ) -> RemediationResult:
         """Regenerate agent file.
 
         Args:
             project_dir: Path to the project root directory.
-            project_name: Name of the project.
 
         Returns:
             RemediationResult indicating success or failure.
@@ -607,7 +602,7 @@ class DoctorService:
 
         try:
             output_path = project_dir / ".github" / "agents" / "nest.agent.md"
-            self._agent_writer.generate(project_name, output_path)
+            self._agent_writer.generate(output_path)
             return RemediationResult(
                 issue="missing_agent_file",
                 attempted=True,
@@ -706,14 +701,12 @@ class DoctorService:
                 "invalid_json",
                 "invalid_structure",
             ):
-                project_name = self._get_project_name(project_dir)
-                result = self.rebuild_manifest(project_dir, project_name)
+                result = self.rebuild_manifest(project_dir)
                 results.append(result)
 
             # Regenerate agent file
             if not project_report.status.agent_file_present:
-                project_name = self._get_project_name(project_dir)
-                result = self.regenerate_agent_file(project_dir, project_name)
+                result = self.regenerate_agent_file(project_dir)
                 results.append(result)
 
             # Migrate legacy layout
@@ -730,7 +723,6 @@ class DoctorService:
         model_report: ModelReport | None,
         project_report: ProjectReport | None,
         confirm_callback: Callable[[str], bool] | None = None,
-        input_callback: Callable[[str], str] | None = None,
     ) -> RemediationReport:
         """Remediate issues sequentially with user confirmation.
 
@@ -740,7 +732,6 @@ class DoctorService:
             model_report: ML model validation report.
             project_report: Project state validation report.
             confirm_callback: Function that returns True if user confirms action.
-            input_callback: Function that returns user string input.
 
         Returns:
             RemediationReport with results.
@@ -751,19 +742,6 @@ class DoctorService:
             if confirm_callback:
                 return confirm_callback(msg)
             return True
-
-        # Resolve project name once if needed for manifest or agent file fixes
-        project_name = self._get_project_name(project_dir)
-        if project_report:
-            needs_name = (
-                project_report.status.manifest_status
-                in ("missing", "invalid_json", "invalid_structure")
-                or not project_report.status.agent_file_present
-            )
-            if needs_name and project_name == "Nest Project" and input_callback:
-                user_input = input_callback("Enter project name (default: Nest Project)")
-                if user_input.strip():
-                    project_name = user_input.strip()
 
         # 1. ML models (Foundational)
         if model_report and not model_report.all_pass:
@@ -787,8 +765,8 @@ class DoctorService:
             "invalid_json",
             "invalid_structure",
         ):
-            if _confirm(f"Rebuild manifest for '{project_name}'?"):
-                result = self.rebuild_manifest(project_dir, project_name)
+            if _confirm("Rebuild manifest?"):
+                result = self.rebuild_manifest(project_dir)
                 results.append(result)
             else:
                 results.append(RemediationResult("corrupt_manifest", False, False, "User declined"))
@@ -796,7 +774,7 @@ class DoctorService:
         # 4. Agent file (Last)
         if project_report and not project_report.status.agent_file_present:
             if _confirm("Regenerate agent file?"):
-                result = self.regenerate_agent_file(project_dir, project_name)
+                result = self.regenerate_agent_file(project_dir)
                 results.append(result)
             else:
                 results.append(
@@ -858,20 +836,3 @@ class DoctorService:
                 success=False,
                 message=f"Migration failed: {e}",
             )
-
-    def _get_project_name(self, project_dir: Path) -> str:
-        """Get project name from manifest or return default.
-
-        Args:
-            project_dir: Path to the project root directory.
-
-        Returns:
-            Project name from manifest or "Nest Project" as default.
-        """
-        if self._manifest_adapter and self._manifest_adapter.exists(project_dir):
-            try:
-                manifest = self._manifest_adapter.load(project_dir)
-                return manifest.project_name
-            except Exception:
-                pass
-        return "Nest Project"

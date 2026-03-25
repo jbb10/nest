@@ -8,7 +8,7 @@ Mocking strategy
 ----------------
 ``MockVisionServer`` starts a local HTTP server on a random port that returns a
 canned OpenAI-compatible JSON response for every POST request.  Subprocesses are
-launched with env vars (``NEST_AI_API_KEY``, ``NEST_AI_ENDPOINT``, …) pointing
+launched with env vars (``NEST_API_KEY``, ``NEST_BASE_URL``, …) pointing
 at the mock server, so both text-enrichment and vision LLM calls are handled by
 the same in-process stub.
 
@@ -26,7 +26,7 @@ from pathlib import Path
 
 import pytest
 
-from .conftest import run_cli, skip_without_docling
+from .conftest import ai_env_vars, run_cli, skip_without_ai, skip_without_docling
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -38,9 +38,7 @@ _FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CANNED_DESCRIPTION = "A bar chart showing quarterly sales performance for 2025."
 
 #: Canned Mermaid diagram returned by the mock vision server.
-CANNED_MERMAID = (
-    "```mermaid\nflowchart TD\n    A[Start] --> B[Process] --> C[End]\n```"
-)
+CANNED_MERMAID = "```mermaid\nflowchart TD\n    A[Start] --> B[Process] --> C[End]\n```"
 
 _MOCK_PROMPT_TOKENS = 150
 _MOCK_COMPLETION_TOKENS = 75
@@ -80,13 +78,9 @@ class _MockOpenAIHandler(BaseHTTPRequestHandler):
         try:
             req = json.loads(raw_body)
             for msg in req.get("messages", []):
-                if (
-                    msg.get("role") == "system"
-                    and "glossary" in msg.get("content", "").lower()
-                ):
+                if msg.get("role") == "system" and "glossary" in msg.get("content", "").lower():
                     response_content = (
-                        "| Vision Pipeline | Technical | "
-                        "AI-based image description subsystem |"
+                        "| Vision Pipeline | Technical | AI-based image description subsystem |"
                     )
                     break
         except Exception:  # noqa: BLE001
@@ -162,9 +156,7 @@ class MockVisionServer:
 
         self._server = HTTPServer(("127.0.0.1", 0), handler_cls)
         self.port = self._server.server_address[1]
-        self._thread = threading.Thread(
-            target=self._server.serve_forever, daemon=True
-        )
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
         self._thread.start()
         return self
 
@@ -185,10 +177,10 @@ class MockVisionServer:
         mock credentials regardless of the existing shell environment.
         """
         return {
-            "NEST_AI_API_KEY": "mock-api-key-for-e2e-testing",
-            "NEST_AI_ENDPOINT": f"http://127.0.0.1:{self.port}/v1",
-            "NEST_AI_VISION_MODEL": "mock-vision-model",
-            "NEST_AI_MODEL": "mock-text-model",
+            "NEST_API_KEY": "mock-api-key-for-e2e-testing",
+            "NEST_BASE_URL": f"http://127.0.0.1:{self.port}/v1",
+            "NEST_VISION_MODEL": "mock-vision-model",
+            "NEST_TEXT_MODEL": "mock-text-model",
         }
 
 
@@ -232,18 +224,14 @@ class TestImageDescriptionE2E:
         _put_image_fixture_in_project(project_dir)
 
         with MockVisionServer(response=CANNED_DESCRIPTION) as server:
-            result = run_cli(
-                ["sync"], cwd=project_dir, timeout=300, env=server.env_vars()
-            )
+            result = run_cli(["sync"], cwd=project_dir, timeout=300, env=server.env_vars())
 
         assert result.exit_code == 0, (
             f"Sync failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
         )
 
         output_md = project_dir / "_nest_context" / "image_doc.md"
-        assert output_md.exists(), (
-            "Expected '_nest_context/image_doc.md' to be created after sync"
-        )
+        assert output_md.exists(), "Expected '_nest_context/image_doc.md' to be created after sync"
         content = output_md.read_text()
         assert CANNED_DESCRIPTION in content, (
             f"Expected canned description in output markdown.\n"
@@ -268,9 +256,7 @@ class TestImageDescriptionE2E:
         _put_image_fixture_in_project(project_dir)
 
         with MockVisionServer(response=CANNED_MERMAID) as server:
-            result = run_cli(
-                ["sync"], cwd=project_dir, timeout=300, env=server.env_vars()
-            )
+            result = run_cli(["sync"], cwd=project_dir, timeout=300, env=server.env_vars())
 
         assert result.exit_code == 0, (
             f"Sync failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -280,8 +266,7 @@ class TestImageDescriptionE2E:
         assert output_md.exists()
         content = output_md.read_text()
         assert "```mermaid" in content, (
-            f"Expected mermaid code block in output.\n"
-            f"Markdown (first 600 chars): {content[:600]}"
+            f"Expected mermaid code block in output.\nMarkdown (first 600 chars): {content[:600]}"
         )
         assert "flowchart TD" in content, (
             f"Expected mermaid diagram elements in output.\n"
@@ -289,9 +274,7 @@ class TestImageDescriptionE2E:
         )
 
     @skip_without_docling
-    def test_no_ai_env_vars_produces_image_placeholder(
-        self, initialized_project: Path
-    ) -> None:
+    def test_no_ai_env_vars_produces_image_placeholder(self, initialized_project: Path) -> None:
         """AC: Without AI credentials, image output contains <!-- image --> placeholder.
 
         Given no AI API keys are configured,
@@ -309,7 +292,7 @@ class TestImageDescriptionE2E:
             ["sync"],
             cwd=project_dir,
             timeout=300,
-            env={"NEST_AI_API_KEY": "", "OPENAI_API_KEY": ""},
+            env={"NEST_API_KEY": "", "OPENAI_API_KEY": ""},
         )
 
         assert result.exit_code == 0, (
@@ -364,17 +347,13 @@ class TestImageDescriptionE2E:
             f"Expected '<!-- image -->' placeholder with --no-ai.\n"
             f"Markdown (first 600 chars): {content[:600]}"
         )
-        assert CANNED_DESCRIPTION not in content, (
-            "Expected no description text with --no-ai flag"
-        )
+        assert CANNED_DESCRIPTION not in content, "Expected no description text with --no-ai flag"
         assert calls_with_no_ai_flag == 0, (
             f"Expected zero mock server calls with --no-ai, got {calls_with_no_ai_flag}"
         )
 
     @skip_without_docling
-    def test_token_reporting_includes_vision_tokens(
-        self, initialized_project: Path
-    ) -> None:
+    def test_token_reporting_includes_vision_tokens(self, initialized_project: Path) -> None:
         """AC: Sync summary 'AI tokens:' line aggregates vision description tokens.
 
         Given image descriptions are generated via the mocked vision LLM,
@@ -385,9 +364,7 @@ class TestImageDescriptionE2E:
         _put_image_fixture_in_project(project_dir)
 
         with MockVisionServer(response=CANNED_DESCRIPTION) as server:
-            result = run_cli(
-                ["sync"], cwd=project_dir, timeout=300, env=server.env_vars()
-            )
+            result = run_cli(["sync"], cwd=project_dir, timeout=300, env=server.env_vars())
 
         assert result.exit_code == 0, (
             f"Sync failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -412,9 +389,7 @@ class TestImageDescriptionE2E:
 
         with MockVisionServer(response=CANNED_DESCRIPTION) as server:
             # First sync: converts PDF and describes images.
-            first = run_cli(
-                ["sync"], cwd=project_dir, timeout=300, env=server.env_vars()
-            )
+            first = run_cli(["sync"], cwd=project_dir, timeout=300, env=server.env_vars())
             assert first.exit_code == 0, (
                 f"First sync failed:\nstdout: {first.stdout}\nstderr: {first.stderr}"
             )
@@ -424,9 +399,7 @@ class TestImageDescriptionE2E:
             )
 
             # Second sync: source unchanged — file skipped, no vision calls.
-            second = run_cli(
-                ["sync"], cwd=project_dir, timeout=300, env=server.env_vars()
-            )
+            second = run_cli(["sync"], cwd=project_dir, timeout=300, env=server.env_vars())
             assert second.exit_code == 0, (
                 f"Second sync failed:\nstdout: {second.stdout}\nstderr: {second.stderr}"
             )
@@ -443,4 +416,71 @@ class TestImageDescriptionE2E:
         content = output_md.read_text()
         assert CANNED_DESCRIPTION in content, (
             "Expected canned description to be preserved after incremental sync"
+        )
+
+
+@pytest.mark.e2e
+class TestImageDescriptionRealLLM:
+    """E2E tests for vision-based image description using a real LLM.
+
+    These tests require both Docling models and a configured AI API key
+    with a vision-capable model.  They hit a real LLM endpoint and verify
+    that the pipeline produces meaningful image descriptions (not
+    placeholders) in the output markdown.
+    """
+
+    @skip_without_docling
+    @skip_without_ai
+    def test_real_vision_generates_image_description(self, initialized_project: Path) -> None:
+        """Real vision LLM produces a description, not an <!-- image --> placeholder.
+
+        Given a PDF with an embedded image and real AI credentials,
+        when nest sync runs,
+        then the output markdown contains descriptive text (not a placeholder)
+        and the sync summary includes 'Images described:'.
+        """
+        project_dir = initialized_project
+        _put_image_fixture_in_project(project_dir)
+
+        result = run_cli(["sync"], cwd=project_dir, timeout=300, env=ai_env_vars())
+
+        assert result.exit_code == 0, (
+            f"Sync failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+
+        output_md = project_dir / "_nest_context" / "image_doc.md"
+        assert output_md.exists(), "Expected '_nest_context/image_doc.md' to be created after sync"
+        content = output_md.read_text()
+
+        assert "<!-- image -->" not in content, (
+            "Expected real vision description, not <!-- image --> placeholder.\n"
+            f"Markdown (first 600 chars): {content[:600]}"
+        )
+        assert len(content) > 100, (
+            "Expected substantial output from vision-described PDF.\n"
+            f"Markdown length: {len(content)}"
+        )
+        assert "Images described:" in result.stdout, (
+            f"Expected 'Images described:' in sync summary.\nstdout: {result.stdout}"
+        )
+
+    @skip_without_docling
+    @skip_without_ai
+    def test_real_vision_token_reporting(self, initialized_project: Path) -> None:
+        """Real vision LLM usage is reflected in AI token reporting.
+
+        Given a PDF with an embedded image and real AI credentials,
+        when nest sync runs,
+        then stdout includes an 'AI tokens:' line with non-zero counts.
+        """
+        project_dir = initialized_project
+        _put_image_fixture_in_project(project_dir)
+
+        result = run_cli(["sync"], cwd=project_dir, timeout=300, env=ai_env_vars())
+
+        assert result.exit_code == 0, (
+            f"Sync failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+        )
+        assert "AI tokens:" in result.stdout, (
+            f"Expected 'AI tokens:' in sync summary.\nstdout: {result.stdout}"
         )

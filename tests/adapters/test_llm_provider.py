@@ -73,12 +73,12 @@ class TestCreateLLMProvider:
     """Tests for create_llm_provider() factory function."""
 
     def test_create_with_nest_ai_vars(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """NEST_AI_API_KEY set → returns adapter with correct config."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "nest-key-123")
-        monkeypatch.setenv("NEST_AI_ENDPOINT", "https://custom.api/v1")
-        monkeypatch.setenv("NEST_AI_MODEL", "gpt-4o")
+        """NEST_API_KEY set → returns adapter with correct config."""
+        monkeypatch.setenv("NEST_API_KEY", "nest-key-123")
+        monkeypatch.setenv("NEST_BASE_URL", "https://custom.api/v1")
+        monkeypatch.setenv("NEST_TEXT_MODEL", "gpt-4o")
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
@@ -92,11 +92,11 @@ class TestCreateLLMProvider:
 
     def test_create_with_openai_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Only OPENAI_API_KEY set → returns adapter."""
-        monkeypatch.delenv("NEST_AI_API_KEY", raising=False)
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("NEST_AI_MODEL", raising=False)
+        monkeypatch.delenv("NEST_API_KEY", raising=False)
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_TEXT_MODEL", raising=False)
         monkeypatch.setenv("OPENAI_API_KEY", "openai-key-456")
-        monkeypatch.setenv("OPENAI_API_BASE", "https://openai.custom/v1")
+        monkeypatch.setenv("OPENAI_BASE_URL", "https://openai.custom/v1")
         monkeypatch.setenv("OPENAI_MODEL", "gpt-3.5-turbo")
 
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
@@ -110,11 +110,11 @@ class TestCreateLLMProvider:
 
     def test_create_no_keys(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """No keys → returns None."""
-        monkeypatch.delenv("NEST_AI_API_KEY", raising=False)
+        monkeypatch.delenv("NEST_API_KEY", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.delenv("NEST_AI_MODEL", raising=False)
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_TEXT_MODEL", raising=False)
         monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
         result = create_llm_provider()
@@ -122,12 +122,12 @@ class TestCreateLLMProvider:
         assert result is None
 
     def test_nest_ai_takes_precedence(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Both NEST_AI_API_KEY and OPENAI_API_KEY set → uses NEST_AI_API_KEY."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "nest-key")
+        """Both NEST_API_KEY and OPENAI_API_KEY set → uses NEST_API_KEY."""
+        monkeypatch.setenv("NEST_API_KEY", "nest-key")
         monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.delenv("NEST_AI_MODEL", raising=False)
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_TEXT_MODEL", raising=False)
         monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
@@ -137,38 +137,38 @@ class TestCreateLLMProvider:
         mock_openai.assert_called_once_with(api_key="nest-key", base_url=DEFAULT_ENDPOINT)
 
     def test_endpoint_fallback_chain(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test all three levels: NEST_AI_ENDPOINT → OPENAI_API_BASE → default."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "key")
-        monkeypatch.delenv("NEST_AI_MODEL", raising=False)
+        """Test all three levels: NEST_BASE_URL → OPENAI_BASE_URL → default."""
+        monkeypatch.setenv("NEST_API_KEY", "key")
+        monkeypatch.delenv("NEST_TEXT_MODEL", raising=False)
         monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
-        # Level 1: NEST_AI_ENDPOINT wins
-        monkeypatch.setenv("NEST_AI_ENDPOINT", "https://nest-ep/v1")
-        monkeypatch.setenv("OPENAI_API_BASE", "https://openai-ep/v1")
+        # Level 1: NEST_BASE_URL wins
+        monkeypatch.setenv("NEST_BASE_URL", "https://nest-ep/v1")
+        monkeypatch.setenv("OPENAI_BASE_URL", "https://openai-ep/v1")
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
             create_llm_provider()
         mock_openai.assert_called_once_with(api_key="key", base_url="https://nest-ep/v1")
 
-        # Level 2: OPENAI_API_BASE fallback
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
+        # Level 2: OPENAI_BASE_URL fallback
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
             create_llm_provider()
         mock_openai.assert_called_once_with(api_key="key", base_url="https://openai-ep/v1")
 
         # Level 3: default
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
             create_llm_provider()
         mock_openai.assert_called_once_with(api_key="key", base_url=DEFAULT_ENDPOINT)
 
     def test_model_fallback_chain(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Test all three levels: NEST_AI_MODEL → OPENAI_MODEL → default."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "key")
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        """Test all three levels: NEST_TEXT_MODEL → OPENAI_MODEL → default."""
+        monkeypatch.setenv("NEST_API_KEY", "key")
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
 
-        # Level 1: NEST_AI_MODEL wins
-        monkeypatch.setenv("NEST_AI_MODEL", "custom-model")
+        # Level 1: NEST_TEXT_MODEL wins
+        monkeypatch.setenv("NEST_TEXT_MODEL", "custom-model")
         monkeypatch.setenv("OPENAI_MODEL", "openai-model")
         with patch("nest.adapters.llm_provider.openai.OpenAI"):
             result = create_llm_provider()
@@ -176,7 +176,7 @@ class TestCreateLLMProvider:
         assert result.model_name == "custom-model"
 
         # Level 2: OPENAI_MODEL fallback
-        monkeypatch.delenv("NEST_AI_MODEL", raising=False)
+        monkeypatch.delenv("NEST_TEXT_MODEL", raising=False)
         with patch("nest.adapters.llm_provider.openai.OpenAI"):
             result = create_llm_provider()
         assert result is not None
@@ -191,10 +191,10 @@ class TestCreateLLMProvider:
 
     def test_default_endpoint(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """No endpoint vars → https://api.openai.com/v1."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "key")
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.delenv("NEST_AI_MODEL", raising=False)
+        monkeypatch.setenv("NEST_API_KEY", "key")
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_TEXT_MODEL", raising=False)
         monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
@@ -203,10 +203,10 @@ class TestCreateLLMProvider:
 
     def test_default_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """No model vars → gpt-4o-mini."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "key")
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.delenv("NEST_AI_MODEL", raising=False)
+        monkeypatch.setenv("NEST_API_KEY", "key")
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_TEXT_MODEL", raising=False)
         monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
         with patch("nest.adapters.llm_provider.openai.OpenAI"):
@@ -390,11 +390,11 @@ class TestCreateLLMProviderAzure:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Azure endpoint URL → returns AzureOpenAIAdapter."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "azure-key-123")
-        monkeypatch.setenv("NEST_AI_ENDPOINT", "https://myorg.openai.azure.com")
-        monkeypatch.setenv("NEST_AI_MODEL", "gpt-4o")
+        monkeypatch.setenv("NEST_API_KEY", "azure-key-123")
+        monkeypatch.setenv("NEST_BASE_URL", "https://myorg.openai.azure.com")
+        monkeypatch.setenv("NEST_TEXT_MODEL", "gpt-4o")
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
         with patch("nest.adapters.llm_provider.openai.AzureOpenAI") as mock_azure:
@@ -413,11 +413,11 @@ class TestCreateLLMProviderAzure:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Standard OpenAI endpoint → returns OpenAIAdapter (not Azure)."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "openai-key")
-        monkeypatch.setenv("NEST_AI_ENDPOINT", "https://api.openai.com/v1")
-        monkeypatch.setenv("NEST_AI_MODEL", "gpt-4o-mini")
+        monkeypatch.setenv("NEST_API_KEY", "openai-key")
+        monkeypatch.setenv("NEST_BASE_URL", "https://api.openai.com/v1")
+        monkeypatch.setenv("NEST_TEXT_MODEL", "gpt-4o-mini")
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
         monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
         with patch("nest.adapters.llm_provider.openai.OpenAI"):
@@ -719,24 +719,24 @@ class TestCreateVisionProvider:
     # 6.11 — no API key
     def test_no_api_key_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Both key env vars unset → returns None."""
-        monkeypatch.delenv("NEST_AI_API_KEY", raising=False)
+        monkeypatch.delenv("NEST_API_KEY", raising=False)
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_VISION_MODEL", raising=False)
         monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
 
         result = create_vision_provider()
 
         assert result is None
 
-    # 6.12 — NEST_AI_VISION_MODEL wins
+    # 6.12 — NEST_VISION_MODEL wins
     def test_nest_ai_vision_model_wins(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """NEST_AI_VISION_MODEL set → adapter uses that model."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "key")
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.setenv("NEST_AI_VISION_MODEL", "gpt-4-vision-preview")
+        """NEST_VISION_MODEL set → adapter uses that model."""
+        monkeypatch.setenv("NEST_API_KEY", "key")
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.setenv("NEST_VISION_MODEL", "gpt-4-vision-preview")
         monkeypatch.setenv("OPENAI_VISION_MODEL", "other-model")
 
         with patch("nest.adapters.llm_provider.openai.OpenAI"):
@@ -747,11 +747,11 @@ class TestCreateVisionProvider:
 
     # 6.13 — OPENAI_VISION_MODEL fallback
     def test_openai_vision_model_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """NEST_AI_VISION_MODEL unset, OPENAI_VISION_MODEL set → uses OPENAI value."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "key")
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        """NEST_VISION_MODEL unset, OPENAI_VISION_MODEL set → uses OPENAI value."""
+        monkeypatch.setenv("NEST_API_KEY", "key")
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_VISION_MODEL", raising=False)
         monkeypatch.setenv("OPENAI_VISION_MODEL", "gpt-4o-vision")
 
         with patch("nest.adapters.llm_provider.openai.OpenAI"):
@@ -763,10 +763,10 @@ class TestCreateVisionProvider:
     # 6.14 — default model
     def test_default_vision_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Both vision model vars unset → model_name == 'gpt-4.1'."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "key")
-        monkeypatch.delenv("NEST_AI_ENDPOINT", raising=False)
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        monkeypatch.setenv("NEST_API_KEY", "key")
+        monkeypatch.delenv("NEST_BASE_URL", raising=False)
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_VISION_MODEL", raising=False)
         monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
 
         with patch("nest.adapters.llm_provider.openai.OpenAI"):
@@ -778,33 +778,91 @@ class TestCreateVisionProvider:
 
     # 6.15 — Azure routing
     def test_azure_endpoint_returns_azure_adapter(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Azure endpoint → returns AzureOpenAIVisionAdapter."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "azure-key")
-        monkeypatch.setenv("NEST_AI_ENDPOINT", "https://myorg.openai.azure.com")
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        """Azure endpoint, no vision or text model vars set → AzureOpenAIVisionAdapter."""
+        monkeypatch.setenv("NEST_API_KEY", "azure-key")
+        monkeypatch.setenv("NEST_BASE_URL", "https://myorg.openai.azure.com")
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_VISION_MODEL", raising=False)
         monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
+        monkeypatch.delenv("NEST_TEXT_MODEL", raising=False)
+        monkeypatch.delenv("OPENAI_MODEL", raising=False)
 
         with patch("nest.adapters.llm_provider.openai.AzureOpenAI") as mock_azure:
             result = create_vision_provider()
 
         assert result is not None
         assert isinstance(result, AzureOpenAIVisionAdapter)
+        assert result.model_name == DEFAULT_MODEL
         mock_azure.assert_called_once_with(
             api_key="azure-key",
             azure_endpoint="https://myorg.openai.azure.com",
             api_version=DEFAULT_AZURE_API_VERSION,
         )
 
-    # 6.16 — NEST_AI_ENDPOINT influences vision adapter endpoint
+    # 6.15b — Azure falls back to NEST_TEXT_MODEL when no vision model is set
+    def test_azure_falls_back_to_nest_ai_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Azure + NEST_TEXT_MODEL set, no vision vars → uses NEST_TEXT_MODEL as deployment."""
+        monkeypatch.setenv("NEST_API_KEY", "azure-key")
+        monkeypatch.setenv("NEST_BASE_URL", "https://myorg.openai.azure.com")
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_VISION_MODEL", raising=False)
+        monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
+        monkeypatch.setenv("NEST_TEXT_MODEL", "gpt-4o")
+        monkeypatch.delenv("OPENAI_MODEL", raising=False)
+
+        with patch("nest.adapters.llm_provider.openai.AzureOpenAI"):
+            result = create_vision_provider()
+
+        assert result is not None
+        assert isinstance(result, AzureOpenAIVisionAdapter)
+        assert result.model_name == "gpt-4o"
+
+    # 6.15c — Azure falls back to OPENAI_MODEL when NEST_TEXT_MODEL unset
+    def test_azure_falls_back_to_openai_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Azure + OPENAI_MODEL set, no vision or NEST_TEXT_MODEL vars → uses OPENAI_MODEL."""
+        monkeypatch.setenv("NEST_API_KEY", "azure-key")
+        monkeypatch.setenv("NEST_BASE_URL", "https://myorg.openai.azure.com")
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_VISION_MODEL", raising=False)
+        monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
+        monkeypatch.delenv("NEST_TEXT_MODEL", raising=False)
+        monkeypatch.setenv("OPENAI_MODEL", "gpt-4o-2024-11")
+
+        with patch("nest.adapters.llm_provider.openai.AzureOpenAI"):
+            result = create_vision_provider()
+
+        assert result is not None
+        assert isinstance(result, AzureOpenAIVisionAdapter)
+        assert result.model_name == "gpt-4o-2024-11"
+
+    # 6.15d — NEST_VISION_MODEL always wins on Azure too
+    def test_azure_explicit_vision_model_wins_over_text_model(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Azure + explicit NEST_VISION_MODEL → vision model overrides NEST_TEXT_MODEL."""
+        monkeypatch.setenv("NEST_API_KEY", "azure-key")
+        monkeypatch.setenv("NEST_BASE_URL", "https://myorg.openai.azure.com")
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.setenv("NEST_VISION_MODEL", "gpt-4o-vision-deploy")
+        monkeypatch.setenv("OPENAI_VISION_MODEL", "ignored")
+        monkeypatch.setenv("NEST_TEXT_MODEL", "gpt-4o-mini-deploy")
+
+        with patch("nest.adapters.llm_provider.openai.AzureOpenAI"):
+            result = create_vision_provider()
+
+        assert result is not None
+        assert isinstance(result, AzureOpenAIVisionAdapter)
+        assert result.model_name == "gpt-4o-vision-deploy"
+
+    # 6.16 — NEST_BASE_URL influences vision adapter endpoint
     def test_nest_ai_endpoint_propagates_to_vision_adapter(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """NEST_AI_ENDPOINT → vision adapter uses same endpoint."""
-        monkeypatch.setenv("NEST_AI_API_KEY", "key")
-        monkeypatch.setenv("NEST_AI_ENDPOINT", "https://custom-vision.api/v1")
-        monkeypatch.delenv("OPENAI_API_BASE", raising=False)
-        monkeypatch.delenv("NEST_AI_VISION_MODEL", raising=False)
+        """NEST_BASE_URL → vision adapter uses same endpoint."""
+        monkeypatch.setenv("NEST_API_KEY", "key")
+        monkeypatch.setenv("NEST_BASE_URL", "https://custom-vision.api/v1")
+        monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+        monkeypatch.delenv("NEST_VISION_MODEL", raising=False)
         monkeypatch.delenv("OPENAI_VISION_MODEL", raising=False)
 
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:

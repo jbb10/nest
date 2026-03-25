@@ -29,7 +29,7 @@ def test_init_creates_agent_file(tmp_path: Path) -> None:
     )
 
     # Execute init
-    service.execute("Nike", tmp_path)
+    service.execute(tmp_path)
 
     # Verify agent file exists
     agent_path = tmp_path / ".github" / "agents" / "nest.agent.md"
@@ -38,7 +38,6 @@ def test_init_creates_agent_file(tmp_path: Path) -> None:
     # Verify agent file content
     content = agent_path.read_text()
     assert content.startswith("---\nname: nest\n")
-    assert "Nike" in content
     assert ".nest/00_MASTER_INDEX.md" in content
     assert "_nest_sources/" in content
 
@@ -63,7 +62,7 @@ def test_init_creates_all_directories(tmp_path: Path) -> None:
         model_downloader=mock_downloader,
     )
 
-    service.execute("TestProject", tmp_path)
+    service.execute(tmp_path)
 
     assert (tmp_path / "_nest_sources").exists()
     assert (tmp_path / "_nest_context").exists()
@@ -87,7 +86,7 @@ def test_init_creates_manifest(tmp_path: Path) -> None:
         model_downloader=mock_downloader,
     )
 
-    service.execute("Nike", tmp_path)
+    service.execute(tmp_path)
 
     manifest_path = tmp_path / ".nest" / "manifest.json"
     assert manifest_path.exists()

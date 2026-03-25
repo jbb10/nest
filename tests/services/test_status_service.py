@@ -43,7 +43,6 @@ class TestStatusService:
 
         manifest = Manifest(
             nest_version="0.0.0",
-            project_name="TestProject",
             last_sync=datetime(2026, 1, 1, tzinfo=timezone.utc),
             files={
                 "modified.pdf": FileEntry(
@@ -72,7 +71,6 @@ class TestStatusService:
         service = StatusService(filesystem=FileSystemAdapter(), manifest=ManifestAdapter())
         report = service.get_status(project_root)
 
-        assert report.project_name == "TestProject"
         assert report.source_total == 3
         assert report.source_new == 1
         assert report.source_modified == 1
@@ -89,7 +87,6 @@ class TestStatusService:
 
         manifest = Manifest(
             nest_version="0.0.0",
-            project_name="TestProject",
             last_sync=None,
             files={},
         )
@@ -111,7 +108,6 @@ class TestStatusService:
 
         manifest = Manifest(
             nest_version="0.0.0",
-            project_name="TestProject",
             last_sync=None,
             files={},
         )
@@ -133,7 +129,6 @@ class TestStatusService:
 
         manifest = Manifest(
             nest_version="0.0.0",
-            project_name="TestProject",
             last_sync=None,
             files={},
         )

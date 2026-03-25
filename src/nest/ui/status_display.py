@@ -53,7 +53,7 @@ def display_status(report: StatusReport, console: Console) -> None:
         console: Rich console instance.
     """
 
-    tree = Tree(f"📁 Project: [bold]{report.project_name}[/bold]")
+    tree = Tree("📁 [bold]Nest Project[/bold]")
     tree.add(f"Nest Version: {report.nest_version}")
 
     sources = tree.add("Sources")

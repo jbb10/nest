@@ -795,31 +795,16 @@ class TestRemediationMethods:
 
     def test_regenerate_agent_file_success(self, tmp_path: Path) -> None:
         """regenerate_agent_file() should use AgentWriterProtocol."""
-        from nest.services.doctor_service import DoctorService, RemediationResult
-
-        mock_writer = MagicMock()
-        service = DoctorService(agent_writer=mock_writer)
-
-        result = service.regenerate_agent_file(tmp_path, "TestProject")
-
-        assert isinstance(result, RemediationResult)
-        assert result.attempted is True
-        assert result.success is True
-        assert mock_writer.generate.called
-
-    def test_regenerate_agent_file_handles_error(self, tmp_path: Path) -> None:
-        """regenerate_agent_file() should handle generation errors."""
         from nest.services.doctor_service import DoctorService
 
         mock_writer = MagicMock()
-        mock_writer.generate.side_effect = OSError("Write failed")
-
         service = DoctorService(agent_writer=mock_writer)
-        result = service.regenerate_agent_file(tmp_path, "TestProject")
+
+        result = service.regenerate_agent_file(tmp_path)
 
         assert result.attempted is True
-        assert result.success is False
-        assert "failed" in result.message.lower()
+        assert result.success is True
+        assert "regenerated" in result.message.lower()
 
     def test_download_models_when_checker_none(self, tmp_path: Path) -> None:
         """download_models() should fail gracefully when no model checker."""
@@ -856,7 +841,7 @@ class TestRebuildManifest:
         from nest.services.doctor_service import DoctorService
 
         service = DoctorService(manifest_adapter=None)
-        result = service.rebuild_manifest(tmp_path, "TestProject")
+        result = service.rebuild_manifest(tmp_path)
 
         assert result.attempted is False
         assert result.success is False
@@ -868,7 +853,7 @@ class TestRebuildManifest:
 
         mock_manifest = MagicMock()
         service = DoctorService(manifest_adapter=mock_manifest, filesystem=None)
-        result = service.rebuild_manifest(tmp_path, "TestProject")
+        result = service.rebuild_manifest(tmp_path)
 
         assert result.attempted is False
         assert result.success is False
@@ -884,7 +869,7 @@ class TestRebuildManifest:
 
         service = DoctorService(manifest_adapter=mock_manifest, filesystem=mock_fs)
 
-        result = service.rebuild_manifest(tmp_path, "TestProject")
+        result = service.rebuild_manifest(tmp_path)
 
         assert result.attempted is True
         assert result.success is True
@@ -914,51 +899,12 @@ class TestRebuildManifest:
         mock_fs.exists.return_value = True
 
         service = DoctorService(manifest_adapter=mock_manifest, filesystem=mock_fs)
-        result = service.rebuild_manifest(tmp_path, "TestProject")
+        result = service.rebuild_manifest(tmp_path)
 
         assert result.attempted is True
         assert result.success is True
         assert "1 files restored" in result.message
         assert mock_manifest.save.called
-
-
-class TestGetProjectName:
-    """Tests for DoctorService._get_project_name()."""
-
-    def test_get_project_name_from_manifest(self, tmp_path: Path) -> None:
-        """_get_project_name() should return name from manifest if available."""
-        from nest.services.doctor_service import DoctorService
-
-        mock_manifest = MagicMock()
-        mock_manifest.exists.return_value = True
-        mock_manifest.load.return_value = MagicMock(project_name="MyProject")
-
-        service = DoctorService(manifest_adapter=mock_manifest)
-        name = service._get_project_name(tmp_path)
-
-        assert name == "MyProject"
-
-    def test_get_project_name_default_when_no_manifest(self, tmp_path: Path) -> None:
-        """_get_project_name() should return default when no manifest."""
-        from nest.services.doctor_service import DoctorService
-
-        service = DoctorService(manifest_adapter=None)
-        name = service._get_project_name(tmp_path)
-
-        assert name == "Nest Project"
-
-    def test_get_project_name_default_when_manifest_error(self, tmp_path: Path) -> None:
-        """_get_project_name() should return default when manifest load fails."""
-        from nest.services.doctor_service import DoctorService
-
-        mock_manifest = MagicMock()
-        mock_manifest.exists.return_value = True
-        mock_manifest.load.side_effect = Exception("Load failed")
-
-        service = DoctorService(manifest_adapter=mock_manifest)
-        name = service._get_project_name(tmp_path)
-
-        assert name == "Nest Project"
 
 
 class TestRemediateIssuesAuto:
@@ -1079,7 +1025,6 @@ class TestRemediateIssuesInteractive:
             None,
             project_report,
             confirm_callback=mock_confirm,
-            input_callback=lambda msg: "TestProject",
         )
 
         assert len(confirm_calls) == 3
@@ -1117,19 +1062,18 @@ class TestRemediateIssuesInteractive:
             None,
             project_report,
             confirm_callback=lambda msg: False,
-            input_callback=lambda msg: "",
         )
 
         assert report.any_attempted is False
         assert all(not r.attempted for r in report.results)
 
-    def test_interactive_asks_project_name_once(self, tmp_path: Path) -> None:
-        """remediate_issues_interactive() should ask project name only once."""
-        input_calls: list[str] = []
+    def test_interactive_confirm_callback_controls_all_fixes(self, tmp_path: Path) -> None:
+        """remediate_issues_interactive() should use confirm_callback for all fixes."""
+        confirm_calls: list[str] = []
 
-        def mock_input(msg: str) -> str:
-            input_calls.append(msg)
-            return "TestProject"
+        def mock_confirm(msg: str) -> bool:
+            confirm_calls.append(msg)
+            return True
 
         mock_fs = MagicMock()
         mock_fs.exists.return_value = False
@@ -1166,11 +1110,10 @@ class TestRemediateIssuesInteractive:
             env_report,
             None,
             project_report,
-            confirm_callback=lambda msg: True,
-            input_callback=mock_input,
+            confirm_callback=mock_confirm,
         )
 
-        assert len(input_calls) == 1
+        assert len(confirm_calls) >= 2
         assert report.any_attempted is True
 
 

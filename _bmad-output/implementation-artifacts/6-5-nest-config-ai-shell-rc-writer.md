@@ -12,7 +12,7 @@ So that **the keys are available as environment variables in all future terminal
 
 ## Business Context
 
-This is the **fifth story in Epic 6** (Built-in AI Enrichment). Stories 6.1–6.4 created the LLM provider adapter, AI index enrichment, AI glossary generation, and parallel execution with token reporting. AI currently auto-detects credentials from `NEST_AI_API_KEY` or `OPENAI_API_KEY` environment variables (see `create_llm_provider()` in `src/nest/adapters/llm_provider.py`).
+This is the **fifth story in Epic 6** (Built-in AI Enrichment). Stories 6.1–6.4 created the LLM provider adapter, AI index enrichment, AI glossary generation, and parallel execution with token reporting. AI currently auto-detects credentials from `NEST_API_KEY` or `OPENAI_API_KEY` environment variables (see `create_llm_provider()` in `src/nest/adapters/llm_provider.py`).
 
 This story adds the **`nest config ai`** subcommand that interactively prompts the user for endpoint, model, and API key, then writes them as `export` statements to the user's shell RC file (`.zshrc`, `.bashrc`, `.bash_profile`, `.profile`, or fish `config.fish`). The command uses idempotent comment-delimited blocks so re-running replaces rather than duplicates configuration.
 
@@ -65,9 +65,9 @@ Story 6.4's first-run discovery message already references this command: `💡 R
 **Then** the following block is written to the shell RC file:
 ```bash
 # --- Nest AI Configuration (managed by `nest config ai`) ---
-export NEST_AI_ENDPOINT="https://..."
-export NEST_AI_MODEL="gpt-4o-mini"
-export NEST_AI_API_KEY="sk-..."
+export NEST_BASE_URL="https://..."
+export NEST_TEXT_MODEL="gpt-4o-mini"
+export NEST_API_KEY="sk-..."
 # --- End Nest AI Configuration ---
 ```
 **And** a success message is shown: `✓ Added to ~/.zshrc`
@@ -106,9 +106,9 @@ export NEST_AI_API_KEY="sk-..."
 **Then** fish-compatible syntax is used:
 ```fish
 # --- Nest AI Configuration (managed by `nest config ai`) ---
-set -gx NEST_AI_ENDPOINT "https://..."
-set -gx NEST_AI_MODEL "gpt-4o-mini"
-set -gx NEST_AI_API_KEY "sk-..."
+set -gx NEST_BASE_URL "https://..."
+set -gx NEST_TEXT_MODEL "gpt-4o-mini"
+set -gx NEST_API_KEY "sk-..."
 # --- End Nest AI Configuration ---
 ```
 
@@ -194,17 +194,17 @@ set -gx NEST_AI_API_KEY "sk-..."
       if shell == "fish":
           lines = [
               BLOCK_START,
-              f'set -gx NEST_AI_ENDPOINT "{endpoint}"',
-              f'set -gx NEST_AI_MODEL "{model}"',
-              f'set -gx NEST_AI_API_KEY "{api_key}"',
+              f'set -gx NEST_BASE_URL "{endpoint}"',
+              f'set -gx NEST_TEXT_MODEL "{model}"',
+              f'set -gx NEST_API_KEY "{api_key}"',
               BLOCK_END,
           ]
       else:
           lines = [
               BLOCK_START,
-              f'export NEST_AI_ENDPOINT="{endpoint}"',
-              f'export NEST_AI_MODEL="{model}"',
-              f'export NEST_AI_API_KEY="{api_key}"',
+              f'export NEST_BASE_URL="{endpoint}"',
+              f'export NEST_TEXT_MODEL="{model}"',
+              f'export NEST_API_KEY="{api_key}"',
               BLOCK_END,
           ]
       return "\n".join(lines) + "\n"
@@ -369,16 +369,16 @@ set -gx NEST_AI_API_KEY "sk-..."
 
       # Prompt with smart defaults from existing env vars
       current_endpoint = (
-          os.environ.get("NEST_AI_ENDPOINT")
-          or os.environ.get("OPENAI_API_BASE")
+          os.environ.get("NEST_BASE_URL")
+          or os.environ.get("OPENAI_BASE_URL")
           or "https://api.openai.com/v1"
       )
       current_model = (
-          os.environ.get("NEST_AI_MODEL")
+          os.environ.get("NEST_TEXT_MODEL")
           or os.environ.get("OPENAI_MODEL")
           or "gpt-4o-mini"
       )
-      current_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+      current_key = os.environ.get("NEST_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
 
       endpoint = typer.prompt("  API endpoint", default=current_endpoint)
       model = typer.prompt("  Model", default=current_model)
@@ -465,7 +465,7 @@ set -gx NEST_AI_API_KEY "sk-..."
   - `test_generate_config_block_bash()` — uses `export VAR="val"` syntax
   - `test_generate_config_block_zsh()` — uses `export VAR="val"` syntax (same as bash)
   - `test_generate_config_block_fish()` — uses `set -gx VAR "val"` syntax
-  - `test_generate_config_block_contains_all_vars()` — block contains `NEST_AI_ENDPOINT`, `NEST_AI_MODEL`, `NEST_AI_API_KEY`
+  - `test_generate_config_block_contains_all_vars()` — block contains `NEST_BASE_URL`, `NEST_TEXT_MODEL`, `NEST_API_KEY`
   - `test_generate_config_block_has_sentinel_comments()` — block starts with `BLOCK_START` and ends with `BLOCK_END`
 
   **Write config tests (using `tmp_path`):**
@@ -619,7 +619,7 @@ def test_write_config_creates_new_file(tmp_path: Path) -> None:
     # Assert
     content = rc_path.read_text()
     assert BLOCK_START in content
-    assert 'export NEST_AI_ENDPOINT="https://api.openai.com/v1"' in content
+    assert 'export NEST_BASE_URL="https://api.openai.com/v1"' in content
 ```
 
 **Typer CliRunner test pattern** (from `tests/cli/test_sync_cmd.py`):
@@ -656,7 +656,7 @@ def test_config_ai_help():
 
 ### Dependencies
 
-- **Upstream:** Story 6.1 (LLM Provider Adapter) — defines the `NEST_AI_ENDPOINT`, `NEST_AI_MODEL`, `NEST_AI_API_KEY` env var names
+- **Upstream:** Story 6.1 (LLM Provider Adapter) — defines the `NEST_BASE_URL`, `NEST_TEXT_MODEL`, `NEST_API_KEY` env var names
 - **Upstream:** Story 6.4 (Parallel AI Execution) — first-run message references `nest config ai`
 - **Downstream:** Story 6.6 (Remove Agents) — may reference `nest config ai` in updated messaging
 

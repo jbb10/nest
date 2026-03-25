@@ -19,7 +19,6 @@ class MockManifestAdapter:
     ) -> None:
         self._manifest = existing_manifest or Manifest(
             nest_version="1.0.0",
-            project_name="test-project",
             last_sync=None,
             files={},
         )
@@ -29,8 +28,7 @@ class MockManifestAdapter:
     def exists(self, project_dir: Path) -> bool:
         return True
 
-    def create(self, project_dir: Path, project_name: str) -> Manifest:
-        self._manifest.project_name = project_name
+    def create(self, project_dir: Path) -> Manifest:
         return self._manifest
 
     def load(self, project_dir: Path) -> Manifest:
@@ -384,4 +382,3 @@ class TestManifestServiceCommit:
 
         # Assert
         assert mock_adapter.save_called
-        assert mock_adapter.saved_manifest.project_name == "project"

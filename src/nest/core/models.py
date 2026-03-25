@@ -60,13 +60,13 @@ class Manifest(BaseModel):
 
     Attributes:
         nest_version: Version of nest that created/updated this manifest.
-        project_name: Human-readable project name.
         last_sync: Timestamp of the last successful sync (optional).
         files: Dictionary mapping source file paths to their FileEntry data.
     """
 
+    model_config = ConfigDict(extra="ignore")
+
     nest_version: str
-    project_name: str
     last_sync: datetime | None = None
     files: dict[str, FileEntry] = Field(default_factory=dict)
 

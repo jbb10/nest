@@ -180,7 +180,9 @@ class TestDisplaySyncSummaryAggregatedTokens:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_status_note="not configured (run 'nest config ai' or set NEST_AI_API_KEY / OPENAI_API_KEY)",
+            ai_status_note=(
+                "not configured (run 'nest config ai' or set NEST_API_KEY / OPENAI_API_KEY)"
+            ),
         )
 
         status_lines = [line for line in lines if "AI:" in line]

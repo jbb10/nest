@@ -2232,7 +2232,7 @@ class TestSyncVisionPipeline:
         assert result.images_skipped == 0
 
     def test_vision_phase1_convert_failure_counted_as_failed(self, mock_deps, tmp_path):
-        """When vision_docling_processor.convert() raises, file is counted as failed, describe never called."""
+        """When vision_docling_processor.convert() raises, file counted as failed."""
         from nest.adapters.docling_processor import DoclingProcessor
         from nest.services.picture_description_service import PictureDescriptionService
 

@@ -173,9 +173,9 @@ def create_llm_provider() -> OpenAIAdapter | AzureOpenAIAdapter | None:
     """Auto-detect AI credentials from environment variables.
 
     Fallback chain:
-        API key:  NEST_AI_API_KEY → OPENAI_API_KEY → None
-        Endpoint: NEST_AI_ENDPOINT → OPENAI_API_BASE → https://api.openai.com/v1
-        Model:    NEST_AI_MODEL → OPENAI_MODEL → gpt-4o-mini
+        API key:  NEST_API_KEY → OPENAI_API_KEY → None
+        Endpoint: NEST_BASE_URL → OPENAI_BASE_URL → https://api.openai.com/v1
+        Model:    NEST_TEXT_MODEL → OPENAI_MODEL → gpt-4o-mini
 
     If the resolved endpoint contains `.openai.azure.com`, an AzureOpenAIAdapter
     is returned instead of the standard OpenAIAdapter.
@@ -183,14 +183,14 @@ def create_llm_provider() -> OpenAIAdapter | AzureOpenAIAdapter | None:
     Returns:
         Configured adapter if API key found, None otherwise.
     """
-    api_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    api_key = os.environ.get("NEST_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         return None
 
     endpoint = (
-        os.environ.get("NEST_AI_ENDPOINT") or os.environ.get("OPENAI_API_BASE") or DEFAULT_ENDPOINT
+        os.environ.get("NEST_BASE_URL") or os.environ.get("OPENAI_BASE_URL") or DEFAULT_ENDPOINT
     )
-    model = os.environ.get("NEST_AI_MODEL") or os.environ.get("OPENAI_MODEL") or DEFAULT_MODEL
+    model = os.environ.get("NEST_TEXT_MODEL") or os.environ.get("OPENAI_MODEL") or DEFAULT_MODEL
 
     if _is_azure_endpoint(endpoint):
         return AzureOpenAIAdapter(
@@ -372,9 +372,15 @@ def create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter |
     """Auto-detect AI credentials from environment variables for vision use.
 
     Fallback chain:
-        API key:      NEST_AI_API_KEY → OPENAI_API_KEY → None
-        Endpoint:     NEST_AI_ENDPOINT → OPENAI_API_BASE → https://api.openai.com/v1
-        Vision model: NEST_AI_VISION_MODEL → OPENAI_VISION_MODEL → gpt-4.1
+        API key:      NEST_API_KEY → OPENAI_API_KEY → None
+        Endpoint:     NEST_BASE_URL → OPENAI_BASE_URL → https://api.openai.com/v1
+        Vision model: NEST_VISION_MODEL → OPENAI_VISION_MODEL
+                      → (Azure only) NEST_TEXT_MODEL → OPENAI_MODEL → gpt-4o-mini
+                      → (OpenAI)     gpt-4.1
+
+    For Azure endpoints the text-model deployment variables are used as a
+    fallback so that a multimodal deployment (e.g. gpt-4o) works without
+    requiring a separate ``NEST_VISION_MODEL`` variable.
 
     If the resolved endpoint contains `.openai.azure.com`, an
     AzureOpenAIVisionAdapter is returned instead of OpenAIVisionAdapter.
@@ -382,18 +388,29 @@ def create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter |
     Returns:
         Configured vision adapter if API key found, None otherwise.
     """
-    api_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    api_key = os.environ.get("NEST_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if not api_key:
         return None
 
     endpoint = (
-        os.environ.get("NEST_AI_ENDPOINT") or os.environ.get("OPENAI_API_BASE") or DEFAULT_ENDPOINT
+        os.environ.get("NEST_BASE_URL") or os.environ.get("OPENAI_BASE_URL") or DEFAULT_ENDPOINT
     )
-    vision_model = (
-        os.environ.get("NEST_AI_VISION_MODEL")
-        or os.environ.get("OPENAI_VISION_MODEL")
-        or DEFAULT_VISION_MODEL
+    # Vision-specific model env vars take priority; fall back to the text model
+    # env vars so Azure users don't need a separate deployment for vision.
+    # The hardcoded DEFAULT_VISION_MODEL is only used on standard OpenAI.
+    explicit_vision_model = os.environ.get("NEST_VISION_MODEL") or os.environ.get(
+        "OPENAI_VISION_MODEL"
     )
+    if explicit_vision_model:
+        vision_model = explicit_vision_model
+    elif _is_azure_endpoint(endpoint):
+        # For Azure, reuse the text-model deployment rather than defaulting to a
+        # model name that likely doesn't exist as a deployment (→ 404).
+        vision_model = (
+            os.environ.get("NEST_TEXT_MODEL") or os.environ.get("OPENAI_MODEL") or DEFAULT_MODEL
+        )
+    else:
+        vision_model = DEFAULT_VISION_MODEL
 
     if _is_azure_endpoint(endpoint):
         return AzureOpenAIVisionAdapter(

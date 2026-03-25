@@ -11,21 +11,38 @@ from nest.agents.vscode_writer import VSCodeAgentWriter
 class TestRender:
     """Tests for the render() method (AC1, AC2, AC8)."""
 
-    def test_render_returns_string_with_project_name(self, mock_filesystem: MockFileSystem) -> None:
-        """Test that render() returns string with correct project name interpolation."""
+    def test_render_returns_string(self, mock_filesystem: MockFileSystem) -> None:
+        """Test that render() returns a string."""
         writer = VSCodeAgentWriter(filesystem=mock_filesystem)
 
-        result = writer.render("Nike")
+        result = writer.render()
 
         assert isinstance(result, str)
-        assert "Nike" in result
-        assert "description: Expert analyst for Nike project documents" in result
+
+    def test_render_contains_static_description(self, mock_filesystem: MockFileSystem) -> None:
+        """Test that render() uses the static folder-agnostic description (AC5)."""
+        writer = VSCodeAgentWriter(filesystem=mock_filesystem)
+
+        result = writer.render()
+
+        assert "description: Expert analyst for documents in this project folder" in result
+
+    def test_render_contains_no_project_name_variable(
+        self, mock_filesystem: MockFileSystem
+    ) -> None:
+        """Test that render() does not contain any Jinja variable placeholders."""
+        writer = VSCodeAgentWriter(filesystem=mock_filesystem)
+
+        result = writer.render()
+
+        assert "{{" not in result
+        assert "}}" not in result
 
     def test_render_does_not_write_to_filesystem(self, mock_filesystem: MockFileSystem) -> None:
         """Test that render() does NOT write to filesystem."""
         writer = VSCodeAgentWriter(filesystem=mock_filesystem)
 
-        writer.render("Nike")
+        writer.render()
 
         assert len(mock_filesystem.written_files) == 0
         assert len(mock_filesystem.created_dirs) == 0
@@ -35,23 +52,22 @@ class TestRender:
         writer = VSCodeAgentWriter(filesystem=mock_filesystem)
         output_path = Path("/project/.github/agents/nest.agent.md")
 
-        rendered = writer.render("Nike")
-        writer.generate("Nike", output_path)
+        rendered = writer.render()
+        writer.generate(output_path)
 
         assert rendered == mock_filesystem.written_files[output_path]
 
-    def test_render_interpolates_multiple_occurrences(
-        self, mock_filesystem: MockFileSystem
-    ) -> None:
-        """Test that render() interpolates project name in multiple places."""
+    def test_render_is_deterministic(self, mock_filesystem: MockFileSystem) -> None:
+        """Test that render() produces identical output on repeated calls."""
         writer = VSCodeAgentWriter(filesystem=mock_filesystem)
 
-        result = writer.render("Acme Corp")
+        result1 = writer.render()
+        result2 = writer.render()
 
-        assert result.count("Acme Corp") >= 2
+        assert result1 == result2
 
 
-# --- generate() tests (regression) ---
+# --- generate() tests ---
 
 
 def test_generate_creates_agent_file(mock_filesystem: MockFileSystem) -> None:
@@ -59,11 +75,11 @@ def test_generate_creates_agent_file(mock_filesystem: MockFileSystem) -> None:
     writer = VSCodeAgentWriter(filesystem=mock_filesystem)
     output_path = Path("/project/.github/agents/nest.agent.md")
 
-    writer.generate("Nike", output_path)
+    writer.generate(output_path)
 
     content = mock_filesystem.written_files[output_path]
     assert "name: nest" in content
-    assert "description: Expert analyst for Nike project documents" in content
+    assert "description: Expert analyst for documents in this project folder" in content
     assert "icon: book" in content
 
 
@@ -72,7 +88,7 @@ def test_generate_creates_parent_directory(mock_filesystem: MockFileSystem) -> N
     writer = VSCodeAgentWriter(filesystem=mock_filesystem)
     output_path = Path("/project/.github/agents/nest.agent.md")
 
-    writer.generate("Nike", output_path)
+    writer.generate(output_path)
 
     assert Path("/project/.github/agents") in mock_filesystem.created_dirs
 
@@ -83,22 +99,9 @@ def test_generate_skips_directory_creation_if_exists(mock_filesystem: MockFileSy
     writer = VSCodeAgentWriter(filesystem=mock_filesystem)
     output_path = Path("/project/.github/agents/nest.agent.md")
 
-    writer.generate("Nike", output_path)
+    writer.generate(output_path)
 
     assert Path("/project/.github/agents") not in mock_filesystem.created_dirs
-
-
-def test_template_interpolates_project_name(mock_filesystem: MockFileSystem) -> None:
-    """Test that project name is correctly interpolated throughout template."""
-    writer = VSCodeAgentWriter(filesystem=mock_filesystem)
-    output_path = Path("/project/.github/agents/nest.agent.md")
-
-    writer.generate("Acme Corp", output_path)
-
-    content = mock_filesystem.written_files[output_path]
-    assert "Acme Corp" in content
-    # Check multiple occurrences
-    assert content.count("Acme Corp") >= 2
 
 
 def test_generate_includes_required_instructions(mock_filesystem: MockFileSystem) -> None:
@@ -106,7 +109,7 @@ def test_generate_includes_required_instructions(mock_filesystem: MockFileSystem
     writer = VSCodeAgentWriter(filesystem=mock_filesystem)
     output_path = Path("/project/.github/agents/nest.agent.md")
 
-    writer.generate("TestProject", output_path)
+    writer.generate(output_path)
 
     content = mock_filesystem.written_files[output_path]
     # Check for key instruction elements
@@ -116,17 +119,14 @@ def test_generate_includes_required_instructions(mock_filesystem: MockFileSystem
     assert "cite" in content.lower() or "citation" in content.lower()
 
 
-def test_generate_handles_special_characters_in_project_name(
-    mock_filesystem: MockFileSystem,
-) -> None:
-    """Test that special characters in project name don't break template."""
+def test_generate_body_uses_folder_agnostic_text(mock_filesystem: MockFileSystem) -> None:
+    """Test that body text references 'documents in this project folder' (AC5)."""
     writer = VSCodeAgentWriter(filesystem=mock_filesystem)
     output_path = Path("/project/.github/agents/nest.agent.md")
 
-    # Project name with special chars that could break YAML/Markdown
-    writer.generate("O'Reilly & Associates", output_path)
+    writer.generate(output_path)
 
     content = mock_filesystem.written_files[output_path]
-    assert "O'Reilly & Associates" in content
+    assert "documents in this project folder" in content
     # Should still have valid frontmatter
     assert content.startswith("---\n")

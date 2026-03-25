@@ -25,23 +25,23 @@ This story creates:
 
 ### AC1: NEST_AI_* Environment Variable Detection
 
-**Given** `NEST_AI_API_KEY` is set in the environment
+**Given** `NEST_API_KEY` is set in the environment
 **When** the LLM provider is initialized
-**Then** it uses `NEST_AI_API_KEY` as the API key
-**And** checks `NEST_AI_ENDPOINT` for the base URL (default: `https://api.openai.com/v1`)
-**And** checks `NEST_AI_MODEL` for the model name (default: `gpt-4o-mini`)
+**Then** it uses `NEST_API_KEY` as the API key
+**And** checks `NEST_BASE_URL` for the base URL (default: `https://api.openai.com/v1`)
+**And** checks `NEST_TEXT_MODEL` for the model name (default: `gpt-4o-mini`)
 
 ### AC2: OPENAI_* Fallback Chain
 
-**Given** `NEST_AI_API_KEY` is NOT set but `OPENAI_API_KEY` IS set
+**Given** `NEST_API_KEY` is NOT set but `OPENAI_API_KEY` IS set
 **When** the LLM provider is initialized
 **Then** it falls back to `OPENAI_API_KEY`
-**And** falls back to `OPENAI_API_BASE` for endpoint
+**And** falls back to `OPENAI_BASE_URL` for endpoint
 **And** falls back to `OPENAI_MODEL` for model name
 
 ### AC3: No API Key = None (No Error)
 
-**Given** neither `NEST_AI_API_KEY` nor `OPENAI_API_KEY` is set
+**Given** neither `NEST_API_KEY` nor `OPENAI_API_KEY` is set
 **When** the LLM provider is initialized
 **Then** it returns `None` (AI is not available)
 **And** no error is raised
@@ -176,9 +176,9 @@ This story creates:
       """Auto-detect AI credentials from environment variables.
 
       Fallback chain:
-          API key:  NEST_AI_API_KEY → OPENAI_API_KEY → None
-          Endpoint: NEST_AI_ENDPOINT → OPENAI_API_BASE → https://api.openai.com/v1
-          Model:    NEST_AI_MODEL → OPENAI_MODEL → gpt-4o-mini
+          API key:  NEST_API_KEY → OPENAI_API_KEY → None
+          Endpoint: NEST_BASE_URL → OPENAI_BASE_URL → https://api.openai.com/v1
+          Model:    NEST_TEXT_MODEL → OPENAI_MODEL → gpt-4o-mini
 
       Returns:
           Configured OpenAIAdapter if API key found, None otherwise.
@@ -191,17 +191,17 @@ This story creates:
   DEFAULT_ENDPOINT = "https://api.openai.com/v1"
   DEFAULT_MODEL = "gpt-4o-mini"
 
-  api_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("OPENAI_API_KEY")
+  api_key = os.environ.get("NEST_API_KEY") or os.environ.get("OPENAI_API_KEY")
   if not api_key:
       return None
 
   endpoint = (
-      os.environ.get("NEST_AI_ENDPOINT")
-      or os.environ.get("OPENAI_API_BASE")
+      os.environ.get("NEST_BASE_URL")
+      or os.environ.get("OPENAI_BASE_URL")
       or DEFAULT_ENDPOINT
   )
   model = (
-      os.environ.get("NEST_AI_MODEL")
+      os.environ.get("NEST_TEXT_MODEL")
       or os.environ.get("OPENAI_MODEL")
       or DEFAULT_MODEL
   )
@@ -218,12 +218,12 @@ This story creates:
 ### Task 6: Unit Tests (AC: 1-6)
 - [x] 6.1: Create `tests/adapters/test_llm_provider.py`:
   - **Test `create_llm_provider()` factory:**
-    - `test_create_with_nest_ai_vars()` — NEST_AI_API_KEY set → returns adapter with correct config
+    - `test_create_with_nest_ai_vars()` — NEST_API_KEY set → returns adapter with correct config
     - `test_create_with_openai_fallback()` — only OPENAI_API_KEY set → returns adapter
     - `test_create_no_keys()` — no keys → returns None
-    - `test_nest_ai_takes_precedence()` — both NEST_AI_API_KEY and OPENAI_API_KEY set → uses NEST_AI_API_KEY
-    - `test_endpoint_fallback_chain()` — test all three levels (NEST_AI_ENDPOINT → OPENAI_API_BASE → default)
-    - `test_model_fallback_chain()` — test all three levels (NEST_AI_MODEL → OPENAI_MODEL → default)
+    - `test_nest_ai_takes_precedence()` — both NEST_API_KEY and OPENAI_API_KEY set → uses NEST_API_KEY
+    - `test_endpoint_fallback_chain()` — test all three levels (NEST_BASE_URL → OPENAI_BASE_URL → default)
+    - `test_model_fallback_chain()` — test all three levels (NEST_TEXT_MODEL → OPENAI_MODEL → default)
     - `test_default_endpoint()` — no endpoint vars → https://api.openai.com/v1
     - `test_default_model()` — no model vars → gpt-4o-mini
   - **Test `OpenAIAdapter.complete()`:**
@@ -258,9 +258,9 @@ This story creates:
 
 **Environment Variable Precedence (FR27, FR33):**
 ```
-NEST_AI_API_KEY  → OPENAI_API_KEY      → None (no AI)
-NEST_AI_ENDPOINT → OPENAI_API_BASE     → "https://api.openai.com/v1"
-NEST_AI_MODEL    → OPENAI_MODEL        → "gpt-4o-mini"
+NEST_API_KEY  → OPENAI_API_KEY      → None (no AI)
+NEST_BASE_URL → OPENAI_BASE_URL     → "https://api.openai.com/v1"
+NEST_TEXT_MODEL    → OPENAI_MODEL        → "gpt-4o-mini"
 ```
 
 **Error Strategy:**

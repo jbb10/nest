@@ -32,19 +32,17 @@ class ManifestAdapter:
         manifest_path = project_dir / NEST_META_DIR / MANIFEST_FILENAME
         return manifest_path.exists()
 
-    def create(self, project_dir: Path, project_name: str) -> Manifest:
+    def create(self, project_dir: Path) -> Manifest:
         """Create a new manifest file with initial values.
 
         Args:
             project_dir: Path to the project root directory.
-            project_name: Human-readable project name.
 
         Returns:
             The newly created Manifest instance.
         """
         manifest = Manifest(
             nest_version=__version__,
-            project_name=project_name,
             last_sync=None,
             files={},
         )

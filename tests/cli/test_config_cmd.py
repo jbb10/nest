@@ -147,7 +147,7 @@ class TestConfigAiInteractive:
 
         assert result.exit_code == 0
         content = rc_path.read_text(encoding="utf-8")
-        assert 'export NEST_AI_ENDPOINT="https://myorg.openai.azure.com"' in content
-        assert 'export NEST_AI_MODEL="my-deployment"' in content
-        assert 'export NEST_AI_API_KEY="azure-key-123"' in content
+        assert 'export NEST_BASE_URL="https://myorg.openai.azure.com"' in content
+        assert 'export NEST_TEXT_MODEL="my-deployment"' in content
+        assert 'export NEST_API_KEY="azure-key-123"' in content
         assert "NEST_AI_PROVIDER" not in content

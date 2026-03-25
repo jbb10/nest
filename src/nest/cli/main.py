@@ -1,5 +1,7 @@
 """Main CLI entry point for nest command."""
 
+import logging
+
 import typer
 
 from nest.cli.config_cmd import config_app
@@ -20,8 +22,22 @@ app.command(name="update")(update_command)
 app.add_typer(config_app, name="config")
 
 
+def _suppress_third_party_loggers() -> None:
+    """Silence noisy third-party loggers that pollute console output.
+
+    Docling internally calls logging.basicConfig(level=INFO) which causes
+    its pipeline internals, httpx HTTP traces, and openai SDK logs to
+    flood stderr.  We pre-configure the root logger at WARNING and
+    explicitly silence the noisiest namespaces.
+    """
+    logging.basicConfig(level=logging.WARNING, force=True)
+    for name in ("docling", "httpx", "openai", "PIL", "urllib3"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 def main() -> None:
     """Entry point for the nest CLI."""
+    _suppress_third_party_loggers()
     app()
 
 

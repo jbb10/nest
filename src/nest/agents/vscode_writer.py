@@ -22,23 +22,19 @@ class VSCodeAgentWriter:
             autoescape=select_autoescape(),
         )
 
-    def render(self, project_name: str) -> str:
+    def render(self) -> str:
         """Render agent template to string without writing to disk.
-
-        Args:
-            project_name: Project name to interpolate into template.
 
         Returns:
             Rendered template content as string.
         """
         template = self._jinja_env.get_template("vscode.md.jinja")
-        return template.render(project_name=project_name)
+        return template.render()
 
-    def generate(self, project_name: str, output_path: Path) -> None:
+    def generate(self, output_path: Path) -> None:
         """Generate VS Code agent file.
 
         Args:
-            project_name: Project name to interpolate into template.
             output_path: Path to write agent file
                 (e.g., .github/agents/nest.agent.md).
 
@@ -50,5 +46,5 @@ class VSCodeAgentWriter:
         if not self._filesystem.exists(output_dir):
             self._filesystem.create_directory(output_dir)
 
-        content = self.render(project_name)
+        content = self.render()
         self._filesystem.write_text(output_path, content)

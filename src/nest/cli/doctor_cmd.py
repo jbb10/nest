@@ -6,7 +6,7 @@ Handles the `nest doctor` command.
 from pathlib import Path
 
 import typer
-from rich.prompt import Confirm, Prompt
+from rich.prompt import Confirm
 
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.git_client import GitClientAdapter
@@ -190,7 +190,6 @@ def doctor_command(
                     model_report,
                     project_report,
                     confirm_callback=lambda msg: Confirm.ask(msg),
-                    input_callback=lambda msg: Prompt.ask(msg),
                 )
                 display_remediation_report(remediation_report, console)
 

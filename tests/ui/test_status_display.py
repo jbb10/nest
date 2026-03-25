@@ -33,7 +33,6 @@ class TestDisplayStatus:
     def test_all_up_to_date_message(self) -> None:
         console = Console(record=True)
         report = StatusReport(
-            project_name="X",
             nest_version="1.0.0",
             source_total=1,
             source_new=0,
@@ -53,7 +52,6 @@ class TestDisplayStatus:
     def test_pending_prompt(self) -> None:
         console = Console(record=True)
         report = StatusReport(
-            project_name="X",
             nest_version="1.0.0",
             source_total=2,
             source_new=1,

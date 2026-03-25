@@ -157,10 +157,8 @@ class ManifestService:
             manifest = self._manifest_adapter.load(self._project_root)
         else:
             logger.info("Manifest not found, creating new one.")
-            # Use directory name as default project name
             manifest = self._manifest_adapter.create(
                 self._project_root,
-                self._project_root.name,
             )
 
         # Merge pending entries

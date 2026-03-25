@@ -178,6 +178,8 @@ You are an expert document analyst specialized in the [Project Name] project. Yo
 | `--no-clean` | (clean is ON) | Disable orphan cleanup (by default, files are removed from `_nest_context/` when source is deleted) |
 | `--dry-run` | `false` | Show what would be processed without making changes |
 | `--force` | `false` | Re-process all files regardless of checksum (ignore manifest) |
+| `--no-ai` | `false` | Skip AI enrichment even when API key is configured |
+| `--verbose`, `-v` | `false` | Show detailed processing logs (Docling pipeline, HTTP requests, etc.). By default, only the progress bar and summary are shown. |
 | `--dir`, `-d` | Current directory | Target directory for sync operation |
 
 **Behavior:**

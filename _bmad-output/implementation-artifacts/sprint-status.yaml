@@ -132,10 +132,26 @@ development_status:
   # FR34-FR38 - vision adapters, image classification,
   # picture description service, sync integration, E2E tests
   # ============================================================
-  epic-7: in-progress
+  epic-7: done
   7-1-vision-capable-llm-adapters: done
   7-2-docling-two-pass-image-pipeline: done
   7-3-picture-description-service: done
   7-4-sync-pipeline-integration-cross-file-parallelism: done
   7-5-e2e-tests-for-image-description: done
   epic-7-retrospective: optional
+
+  # ============================================================
+  # Epic 8: Developer Experience Polish
+  # Remove project name concept — nest init takes no arguments
+  # ============================================================
+  epic-8: in-progress
+  8-1-remove-project-name-concept: review
+  8-2-suppress-third-party-log-noise: done
+
+  # ============================================================
+  # Epic 9: Environment Variable Naming Standardization
+  # Rename env vars to match OpenAI SDK standard naming
+  # Origin: Sprint Change Proposal 2026-03-23 (Approved)
+  # ============================================================
+  epic-9: done
+  9-1-env-var-naming-standardization: done

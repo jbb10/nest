@@ -57,7 +57,7 @@ class TestDiscoveryManifestKeyRoundtrip:
 
         # Step 1: Record the file via ManifestService (simulates first sync)
         manifest_adapter = ManifestAdapter()
-        manifest_adapter.create(project_root, "test-project")
+        manifest_adapter.create(project_root)
 
         manifest_svc = ManifestService(
             manifest=manifest_adapter,
@@ -102,7 +102,7 @@ class TestDiscoveryManifestKeyRoundtrip:
         output_file.write_text("# Original\n\nContent.")
 
         manifest_adapter = ManifestAdapter()
-        manifest_adapter.create(project_root, "test-project")
+        manifest_adapter.create(project_root)
 
         manifest_svc = ManifestService(
             manifest=manifest_adapter,
@@ -147,7 +147,7 @@ class TestDiscoveryManifestKeyRoundtrip:
         output_file.write_text("# Existing")
 
         manifest_adapter = ManifestAdapter()
-        manifest_adapter.create(project_root, "test-project")
+        manifest_adapter.create(project_root)
 
         manifest_svc = ManifestService(
             manifest=manifest_adapter,
@@ -196,7 +196,7 @@ class TestDiscoveryManifestKeyRoundtrip:
         output_file.write_text("# Alpha Contract")
 
         manifest_adapter = ManifestAdapter()
-        manifest_adapter.create(project_root, "test-project")
+        manifest_adapter.create(project_root)
 
         manifest_svc = ManifestService(
             manifest=manifest_adapter,
@@ -238,7 +238,7 @@ class TestDiscoveryManifestKeyRoundtrip:
         output_file.write_text("# Report")
 
         manifest_adapter = ManifestAdapter()
-        manifest_adapter.create(project_root, "test-project")
+        manifest_adapter.create(project_root)
 
         manifest_svc = ManifestService(
             manifest=manifest_adapter,
