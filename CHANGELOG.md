@@ -2,6 +2,21 @@
 
 All notable changes to Nest.
 
+## [v1.0.0] - 2026-03-25
+
+### Documentation
+
+- mark story 7.4 done in story file and sprint-status.yaml
+
+### Features
+
+- remove project name concept, standardize env vars, suppress log noise
+- **epic-7**: wire PictureDescriptionService into sync pipeline with cross-file parallelism
+- refine glossary and index AI output
+
+### Maintenance
+
+- update README with AI sync docs, misc cleanup
 ## [v0.4.0] - 2026-03-16
 
 ### Features
