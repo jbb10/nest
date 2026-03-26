@@ -2,6 +2,11 @@
 
 All notable changes to Nest.
 
+## [v1.1.0] - 2026-03-26
+
+### Features
+
+- **epic-10**: multi-agent architecture — coordinator, researcher, synthesizer, planner
 ## [v1.0.0] - 2026-03-25
 
 ### Documentation
