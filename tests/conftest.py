@@ -96,12 +96,24 @@ class MockAgentWriter:
     def __init__(self, template_content: str = "rendered-template") -> None:
         self.template_content = template_content
         self.generated_agents: list[Path] = []
+        self.generated_all_dirs: list[Path] = []
 
     def render(self) -> str:
         return self.template_content
 
     def generate(self, output_path: Path) -> None:
         self.generated_agents.append(output_path)
+
+    def render_all(self) -> dict[str, str]:
+        return {
+            "nest.agent.md": self.template_content,
+            "nest-master-researcher.agent.md": self.template_content,
+            "nest-master-synthesizer.agent.md": self.template_content,
+            "nest-master-planner.agent.md": self.template_content,
+        }
+
+    def generate_all(self, output_dir: Path) -> None:
+        self.generated_all_dirs.append(output_dir)
 
 
 @pytest.fixture

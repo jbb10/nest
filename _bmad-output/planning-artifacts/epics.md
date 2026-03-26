@@ -149,6 +149,9 @@ This document provides the complete epic and story breakdown for Nest, decomposi
 | FR38 | Epic 7 | Token usage reporting for image descriptions |
 | FR39 | Epic 8 | Remove project name concept from nest init |
 | FR40 | Epic 8 | Suppress third-party log noise + --verbose flag |
+| FR41 | Epic 10 | Multi-agent template bundle: coordinator + researcher, synthesizer, planner subagents |
+| FR42 | Epic 10 | Multi-agent init and validation: all 4 agent files created during init and validated by doctor |
+| FR43 | Epic 10 | Multi-agent migration: update checks and migrates all 4 agent files |
 
 ## Epic List
 
@@ -2283,5 +2286,76 @@ As a Nest user, I want the CLI to feel clean and professional, so I can focus on
 **Files Changed:**
 - `src/nest/cli/main.py` — `_suppress_third_party_loggers()` called from `main()`
 - `src/nest/cli/sync_cmd.py` — `--verbose` / `-v` flag added
+
+---
+
+## Epic 10: Multi-Agent Architecture
+
+As a user working with project documents, I want a team of specialized AI agents instead of a single generalist, so that document research, synthesis, and planning tasks are handled by dedicated experts with better quality and reduced token usage.
+
+**FRs covered:** FR41, FR42, FR43
+
+**Scope:**
+- Replace single `nest.agent.md` with a coordinator + 3 subagent architecture
+- Coordinator orchestrates and delegates to: researcher, synthesizer, planner
+- Subagents run in isolated VS Code context windows (parallel-capable)
+- All 4 files generated during `nest init`, validated by `nest doctor`, migrated during `nest update`
+- Legacy projects (single agent file) seamlessly upgraded via migration service
+
+**Dependencies:** Epic 4 (agent migration infrastructure), Epic 8 (project name removal)
+
+---
+
+### Story 10.1: Multi-Agent Template Bundle
+
+**As a** developer maintaining the Nest agent system,
+**I want** the single agent template replaced with a coordinator + three subagent templates,
+**so that** generated agent files use the new multi-agent architecture.
+
+**Acceptance Criteria:**
+
+1. Four Jinja templates exist: `coordinator.md.jinja`, `researcher.md.jinja`, `synthesizer.md.jinja`, `planner.md.jinja`
+2. Old `vscode.md.jinja` is removed
+3. Coordinator frontmatter includes `agents: ['nest-master-researcher', 'nest-master-synthesizer', 'nest-master-planner']`
+4. All templates reference `.nest/00_MASTER_INDEX.md` for index and `.nest/glossary.md` for terminology
+5. Subagent templates have `user-invokable: false` in frontmatter
+6. `VSCodeAgentWriter` gains `render_all()` and `generate_all()` methods
+7. Existing `render()` and `generate()` remain backward compatible
+8. `AgentWriterProtocol` updated with new method signatures
+
+---
+
+### Story 10.2: Init & Doctor Multi-Agent Integration
+
+**As a** user running `nest init` or `nest doctor --fix`,
+**I want** all four agent files created and validated,
+**so that** my project uses the full multi-agent architecture from day one.
+
+**Acceptance Criteria:**
+
+1. `nest init` creates all 4 agent files in `.github/agents/`
+2. Init CLI output mentions multi-agent setup
+3. `ProjectChecker.agent_file_exists()` returns `True` only when ALL 4 files exist
+4. Doctor detects and reports which specific agent files are missing
+5. `nest doctor --fix` regenerates all agent files (overwrites directly, no backups)
+6. Legacy projects (single file) handled gracefully
+
+---
+
+### Story 10.3: Multi-Agent Migration Service
+
+**As a** user running `nest update`,
+**I want** the migration check to cover all four agent files,
+**so that** after a version update, all my agent files stay in sync with the latest templates.
+
+**Acceptance Criteria:**
+
+1. `check_migration_needed()` compares ALL 4 local files against rendered templates
+2. Result reports which specific files are outdated or missing
+3. `execute_migration()` only regenerates changed/missing files (up-to-date files untouched)
+4. No .bak backup files created (clean upgrade, no leftover files in agents directory)
+5. Legacy projects with old single-file agent: old agent replaced with coordinator, 3 subagents created
+6. CLI shows file-level detail (Replace/Create), single batch confirmation prompt
+7. No-manifest scenario still skips check gracefully
 
 ---

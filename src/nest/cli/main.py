@@ -28,11 +28,13 @@ def _suppress_third_party_loggers() -> None:
     Docling internally calls logging.basicConfig(level=INFO) which causes
     its pipeline internals, httpx HTTP traces, and openai SDK logs to
     flood stderr.  We pre-configure the root logger at WARNING and
-    explicitly silence the noisiest namespaces.
+    explicitly silence the noisiest namespaces at ERROR so their
+    non-actionable warnings (msword list items, slow tokenizer, etc.)
+    do not reach the user.
     """
     logging.basicConfig(level=logging.WARNING, force=True)
-    for name in ("docling", "httpx", "openai", "PIL", "urllib3"):
-        logging.getLogger(name).setLevel(logging.WARNING)
+    for name in ("docling", "httpx", "openai", "PIL", "transformers", "urllib3"):
+        logging.getLogger(name).setLevel(logging.ERROR)
 
 
 def main() -> None:

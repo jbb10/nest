@@ -251,6 +251,25 @@ class AgentWriterProtocol(Protocol):
         """
         ...
 
+    def render_all(self) -> dict[str, str]:
+        """Render all agent templates to strings without writing to disk.
+
+        Returns:
+            Dictionary mapping agent filenames to rendered content.
+        """
+        ...
+
+    def generate_all(self, output_dir: Path) -> None:
+        """Generate all agent files to specified directory.
+
+        Args:
+            output_dir: Directory where agent files should be written.
+
+        Raises:
+            IOError: If directory cannot be created or files cannot be written.
+        """
+        ...
+
 
 @runtime_checkable
 class ModelDownloaderProtocol(Protocol):
@@ -401,13 +420,24 @@ class ProjectCheckerProtocol(Protocol):
         ...
 
     def agent_file_exists(self, project_dir: Path) -> bool:
-        """Check if agent file exists.
+        """Check if all agent files exist.
 
         Args:
             project_dir: Path to the project root directory.
 
         Returns:
-            True if .github/agents/nest.agent.md exists, False otherwise.
+            True if all agent files exist, False otherwise.
+        """
+        ...
+
+    def missing_agent_files(self, project_dir: Path) -> list[str]:
+        """Return list of missing agent filenames.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            List of agent filenames that are missing. Empty list if all present.
         """
         ...
 

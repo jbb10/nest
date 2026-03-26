@@ -37,9 +37,8 @@ def test_init_creates_agent_file(tmp_path: Path) -> None:
 
     # Verify agent file content
     content = agent_path.read_text()
-    assert content.startswith("---\nname: nest\n")
+    assert content.startswith("---\nname: nest-master-coordinator\n")
     assert ".nest/00_MASTER_INDEX.md" in content
-    assert "_nest_sources/" in content
 
     # Verify downloader methods were called appropriately
     mock_downloader.are_models_cached.assert_called_once()

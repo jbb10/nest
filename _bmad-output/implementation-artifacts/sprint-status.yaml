@@ -155,3 +155,13 @@ development_status:
   # ============================================================
   epic-9: done
   9-1-env-var-naming-standardization: done
+
+  # ============================================================
+  # Epic 10: Multi-Agent Architecture
+  # FR41-FR43 - coordinator + 3 specialized subagents
+  # Origin: Sprint Change Proposal 2026-03-25 (Approved)
+  # ============================================================
+  epic-10: done
+  10-1-multi-agent-template-bundle: done
+  10-2-init-doctor-multi-agent-integration: done
+  10-3-multi-agent-migration-service: done

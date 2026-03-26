@@ -42,9 +42,10 @@ Nest operates as a global CLI that manages local files. It does not run a backgr
 my-project/
 ├── .github/
 │   └── agents/
-│       ├── nest.agent.md           <-- The "Persona" (VS Code picks this up automatically)
-│       ├── nest-enricher.agent.md  <-- Index enrichment agent
-│       └── nest-glossary.agent.md  <-- Glossary generation agent
+│       ├── nest.agent.md                      <-- Coordinator (orchestrates subagents)
+│       ├── nest-master-researcher.agent.md    <-- Deep document search & extraction
+│       ├── nest-master-synthesizer.agent.md   <-- Cross-document analysis & structured output
+│       └── nest-master-planner.agent.md       <-- Action items, risks & planning
 ├── _nest_sources/              <-- User Input (ALL documents: PDFs, XLSX, text files, etc.) — committed
 ├── _nest_context/              <-- AI Knowledge Base (Converted Markdown + passthrough copies) — committed
 │   ├── policy_v1.md            <-- Generated from sources
@@ -98,10 +99,10 @@ my-project/
 
 **Behavior:**
 1.  Creates directories: `_nest_sources/`, `_nest_context/`, `.nest/`.
-2.  Creates `.github/agents/nest.agent.md`.
+2.  Creates four agent files in `.github/agents/`: coordinator (`nest.agent.md`) plus three specialized subagents (researcher, synthesizer, planner).
 3.  Creates `.nest/manifest.json` (empty manifest).
 4.  Downloads Docling ML models if not already cached (first-time only, ~1.5-2GB).
-5.  **Crucial:** The agent file must use the specific **VS Code Custom Agent** format (Frontmatter + Instructions).
+5.  **Crucial:** The agent files must use the specific **VS Code Custom Agent** format (Frontmatter + Instructions). Subagents declare `user-invokable: false`.
 
 **First-Run Experience:**
 ```

@@ -427,10 +427,11 @@ class TestAgentMigrationPrompt:
         mock_service = MagicMock()
         mock_service.check_migration_needed.return_value = AgentMigrationCheckResult(
             migration_needed=True,
-            message="Agent file is outdated",
+            message="Agent files need updating (1 outdated)",
+            outdated_files=["nest.agent.md"],
         )
         mock_service.execute_migration.return_value = AgentMigrationResult(
-            success=True, backed_up=True
+            success=True, files_replaced=["nest.agent.md"]
         )
 
         with patch("nest.cli.update_cmd.Confirm") as mock_confirm:
@@ -439,7 +440,7 @@ class TestAgentMigrationPrompt:
 
         mock_service.execute_migration.assert_called_once_with(Path("/tmp/project"))
         output = capsys.readouterr().out
-        assert "Agent file updated" in output
+        assert "agent files updated" in output
 
     def test_migration_declined_shows_info(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Declining migration shows info message."""
@@ -447,7 +448,8 @@ class TestAgentMigrationPrompt:
         mock_service = MagicMock()
         mock_service.check_migration_needed.return_value = AgentMigrationCheckResult(
             migration_needed=True,
-            message="Agent file is outdated",
+            message="Agent files need updating (1 outdated)",
+            outdated_files=["nest.agent.md"],
         )
 
         with patch("nest.cli.update_cmd.Confirm") as mock_confirm:
@@ -456,21 +458,48 @@ class TestAgentMigrationPrompt:
 
         mock_service.execute_migration.assert_not_called()
         output = capsys.readouterr().out
-        assert "Keeping existing agent file" in output
+        assert "Keeping existing agent files" in output
 
     def test_migration_up_to_date_no_prompt(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """No prompt when agent file is up to date (AC8)."""
+        """No prompt when agent files are up to date (AC8)."""
         console = _make_no_color_console()
         mock_service = MagicMock()
         mock_service.check_migration_needed.return_value = AgentMigrationCheckResult(
             migration_needed=False,
-            message="Agent file is up to date",
+            message="All agent files are up to date",
         )
 
         _handle_agent_migration(mock_service, Path("/tmp/project"), console)
 
         output = capsys.readouterr().out
-        assert "Agent file is up to date" in output
+        assert "All agent files are up to date" in output
+
+    def test_file_level_detail_shown(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """AC6: Replace/Create labels shown for individual files."""
+        console = _make_no_color_console()
+        mock_service = MagicMock()
+        mock_service.check_migration_needed.return_value = AgentMigrationCheckResult(
+            migration_needed=True,
+            agent_file_missing=True,
+            message="Agent files need updating (1 outdated, 2 missing)",
+            outdated_files=["nest.agent.md"],
+            missing_files=["nest-master-researcher.agent.md", "nest-master-planner.agent.md"],
+        )
+        mock_service.execute_migration.return_value = AgentMigrationResult(
+            success=True,
+            files_replaced=["nest.agent.md"],
+            files_created=["nest-master-researcher.agent.md", "nest-master-planner.agent.md"],
+        )
+
+        with patch("nest.cli.update_cmd.Confirm") as mock_confirm:
+            mock_confirm.ask.return_value = True
+            _handle_agent_migration(mock_service, Path("/tmp/project"), console)
+
+        output = capsys.readouterr().out
+        assert "Replace  nest.agent.md" in output
+        assert "Create   nest-master-researcher.agent.md" in output
+        assert "Create   nest-master-planner.agent.md" in output
+        assert "3 agent files updated" in output
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +540,8 @@ class TestAgentMigrationFailure:
         mock_service = MagicMock()
         mock_service.check_migration_needed.return_value = AgentMigrationCheckResult(
             migration_needed=True,
-            message="Agent file is outdated",
+            message="Agent files need updating (1 outdated)",
+            outdated_files=["nest.agent.md"],
         )
         mock_service.execute_migration.return_value = AgentMigrationResult(
             success=False, error="Permission denied"
@@ -673,19 +703,31 @@ class TestRunUpdate:
 
 
 class TestAgentMigrationMissingFile:
-    """Tests for agent migration when file is missing."""
+    """Tests for agent migration when files are missing."""
 
     def test_missing_agent_file_prompt(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Missing agent file shows create prompt."""
+        """Missing agent files shows create prompt."""
         console = _make_no_color_console()
         mock_service = MagicMock()
         mock_service.check_migration_needed.return_value = AgentMigrationCheckResult(
             migration_needed=True,
             agent_file_missing=True,
-            message="Agent file missing",
+            message="Agent files need updating (4 missing)",
+            missing_files=[
+                "nest.agent.md",
+                "nest-master-researcher.agent.md",
+                "nest-master-synthesizer.agent.md",
+                "nest-master-planner.agent.md",
+            ],
         )
         mock_service.execute_migration.return_value = AgentMigrationResult(
-            success=True, backed_up=False
+            success=True,
+            files_created=[
+                "nest.agent.md",
+                "nest-master-researcher.agent.md",
+                "nest-master-synthesizer.agent.md",
+                "nest-master-planner.agent.md",
+            ],
         )
 
         with patch("nest.cli.update_cmd.Confirm") as mock_confirm:
@@ -693,4 +735,4 @@ class TestAgentMigrationMissingFile:
             _handle_agent_migration(mock_service, Path("/tmp/project"), console)
 
         output = capsys.readouterr().out
-        assert "Agent file created" in output
+        assert "4 agent files updated" in output

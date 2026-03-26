@@ -4,12 +4,11 @@ from pathlib import Path
 
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.models import Manifest
-from nest.core.paths import NEST_META_DIR
+from nest.core.paths import AGENT_DIR, AGENT_FILES, NEST_META_DIR
 
 # Folder names (consistent with init and sync commands)
 SOURCE_FOLDER = "_nest_sources"
 CONTEXT_FOLDER = "_nest_context"
-AGENT_FILE_PATH = ".github/agents/nest.agent.md"
 
 # Legacy manifest filename (pre-.nest/ era)
 _LEGACY_MANIFEST = ".nest_manifest.json"
@@ -51,15 +50,28 @@ class ProjectChecker:
         return self._manifest_adapter.load(project_dir)
 
     def agent_file_exists(self, project_dir: Path) -> bool:
-        """Check if agent file exists.
+        """Check if all agent files exist.
 
         Args:
             project_dir: Path to the project root directory.
 
         Returns:
-            True if .github/agents/nest.agent.md exists, False otherwise.
+            True if all agent files exist, False otherwise.
         """
-        return (project_dir / AGENT_FILE_PATH).exists()
+        agent_dir = project_dir / AGENT_DIR
+        return all((agent_dir / f).exists() for f in AGENT_FILES)
+
+    def missing_agent_files(self, project_dir: Path) -> list[str]:
+        """Return list of missing agent filenames.
+
+        Args:
+            project_dir: Path to the project root directory.
+
+        Returns:
+            List of agent filenames that are missing. Empty list if all present.
+        """
+        agent_dir = project_dir / AGENT_DIR
+        return [f for f in AGENT_FILES if not (agent_dir / f).exists()]
 
     def source_folder_exists(self, project_dir: Path) -> bool:
         """Check if source folder exists.

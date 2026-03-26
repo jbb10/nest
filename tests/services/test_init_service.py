@@ -12,7 +12,7 @@ from conftest import (
     MockModelDownloader,
 )
 from nest.core.exceptions import NestError
-from nest.core.paths import CONTEXT_TEXT_EXTENSIONS, SUPPORTED_EXTENSIONS
+from nest.core.paths import AGENT_DIR, CONTEXT_TEXT_EXTENSIONS, SUPPORTED_EXTENSIONS
 from nest.services.init_service import InitService
 
 
@@ -26,7 +26,7 @@ def test_init_service_calls_agent_writer(
     mock_agent_writer: MockAgentWriter,
     mock_model_downloader: MockModelDownloader,
 ) -> None:
-    """Test that InitService calls agent_writer.generate() with correct args."""
+    """Test that InitService calls agent_writer.generate_all() with correct args."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
@@ -37,10 +37,10 @@ def test_init_service_calls_agent_writer(
 
     service.execute(target_dir)
 
-    # Verify agent writer was called
-    assert len(mock_agent_writer.generated_agents) == 1
-    output_path = mock_agent_writer.generated_agents[0]
-    assert output_path == target_dir / ".github" / "agents" / "nest.agent.md"
+    # Verify agent writer generate_all was called
+    assert len(mock_agent_writer.generated_all_dirs) == 1
+    output_dir = mock_agent_writer.generated_all_dirs[0]
+    assert output_dir == target_dir / AGENT_DIR
 
 
 @patch("nest.services.init_service.InitService._setup_gitattributes")
@@ -53,7 +53,7 @@ def test_init_service_strips_project_name_whitespace(
     mock_agent_writer: MockAgentWriter,
     mock_model_downloader: MockModelDownloader,
 ) -> None:
-    """Test that agent file is generated at the correct path."""
+    """Test that agent files are generated at the correct directory."""
     service = InitService(
         filesystem=mock_filesystem,
         manifest=mock_manifest,
@@ -63,8 +63,8 @@ def test_init_service_strips_project_name_whitespace(
 
     service.execute(Path("/project"))
 
-    output_path = mock_agent_writer.generated_agents[0]
-    assert output_path == Path("/project") / ".github" / "agents" / "nest.agent.md"
+    output_dir = mock_agent_writer.generated_all_dirs[0]
+    assert output_dir == Path("/project") / AGENT_DIR
 
 
 @patch("nest.services.init_service.InitService._setup_gitattributes")
@@ -219,7 +219,7 @@ def test_init_service_progress_output_sequence_cached(
     # Verify the status messages match AC2 requirements
     start_calls = [call[0][0] for call in mock_status_start.call_args_list]
     assert "Creating project structure" in start_calls
-    assert "Generating agent file" in start_calls
+    assert "Generating agent files" in start_calls
     assert "Checking ML models" in start_calls
 
     # Verify cached path shows "cached" suffix

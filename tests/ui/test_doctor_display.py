@@ -193,7 +193,7 @@ class TestDisplayProjectReport:
         output = _render_report(env_report, None, project_report)
         assert "Project" in output
         assert "Manifest: valid" in output
-        assert "Agent file: present" in output
+        assert "Agent files: all present" in output
         assert "Folders: intact" in output
 
     def test_display_doctor_report_with_issues(self) -> None:
@@ -215,7 +215,8 @@ class TestDisplayProjectReport:
                 legacy_layout_detected=False,
                 suggestions=[
                     "Run `nest init` to create project",
-                    "Run `nest init` to regenerate agent file",
+                    "Missing agent files: nest.agent.md, nest-master-researcher.agent.md,"
+                    " nest-master-synthesizer.agent.md, nest-master-planner.agent.md",
                     "Run `nest init` to recreate _nest_sources/",
                 ],
             )
@@ -224,10 +225,10 @@ class TestDisplayProjectReport:
         output = _render_report(env_report, None, project_report)
         assert "Project" in output
         assert "Manifest: missing" in output
-        assert "Agent file: missing" in output
+        assert "Agent files: incomplete" in output
         assert "Folders: _nest_sources/ missing" in output
         assert "→ Run `nest init` to create project" in output
-        assert "→ Run `nest init` to regenerate agent file" in output
+        assert "→ Missing agent files: nest.agent.md" in output
         assert "→ Run `nest init` to recreate _nest_sources/" in output
 
     def test_display_doctor_report_with_version_mismatch(self) -> None:

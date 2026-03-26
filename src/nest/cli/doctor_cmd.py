@@ -99,7 +99,7 @@ def _count_issues(
             }
             issues.append(label_map.get(status.manifest_status, "Manifest issue"))
         if not status.agent_file_present:
-            issues.append("Agent file missing")
+            issues.append("Agent files missing")
         if status.folders_status != "intact":
             folder_map = {
                 "sources_missing": "_nest_sources/ folder missing",

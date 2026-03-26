@@ -13,6 +13,7 @@ from nest.adapters.protocols import (
 )
 from nest.core.exceptions import NestError
 from nest.core.paths import (
+    AGENT_DIR,
     CONTEXT_DIR,
     CONTEXT_TEXT_EXTENSIONS,
     NEST_META_DIR,
@@ -101,10 +102,10 @@ class InitService:
         # Create/update .gitattributes for cross-platform line endings
         self._setup_gitattributes(target_dir)
 
-        # Generate agent file with progress
-        status_start("Generating agent file")
-        agent_path = target_dir / ".github" / "agents" / "nest.agent.md"
-        self._agent_writer.generate(agent_path)
+        # Generate agent files with progress
+        status_start("Generating agent files")
+        agent_dir = target_dir / AGENT_DIR
+        self._agent_writer.generate_all(agent_dir)
         status_done()
 
         # Download ML models if needed

@@ -22,6 +22,21 @@ ERROR_LOG_FILENAME = "errors.log"
 AI_SEEN_MARKER = ".ai_seen"
 SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
 
+# Agent file constants (Epic 10: Multi-Agent Architecture)
+AGENT_DIR = Path(".github") / "agents"
+AGENT_FILES = [
+    "nest.agent.md",
+    "nest-master-researcher.agent.md",
+    "nest-master-synthesizer.agent.md",
+    "nest-master-planner.agent.md",
+]
+TEMPLATE_TO_AGENT_FILE = {
+    "coordinator.md.jinja": "nest.agent.md",
+    "researcher.md.jinja": "nest-master-researcher.agent.md",
+    "synthesizer.md.jinja": "nest-master-synthesizer.agent.md",
+    "planner.md.jinja": "nest-master-planner.agent.md",
+}
+
 # Text file extensions supported in context directory (for indexing and counting)
 CONTEXT_TEXT_EXTENSIONS = [
     ".md",

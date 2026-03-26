@@ -134,9 +134,9 @@ def display_project_report(report: ProjectReport, tree: Tree) -> None:
 
     # Agent file status
     if status.agent_file_present:
-        agent_line = "Agent file: present [green]✓[/green]"
+        agent_line = "Agent files: all present [green]✓[/green]"
     else:
-        agent_line = "Agent file: missing [red]✗[/red]"
+        agent_line = "Agent files: incomplete [red]✗[/red]"
 
     agent_node = project.add(agent_line)
 

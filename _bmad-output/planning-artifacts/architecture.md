@@ -594,7 +594,10 @@ src/nest/
 │   ├── protocol.py          # AgentWriter protocol
 │   ├── vscode_writer.py     # VS Code agent format
 │   └── templates/           # Agent instruction templates
-│       └── vscode.md.jinja
+│       ├── coordinator.md.jinja   # Primary orchestrator agent
+│       ├── researcher.md.jinja    # Document search subagent
+│       ├── synthesizer.md.jinja   # Cross-document analysis subagent
+│       └── planner.md.jinja       # Planning & action items subagent
 └── ui/                      # Rich console output
     ├── __init__.py
     ├── console.py           # Shared Rich console instance
@@ -1377,7 +1380,10 @@ nest/
 │       │   ├── protocol.py          # AgentWriter protocol
 │       │   ├── vscode_writer.py     # VS Code agent implementation
 │       │   └── templates/
-│       │       └── vscode.md.jinja  # VS Code agent template
+│       │       ├── coordinator.md.jinja   # Primary orchestrator
+│       │       ├── researcher.md.jinja    # Document search subagent
+│       │       ├── synthesizer.md.jinja   # Analysis subagent
+│       │       └── planner.md.jinja       # Planning subagent
 │       │
 │       └── ui/                      # Rich console output
 │           ├── __init__.py
@@ -1549,7 +1555,10 @@ class VisionLLMProviderProtocol(Protocol):
 | `src/nest/core/exceptions.py` | `NestError`, `ProcessingError`, `ConfigError`, etc. |
 | `src/nest/core/manifest.py` | `Manifest`, `FileEntry` Pydantic models |
 | `src/nest/adapters/protocols.py` | All protocol definitions for DI |
-| `src/nest/agents/templates/vscode.md.jinja` | VS Code agent instruction template |
+| `src/nest/agents/templates/coordinator.md.jinja` | Coordinator agent template (orchestrates subagents) |
+| `src/nest/agents/templates/researcher.md.jinja` | Researcher subagent template |
+| `src/nest/agents/templates/synthesizer.md.jinja` | Synthesizer subagent template |
+| `src/nest/agents/templates/planner.md.jinja` | Planner subagent template |
 | `src/nest/ui/messages.py` | `success()`, `error()`, `warning()`, `info()` |
 | `tests/conftest.py` | `MockFileSystem`, `MockProcessor`, `MockManifest` factories |
 | `tests/fixtures/sample_files/` | Real test documents for integration tests |

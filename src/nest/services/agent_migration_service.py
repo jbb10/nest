@@ -1,7 +1,7 @@
 """Service for checking and executing agent template migrations.
 
-Compares the local agent file against the current bundled template
-and performs backup + regeneration when templates change.
+Compares the local agent files against the current bundled templates
+and performs selective regeneration when templates change.
 """
 
 from pathlib import Path
@@ -13,16 +13,14 @@ from nest.adapters.protocols import (
 )
 from nest.core.exceptions import ManifestError
 from nest.core.models import AgentMigrationCheckResult, AgentMigrationResult
-
-AGENT_FILE_PATH = Path(".github") / "agents" / "nest.agent.md"
-AGENT_BACKUP_SUFFIX = ".bak"
+from nest.core.paths import AGENT_DIR
 
 
 class AgentMigrationService:
     """Service for checking and executing agent template migrations.
 
-    Compares the local agent file against the current bundled template
-    and performs backup + regeneration when templates change.
+    Compares the local agent files against the current bundled templates
+    and performs selective regeneration when templates change.
     """
 
     def __init__(
@@ -39,10 +37,10 @@ class AgentMigrationService:
         self,
         project_dir: Path,
     ) -> AgentMigrationCheckResult:
-        """Check whether the local agent file needs migration.
+        """Check whether local agent files need migration.
 
-        Compares the local agent file content against the current bundled
-        template rendered with the project name from the manifest.
+        Compares all local agent files against the current bundled
+        templates and reports which are outdated or missing.
 
         Args:
             project_dir: Path to the project root directory.
@@ -50,7 +48,6 @@ class AgentMigrationService:
         Returns:
             AgentMigrationCheckResult indicating migration status.
         """
-        # AC6: Check manifest exists
         if not self._manifest.exists(project_dir):
             return AgentMigrationCheckResult(
                 migration_needed=False,
@@ -58,7 +55,6 @@ class AgentMigrationService:
                 message="Not a Nest project — skipping agent check",
             )
 
-        # Load manifest to verify it is valid (AC8)
         try:
             self._manifest.load(project_dir)
         except (ManifestError, FileNotFoundError):
@@ -68,39 +64,53 @@ class AgentMigrationService:
                 message="Manifest is corrupt — skipping agent check",
             )
 
-        agent_path = project_dir / AGENT_FILE_PATH
+        rendered = self._agent_writer.render_all()
+        agent_dir = project_dir / AGENT_DIR
+        outdated: list[str] = []
+        missing: list[str] = []
 
-        # AC5: Check if agent file exists
-        if not self._filesystem.exists(agent_path):
+        try:
+            for filename, expected_content in rendered.items():
+                local_path = agent_dir / filename
+                if not self._filesystem.exists(local_path):
+                    missing.append(filename)
+                elif self._filesystem.read_text(local_path) != expected_content:
+                    outdated.append(filename)
+        except OSError as exc:
             return AgentMigrationCheckResult(
-                migration_needed=True,
-                agent_file_missing=True,
-                message="Agent file missing — will be created",
+                migration_needed=False,
+                skipped=True,
+                message=f"Cannot read agent files — {exc}",
             )
 
-        # AC1/AC2: Compare rendered template with local file
-        rendered = self._agent_writer.render()
-        local_content = self._filesystem.read_text(agent_path)
-
-        if rendered != local_content:
+        if not outdated and not missing:
             return AgentMigrationCheckResult(
-                migration_needed=True,
-                message="Agent file is outdated",
+                migration_needed=False,
+                message="All agent files are up to date",
             )
+
+        parts: list[str] = []
+        if outdated:
+            parts.append(f"{len(outdated)} outdated")
+        if missing:
+            parts.append(f"{len(missing)} missing")
+        message = f"Agent files need updating ({', '.join(parts)})"
 
         return AgentMigrationCheckResult(
-            migration_needed=False,
-            message="Agent file is up to date",
+            migration_needed=True,
+            agent_file_missing=bool(missing),
+            message=message,
+            outdated_files=outdated,
+            missing_files=missing,
         )
 
     def execute_migration(
         self,
         project_dir: Path,
     ) -> AgentMigrationResult:
-        """Execute agent template migration with backup.
+        """Execute agent template migration for outdated/missing files.
 
-        Backs up the existing agent file (if present), then regenerates
-        from the current bundled template.
+        Only writes files that differ from the current template or are missing.
 
         Args:
             project_dir: Path to the project root directory.
@@ -108,7 +118,6 @@ class AgentMigrationService:
         Returns:
             AgentMigrationResult indicating success/failure.
         """
-        # Verify manifest is loadable before attempting migration
         if not self._manifest.exists(project_dir):
             return AgentMigrationResult(
                 success=False,
@@ -122,28 +131,36 @@ class AgentMigrationService:
                 error=f"Failed to load manifest: {exc}",
             )
 
-        agent_path = project_dir / AGENT_FILE_PATH
-        backup_path = agent_path.parent / (agent_path.name + AGENT_BACKUP_SUFFIX)
-        backed_up = False
+        agent_dir = project_dir / AGENT_DIR
+        rendered = self._agent_writer.render_all()
+        files_replaced: list[str] = []
+        files_created: list[str] = []
 
         try:
-            # AC3/AC9: Backup existing file before regeneration
-            if self._filesystem.exists(agent_path):
-                current_content = self._filesystem.read_text(agent_path)
-                self._filesystem.write_text(backup_path, current_content)
-                backed_up = True
+            if not self._filesystem.exists(agent_dir):
+                self._filesystem.create_directory(agent_dir)
 
-            # AC3/AC7: Regenerate agent file
-            self._agent_writer.generate(agent_path)
+            for filename, expected_content in rendered.items():
+                local_path = agent_dir / filename
+                if self._filesystem.exists(local_path):
+                    local_content = self._filesystem.read_text(local_path)
+                    if local_content == expected_content:
+                        continue
+                    self._filesystem.write_text(local_path, expected_content)
+                    files_replaced.append(filename)
+                else:
+                    self._filesystem.write_text(local_path, expected_content)
+                    files_created.append(filename)
 
             return AgentMigrationResult(
                 success=True,
-                backed_up=backed_up,
+                files_replaced=files_replaced,
+                files_created=files_created,
             )
         except OSError as exc:
-            # AC10: Filesystem error during migration
             return AgentMigrationResult(
                 success=False,
-                backed_up=backed_up,
+                files_replaced=files_replaced,
+                files_created=files_created,
                 error=str(exc),
             )

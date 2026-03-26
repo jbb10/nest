@@ -179,27 +179,28 @@ def _handle_agent_migration(
 
     # AC8: No prompt if up to date
     if not migration_check.migration_needed:
-        success("Agent file is up to date")
+        success("All agent files are up to date")
         return
 
-    # AC7: Prompt for migration
-    if migration_check.agent_file_missing:
-        confirm_msg = "Agent file is missing. Create it?"
-    else:
-        confirm_msg = "Agent template has changed. Update?"
+    # AC6: Display file-level detail
+    console.print()
+    console.print("  Agent files need updating:")
+    for f in migration_check.outdated_files:
+        console.print(f"    Replace  {f}")
+    for f in migration_check.missing_files:
+        console.print(f"    Create   {f}")
+    console.print()
 
-    if Confirm.ask(confirm_msg, default=False, console=console):
+    if Confirm.ask("Update agent files?", default=False, console=console):
         migration_result = migration_service.execute_migration(project_dir)
         if migration_result.success:
-            if migration_result.backed_up:
-                success("Agent file updated (backup: nest.agent.md.bak)")
-            else:
-                success("Agent file created")
+            total = len(migration_result.files_replaced) + len(migration_result.files_created)
+            success(f"{total} agent files updated")
         else:
             # AC14: Non-critical failure
             warning(f"Agent file update failed: {migration_result.error}")
     else:
-        info("Keeping existing agent file. Run nest doctor to update later.")
+        info("Keeping existing agent files. Run nest doctor to update later.")
 
 
 def _handle_metadata_migration(

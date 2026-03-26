@@ -130,7 +130,7 @@ class TestCountIssues:
             None,
             _make_project_report(agent=False),
         )
-        assert "Agent file missing" in issues
+        assert "Agent files missing" in issues
 
     def test_folders_both_missing(self) -> None:
         """Both folders missing appears in issue list."""
@@ -169,7 +169,7 @@ class TestCountIssues:
         assert len(issues) == 4
         assert "ML models not cached" in issues
         assert "Manifest missing" in issues
-        assert "Agent file missing" in issues
+        assert "Agent files missing" in issues
         assert "Project folders missing" in issues
 
     def test_none_reports_returns_env_only(self) -> None:
@@ -214,12 +214,12 @@ class TestDisplayIssueSummary:
 
         buf = StringIO()
         console = Console(file=buf, force_terminal=False, color_system=None, width=120)
-        display_issue_summary(["ML models not cached", "Agent file missing"], console)
+        display_issue_summary(["ML models not cached", "Agent files missing"], console)
         output = buf.getvalue()
 
         assert "2 issues found:" in output
         assert "1. ML models not cached" in output
-        assert "2. Agent file missing" in output
+        assert "2. Agent files missing" in output
 
 
 # ---------------------------------------------------------------------------

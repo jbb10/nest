@@ -475,6 +475,7 @@ class MockProjectChecker:
         context_exist: bool = True,
         meta_folder_exists: bool = True,
         has_legacy_layout: bool = False,
+        missing_agents: list[str] | None = None,
     ) -> None:
         """Initialize mock with desired states."""
         self._manifest_exists = manifest_exists
@@ -485,6 +486,20 @@ class MockProjectChecker:
         self._context_exist = context_exist
         self._meta_folder_exists = meta_folder_exists
         self._has_legacy_layout = has_legacy_layout
+        self._missing_agents = (
+            missing_agents
+            if missing_agents is not None
+            else (
+                []
+                if agent_exists
+                else [
+                    "nest.agent.md",
+                    "nest-master-researcher.agent.md",
+                    "nest-master-synthesizer.agent.md",
+                    "nest-master-planner.agent.md",
+                ]
+            )
+        )
 
     def manifest_exists(self, project_dir: Path) -> bool:
         """Check if manifest exists."""
@@ -504,6 +519,10 @@ class MockProjectChecker:
     def agent_file_exists(self, project_dir: Path) -> bool:
         """Check if agent file exists."""
         return self._agent_exists
+
+    def missing_agent_files(self, project_dir: Path) -> list[str]:
+        """Return list of missing agent filenames."""
+        return self._missing_agents
 
     def source_folder_exists(self, project_dir: Path) -> bool:
         """Check if source folder exists."""
@@ -615,7 +634,7 @@ class TestCheckProject:
         assert report is not None
         assert report.status.agent_file_present is False
         assert report.all_pass is False
-        assert "regenerate agent" in " ".join(report.status.suggestions).lower()
+        assert "missing agent files" in " ".join(report.status.suggestions).lower()
 
     def test_check_project_missing_sources_folder(self, tmp_path: Path) -> None:
         """check_project() should detect missing sources folder."""
@@ -794,7 +813,8 @@ class TestRemediationMethods:
         assert mock_fs.create_directory.call_count == 2
 
     def test_regenerate_agent_file_success(self, tmp_path: Path) -> None:
-        """regenerate_agent_file() should use AgentWriterProtocol."""
+        """regenerate_agent_file() should use AgentWriterProtocol.generate_all()."""
+        from nest.core.paths import AGENT_DIR
         from nest.services.doctor_service import DoctorService
 
         mock_writer = MagicMock()
@@ -805,6 +825,7 @@ class TestRemediationMethods:
         assert result.attempted is True
         assert result.success is True
         assert "regenerated" in result.message.lower()
+        mock_writer.generate_all.assert_called_once_with(tmp_path / AGENT_DIR)
 
     def test_download_models_when_checker_none(self, tmp_path: Path) -> None:
         """download_models() should fail gracefully when no model checker."""
@@ -948,7 +969,7 @@ class TestRemediateIssuesAuto:
         assert len(report.results) == 3
         assert mock_fs.create_directory.called
         assert mock_manifest.save.called
-        assert mock_writer.generate.called
+        assert mock_writer.generate_all.called
 
     def test_auto_skips_when_no_issues(self, tmp_path: Path) -> None:
         """remediate_issues_auto() should return empty when no issues."""

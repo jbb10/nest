@@ -289,16 +289,20 @@ class AgentMigrationCheckResult(BaseModel):
     """Result of checking whether agent template needs migration.
 
     Attributes:
-        migration_needed: True if local agent file differs from current template.
-        agent_file_missing: True if agent file doesn't exist at all.
+        migration_needed: True if any local agent file differs from current template.
+        agent_file_missing: True if any agent file doesn't exist at all.
         skipped: True if check was skipped (e.g., not a Nest project).
         message: Human-readable status description.
+        outdated_files: Filenames whose content differs from template.
+        missing_files: Filenames that don't exist locally.
     """
 
     migration_needed: bool
     agent_file_missing: bool = False
     skipped: bool = False
     message: str
+    outdated_files: list[str] = Field(default_factory=list)
+    missing_files: list[str] = Field(default_factory=list)
 
 
 class AgentMigrationResult(BaseModel):
@@ -306,12 +310,14 @@ class AgentMigrationResult(BaseModel):
 
     Attributes:
         success: Whether the migration completed successfully.
-        backed_up: Whether the old file was backed up before replacement.
+        files_replaced: Filenames that were overwritten.
+        files_created: Filenames that were newly created.
         error: Error message if migration failed.
     """
 
     success: bool
-    backed_up: bool = False
+    files_replaced: list[str] = Field(default_factory=list)
+    files_created: list[str] = Field(default_factory=list)
     error: str | None = None
 
 

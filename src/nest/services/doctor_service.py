@@ -20,6 +20,7 @@ from nest.adapters.protocols import (
 from nest.core.checksum import compute_sha256
 from nest.core.exceptions import ConfigError, ManifestError
 from nest.core.models import FileEntry, Manifest
+from nest.core.paths import AGENT_DIR
 from nest.core.version import is_newer, sort_versions
 
 logger = logging.getLogger(__name__)
@@ -402,7 +403,9 @@ class DoctorService:
         # Check agent file
         agent_present = self._project_checker.agent_file_exists(project_dir)
         if not agent_present:
-            suggestions.append("Run `nest init` to regenerate agent file")
+            missing = self._project_checker.missing_agent_files(project_dir)
+            missing_names = ", ".join(missing)
+            suggestions.append(f"Missing agent files: {missing_names}")
 
         # Check folders
         sources_exist = self._project_checker.source_folder_exists(project_dir)
@@ -584,7 +587,7 @@ class DoctorService:
         self,
         project_dir: Path,
     ) -> RemediationResult:
-        """Regenerate agent file.
+        """Regenerate all agent files.
 
         Args:
             project_dir: Path to the project root directory.
@@ -601,21 +604,21 @@ class DoctorService:
             )
 
         try:
-            output_path = project_dir / ".github" / "agents" / "nest.agent.md"
-            self._agent_writer.generate(output_path)
+            agent_dir = project_dir / AGENT_DIR
+            self._agent_writer.generate_all(agent_dir)
             return RemediationResult(
                 issue="missing_agent_file",
                 attempted=True,
                 success=True,
-                message=f"Agent file regenerated at {output_path.relative_to(project_dir)}",
+                message=f"Agent files regenerated at {AGENT_DIR}",
             )
         except Exception as e:
-            logger.exception("Failed to regenerate agent file in %s", project_dir)
+            logger.exception("Failed to regenerate agent files in %s", project_dir)
             return RemediationResult(
                 issue="missing_agent_file",
                 attempted=True,
                 success=False,
-                message=f"Failed to regenerate agent file: {e}",
+                message=f"Failed to regenerate agent files: {e}",
             )
 
     def download_models(self) -> RemediationResult:
@@ -773,7 +776,7 @@ class DoctorService:
 
         # 4. Agent file (Last)
         if project_report and not project_report.status.agent_file_present:
-            if _confirm("Regenerate agent file?"):
+            if _confirm("Regenerate agent files?"):
                 result = self.regenerate_agent_file(project_dir)
                 results.append(result)
             else:

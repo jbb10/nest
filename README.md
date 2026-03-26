@@ -8,8 +8,12 @@ Drop PDFs, Excel files, and PowerPoints into a folder. Nest converts them to Mar
 [Copilot Chat with Nest agent selected]
 
 You: What authentication method did we agree on for the partner API?
-AI:  The integration spec requires OAuth 2.0 with client credentials flow.
-     Token lifetime is 1 hour, refresh not supported... [Source: specs/partner-api-v2.md]
+Nest: The integration spec requires OAuth 2.0 with client credentials flow.
+      Token lifetime is 1 hour, refresh not supported... [Source: specs/partner-api-v2.md]
+
+You: Build me a migration plan from the legacy system
+Nest: [Delegates to researcher → synthesizer → planner agents automatically]
+      Here's a phased migration plan based on your SOW and architecture docs...
 ```
 
 ---
@@ -17,7 +21,7 @@ AI:  The integration spec requires OAuth 2.0 with client credentials flow.
 ## What It Does
 
 - **Converts documents** — PDFs, DOCX, PPTX, XLSX, HTML → clean Markdown (via [Docling](https://github.com/DS4SD/docling), fully local)
-- **Creates a VS Code agent** — Select "Nest" from the Copilot Chat agent dropdown
+- **Creates VS Code agents** — A multi-agent team: coordinator, researcher, synthesizer, and planner
 - **Tracks changes** — Only re-processes modified files (fast incremental syncs)
 - **Builds an index** — A master index so your AI agent knows exactly what's available
 - **Self-updates** — `nest update` keeps the tool and agent template current
@@ -53,6 +57,7 @@ cp -r ~/Downloads/rfp-response/ _nest_sources/
 nest sync
 
 # 5. Open VS Code → Copilot Chat → select "Nest" from the agent dropdown
+#    (The coordinator automatically delegates to researcher, synthesizer, and planner agents)
 ```
 
 ---
@@ -66,15 +71,16 @@ Scaffolds a new Nest project:
 ```
 my-project/
 ├── .github/agents/
-│   ├── nest.agent.md               ← VS Code shows this in the agent dropdown
-│   ├── nest-enricher.agent.md      ← Index enrichment agent
-│   └── nest-glossary.agent.md      ← Glossary generation agent
-├── _nest_sources/                  ← Put ALL your documents here (PDFs, text files, etc.)
-├── _nest_context/                  ← AI-readable output (converted Markdown + passthrough copies)
-└── .nest/                          ← Metadata directory
-    ├── manifest.json               ← Tracks what's been processed
-    ├── errors.log                  ← Error diagnostics
-    └── 00_MASTER_INDEX.md          ← Auto-generated index of all context files
+│   ├── nest.agent.md                        ← Coordinator (select from agent dropdown)
+│   ├── nest-master-researcher.agent.md      ← Deep document research
+│   ├── nest-master-synthesizer.agent.md     ← Cross-document synthesis
+│   └── nest-master-planner.agent.md         ← Action plans and roadmaps
+├── _nest_sources/                           ← Put ALL your documents here (PDFs, text files, etc.)
+├── _nest_context/                           ← AI-readable output (converted Markdown + passthrough copies)
+└── .nest/                                   ← Metadata directory
+    ├── manifest.json                        ← Tracks what's been processed
+    ├── errors.log                           ← Error diagnostics
+    └── 00_MASTER_INDEX.md                   ← Auto-generated index of all context files
 ```
 
 ### `nest sync`
