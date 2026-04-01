@@ -2,6 +2,15 @@
 
 All notable changes to Nest.
 
+## [v1.2.0] - 2026-04-01
+
+### Bug Fixes
+
+- configure test AI proxy credentials and fix e2e test assertions
+
+### Features
+
+- add experimental PowerShell support for AI config on Windows
 ## [v1.1.0] - 2026-03-26
 
 ### Features
