@@ -58,7 +58,7 @@ class TestDoctorE2E:
         assert result.exit_code == 0
         assert "Project" in result.stdout
         assert "Manifest:" in result.stdout
-        assert "Agent file:" in result.stdout
+        assert "Agent files:" in result.stdout
         assert "Folders:" in result.stdout
 
     def test_doctor_skips_project_section_outside_project(self, fresh_temp_dir: Path) -> None:
@@ -97,8 +97,8 @@ class TestDoctorE2E:
         result = run_cli(["doctor"], cwd=initialized_project, timeout=30)
 
         assert result.exit_code == 0
-        assert "Agent file:" in result.stdout
-        assert "missing" in result.stdout
+        assert "Agent files:" in result.stdout
+        assert "missing" in result.stdout.lower() or "incomplete" in result.stdout.lower()
 
     def test_doctor_fix_recreates_missing_folders(self, initialized_project: Path) -> None:
         """Test that --fix flag recreates missing folders."""
@@ -243,7 +243,7 @@ class TestDoctorE2E:
         # Issue summary should appear
         assert "issue" in result.stdout
         assert "found" in result.stdout
-        assert "Agent file missing" in result.stdout
+        assert "Agent files missing" in result.stdout
         assert "nest doctor --fix" in result.stdout
 
     def test_doctor_shows_success_message_when_all_pass(self, initialized_project: Path) -> None:

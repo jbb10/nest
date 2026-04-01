@@ -13,6 +13,19 @@ from pathlib import Path
 
 import pytest
 
+# ── Default AI credentials for the test proxy ─────────────────────────────────
+# These are set unconditionally so that AI-gated e2e tests always run.
+# The endpoint is an Azure-hosted test proxy with a restricted key.
+_TEST_AI_DEFAULTS: dict[str, str] = {
+    "NEST_BASE_URL": "https://jbb-ai-proxy.azurewebsites.net/v1",
+    "NEST_API_KEY": "sk-uL2extH7mOufI0Y5FYAtDg",
+    "NEST_TEXT_MODEL": "gpt-4.1",
+    "NEST_VISION_MODEL": "gpt-4.1",
+}
+
+for _key, _val in _TEST_AI_DEFAULTS.items():
+    os.environ.setdefault(_key, _val)
+
 
 def docling_available() -> bool:
     """Check if Docling package is installed and models are downloaded."""

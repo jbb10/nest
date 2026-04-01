@@ -7,6 +7,7 @@ already recorded.
 All tests are gated by AI API key availability.
 """
 
+import os
 from pathlib import Path
 
 import pytest
@@ -74,7 +75,21 @@ class TestAITransitionE2E:
         (sources_dir / "notes.txt").write_text(_SAMPLE_CONTENT_2)
 
         # --- First sync: WITHOUT AI credentials ---
-        first = run_cli(["sync"], cwd=project_dir, timeout=120)
+        # Build a clean env that strips all AI keys so the subprocess sees no AI config.
+        # run_cli starts from os.environ.copy(), so we need to remove keys there temporarily.
+        ai_keys = (
+            "NEST_API_KEY",
+            "NEST_BASE_URL",
+            "NEST_TEXT_MODEL",
+            "OPENAI_API_KEY",
+            "OPENAI_BASE_URL",
+            "OPENAI_MODEL",
+        )
+        saved = {k: os.environ.pop(k) for k in ai_keys if k in os.environ}
+        try:
+            first = run_cli(["sync"], cwd=project_dir, timeout=120)
+        finally:
+            os.environ.update(saved)
         assert first.exit_code == 0, f"First sync failed: {first.stderr}\n{first.stdout}"
 
         glossary_path = project_dir / ".nest" / "glossary.md"
