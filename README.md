@@ -23,7 +23,7 @@ Nest: [Delegates to researcher → synthesizer → planner agents automatically]
 - **Converts documents** — PDFs, DOCX, PPTX, XLSX, HTML → clean Markdown (via [Docling](https://github.com/DS4SD/docling), fully local)
 - **Creates VS Code agents** — A multi-agent team: coordinator, researcher, synthesizer, and planner
 - **Tracks changes** — Only re-processes modified files (fast incremental syncs)
-- **Builds an index** — A master index so your AI agent knows exactly what's available
+- **AI-powered context** — Optionally connects to an LLM to generate image descriptions and a project glossary, giving your agents richer understanding of your documents
 - **Self-updates** — `nest update` keeps the tool and agent template current
 
 All processing happens on your machine. No documents are sent to external services.
@@ -38,6 +38,16 @@ All processing happens on your machine. No documents are sent to external servic
 uv tool install git+https://github.com/jbb10/nest
 ```
 
+### Updating
+
+```bash
+# Recommended
+nest update
+
+# Or manually via uv
+uv tool upgrade nest
+```
+
 ---
 
 ## Quick Start
@@ -47,7 +57,7 @@ uv tool install git+https://github.com/jbb10/nest
 mkdir acme-project && cd acme-project
 
 # 2. Initialize Nest (downloads ML models on first run, ~1.5 GB one-time)
-nest init "Acme Digital Transformation"
+nest init
 
 # 3. Drop documents into _nest_sources/
 cp ~/Downloads/acme-sow.pdf ~/Downloads/acme-msa.pdf _nest_sources/
@@ -64,9 +74,9 @@ nest sync
 
 ## Commands
 
-### `nest init "Project Name"`
+### `nest init`
 
-Scaffolds a new Nest project:
+Scaffolds a new Nest project in the current directory:
 
 ```
 my-project/
@@ -127,6 +137,21 @@ Checks for new versions, updates Nest, and migrates your agent file if the templ
 | `--check` | Only check for updates without installing |
 | `--dir` | Specify project directory for agent migration check |
 
+### `nest config ai`
+
+Interactively configures AI enrichment by writing API credentials to your shell RC file (e.g. `~/.zshrc`). Prompts for API endpoint, model name, and API key.
+
+Once configured, `nest sync` will automatically generate file descriptions and a project glossary that help your agents understand your documents better.
+
+```bash
+nest config ai            # Set up AI credentials
+nest config ai --remove   # Remove AI configuration
+```
+
+| Flag | Description |
+|------|-------------|
+| `--remove` | Remove Nest AI configuration from your shell RC file |
+
 ---
 
 ## Supported File Types
@@ -164,8 +189,7 @@ Directory structure is preserved — organize `_nest_sources/` however you like 
 ### Tips
 
 - **Use descriptive filenames** — `acme-sow-v2.pdf` beats `Document1.pdf`
-- **Organize by workstream** — `discovery/`, `contracts/`, `deliverables/`
-- **Check the master index** — `.nest/00_MASTER_INDEX.md` shows everything available
+- **Organize by area/domain** — `discovery/`, `contracts/`, `deliverables/`
 
 ### Team Workflow
 

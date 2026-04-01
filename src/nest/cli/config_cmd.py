@@ -124,4 +124,7 @@ def ai_command(
 
     console.print()
     success(f"Added to {_display_path(rc_path)}")
-    warning(f"Run 'source {_display_path(rc_path)}' or open a new terminal to activate.")
+    if shell == "powershell":
+        warning(f"Run '. {_display_path(rc_path)}' or open a new terminal to activate.")
+    else:
+        warning(f"Run 'source {_display_path(rc_path)}' or open a new terminal to activate.")

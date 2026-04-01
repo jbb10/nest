@@ -19,15 +19,21 @@ class ShellRCService:
     """Service for managing shell RC file AI configuration blocks."""
 
     def detect_shell(self) -> str:
-        """Detect current shell from $SHELL environment variable.
+        """Detect current shell from environment.
+
+        Checks $SHELL for POSIX shells. On Windows (or when $SHELL is absent),
+        detects PowerShell via the PSModulePath environment variable.
 
         Returns:
-            Shell name: "zsh", "bash", "fish", or "unknown".
+            Shell name: "zsh", "bash", "fish", "powershell", or "unknown".
         """
         shell_path = os.environ.get("SHELL", "")
         shell_name = Path(shell_path).name if shell_path else ""
         if shell_name in ("zsh", "bash", "fish"):
             return shell_name
+        # Detect PowerShell (Windows or pwsh on any platform)
+        if os.environ.get("PSModulePath"):
+            return "powershell"
         return "unknown"
 
     def resolve_rc_path(self, shell: str) -> Path:
@@ -50,6 +56,16 @@ class ShellRCService:
             return home / ".bashrc"
         if shell == "fish":
             return home / ".config" / "fish" / "config.fish"
+        if shell == "powershell":
+            # PowerShell profile: prefer $PROFILE env var, otherwise use standard path
+            profile_env = os.environ.get("PROFILE", "")
+            if profile_env:
+                return Path(profile_env)
+            if sys.platform == "win32":
+                docs = home / "Documents" / "PowerShell"
+            else:
+                docs = home / ".config" / "powershell"
+            return docs / "Microsoft.PowerShell_profile.ps1"
         # fallback
         return home / ".profile"
 
@@ -72,6 +88,21 @@ class ShellRCService:
         value = value.replace("$", "\\$")
         return value
 
+    @staticmethod
+    def _escape_powershell_value(value: str) -> str:
+        """Escape a value for safe inclusion in a PowerShell single-quoted string.
+
+        In PowerShell single-quoted strings, the only character that needs
+        escaping is the single quote itself (doubled: '' → ').
+
+        Args:
+            value: Raw value to escape.
+
+        Returns:
+            PowerShell-safe escaped value.
+        """
+        return value.replace("'", "''")
+
     def generate_config_block(
         self,
         endpoint: str,
@@ -90,12 +121,21 @@ class ShellRCService:
         Returns:
             Complete config block string including sentinel comments.
         """
-        # Escape double quotes and backslashes in values for shell safety
-        safe_endpoint = self._escape_shell_value(endpoint)
-        safe_model = self._escape_shell_value(model)
-        safe_key = self._escape_shell_value(api_key)
-
-        if shell == "fish":
+        if shell == "powershell":
+            safe_endpoint = self._escape_powershell_value(endpoint)
+            safe_model = self._escape_powershell_value(model)
+            safe_key = self._escape_powershell_value(api_key)
+            lines = [
+                BLOCK_START,
+                f"$Env:NEST_BASE_URL = '{safe_endpoint}'",
+                f"$Env:NEST_TEXT_MODEL = '{safe_model}'",
+                f"$Env:NEST_API_KEY = '{safe_key}'",
+                BLOCK_END,
+            ]
+        elif shell == "fish":
+            safe_endpoint = self._escape_shell_value(endpoint)
+            safe_model = self._escape_shell_value(model)
+            safe_key = self._escape_shell_value(api_key)
             lines = [
                 BLOCK_START,
                 f'set -gx NEST_BASE_URL "{safe_endpoint}"',
@@ -104,6 +144,9 @@ class ShellRCService:
                 BLOCK_END,
             ]
         else:
+            safe_endpoint = self._escape_shell_value(endpoint)
+            safe_model = self._escape_shell_value(model)
+            safe_key = self._escape_shell_value(api_key)
             lines = [
                 BLOCK_START,
                 f'export NEST_BASE_URL="{safe_endpoint}"',

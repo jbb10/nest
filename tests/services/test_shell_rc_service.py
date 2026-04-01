@@ -45,8 +45,27 @@ class TestDetectShell:
     def test_detect_shell_returns_unknown_when_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """$SHELL not set → returns 'unknown'."""
         monkeypatch.delenv("SHELL", raising=False)
+        monkeypatch.delenv("PSModulePath", raising=False)
         service = ShellRCService()
         assert service.detect_shell() == "unknown"
+
+    def test_detect_shell_returns_powershell_when_psmodulepath_set(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """No $SHELL but $PSModulePath set → returns 'powershell'."""
+        monkeypatch.delenv("SHELL", raising=False)
+        monkeypatch.setenv("PSModulePath", "C:\\Users\\test\\Documents\\PowerShell\\Modules")
+        service = ShellRCService()
+        assert service.detect_shell() == "powershell"
+
+    def test_detect_shell_prefers_posix_shell_over_psmodulepath(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """$SHELL=/bin/zsh with $PSModulePath → returns 'zsh' (POSIX wins)."""
+        monkeypatch.setenv("SHELL", "/bin/zsh")
+        monkeypatch.setenv("PSModulePath", "/some/path")
+        service = ShellRCService()
+        assert service.detect_shell() == "zsh"
 
 
 class TestResolveRCPath:
@@ -100,6 +119,38 @@ class TestResolveRCPath:
         result = service.resolve_rc_path("unknown")
         assert result == Path.home() / ".profile"
 
+    def test_resolve_rc_path_powershell_windows(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """PowerShell on Windows → ~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1."""
+        monkeypatch.setattr("nest.services.shell_rc_service.sys.platform", "win32")
+        monkeypatch.delenv("PROFILE", raising=False)
+        monkeypatch.setattr("nest.services.shell_rc_service.Path.home", lambda: tmp_path)
+        service = ShellRCService()
+        result = service.resolve_rc_path("powershell")
+        assert result == tmp_path / "Documents" / "PowerShell" / "Microsoft.PowerShell_profile.ps1"
+
+    def test_resolve_rc_path_powershell_unix(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """PowerShell (pwsh) on Unix → ~/.config/powershell/Microsoft.PowerShell_profile.ps1."""
+        monkeypatch.setattr("nest.services.shell_rc_service.sys.platform", "linux")
+        monkeypatch.delenv("PROFILE", raising=False)
+        monkeypatch.setattr("nest.services.shell_rc_service.Path.home", lambda: tmp_path)
+        service = ShellRCService()
+        result = service.resolve_rc_path("powershell")
+        assert result == tmp_path / ".config" / "powershell" / "Microsoft.PowerShell_profile.ps1"
+
+    def test_resolve_rc_path_powershell_profile_env(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """$PROFILE env var set → uses that path directly."""
+        profile_path = str(tmp_path / "custom" / "profile.ps1")
+        monkeypatch.setenv("PROFILE", profile_path)
+        service = ShellRCService()
+        result = service.resolve_rc_path("powershell")
+        assert result == Path(profile_path)
+
 
 class TestGenerateConfigBlock:
     """Tests for config block generation."""
@@ -147,6 +198,16 @@ class TestGenerateConfigBlock:
         assert block.startswith(BLOCK_START)
         assert BLOCK_END in block
 
+    def test_generate_config_block_powershell(self) -> None:
+        """PowerShell block uses '$Env:VAR = ...' syntax with single quotes."""
+        service = ShellRCService()
+        block = service.generate_config_block(
+            "https://api.openai.com/v1", "gpt-4o-mini", "sk-test", "powershell"
+        )
+        assert "$Env:NEST_BASE_URL = 'https://api.openai.com/v1'" in block
+        assert "$Env:NEST_TEXT_MODEL = 'gpt-4o-mini'" in block
+        assert "$Env:NEST_API_KEY = 'sk-test'" in block
+
 
 class TestWriteConfig:
     """Tests for writing config to RC files."""
@@ -181,6 +242,26 @@ class TestWriteConfig:
         assert rc_path.exists()
         content = rc_path.read_text(encoding="utf-8")
         assert 'set -gx NEST_BASE_URL "https://api.openai.com/v1"' in content
+
+    def test_write_config_powershell_creates_profile(self, tmp_path: Path) -> None:
+        """PowerShell profile created with $Env: syntax."""
+        # Arrange
+        rc_path = tmp_path / "Documents" / "PowerShell" / "Microsoft.PowerShell_profile.ps1"
+        service = ShellRCService()
+
+        # Act
+        service.write_config(
+            rc_path, "https://api.openai.com/v1", "gpt-4o-mini", "sk-test", "powershell"
+        )
+
+        # Assert
+        assert rc_path.exists()
+        content = rc_path.read_text(encoding="utf-8")
+        assert "$Env:NEST_BASE_URL = 'https://api.openai.com/v1'" in content
+        assert "$Env:NEST_TEXT_MODEL = 'gpt-4o-mini'" in content
+        assert "$Env:NEST_API_KEY = 'sk-test'" in content
+        assert BLOCK_START in content
+        assert BLOCK_END in content
 
     def test_write_config_appends_to_existing(self, tmp_path: Path) -> None:
         """Existing RC content preserved, block appended."""
@@ -372,6 +453,28 @@ class TestEscapeShellValue:
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "m", 'sk-ab"cd', "fish")
         assert 'set -gx NEST_API_KEY "sk-ab\\"cd"' in block
+
+
+class TestEscapePowershellValue:
+    """Tests for PowerShell value escaping."""
+
+    def test_escapes_single_quotes(self) -> None:
+        """Single quotes are doubled in PowerShell single-quoted strings."""
+        service = ShellRCService()
+        block = service.generate_config_block("https://ep", "m", "sk-ab'cd", "powershell")
+        assert "$Env:NEST_API_KEY = 'sk-ab''cd'" in block
+
+    def test_dollar_signs_not_escaped_in_powershell(self) -> None:
+        """Dollar signs are literal inside PowerShell single-quoted strings."""
+        service = ShellRCService()
+        block = service.generate_config_block("https://ep", "m", "sk-ab$cd", "powershell")
+        assert "$Env:NEST_API_KEY = 'sk-ab$cd'" in block
+
+    def test_backslashes_not_escaped_in_powershell(self) -> None:
+        """Backslashes are literal inside PowerShell single-quoted strings."""
+        service = ShellRCService()
+        block = service.generate_config_block("https://ep", "m", "sk-ab\\cd", "powershell")
+        assert "$Env:NEST_API_KEY = 'sk-ab\\cd'" in block
 
 
 class TestSentinelOrderValidation:
