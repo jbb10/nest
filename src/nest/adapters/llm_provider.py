@@ -205,7 +205,8 @@ def create_llm_provider() -> OpenAIAdapter | AzureOpenAIAdapter | None:
     )
     if not model:
         logger.warning(
-            "No LLM model configured. Set NEST_AI_MODEL (or run 'nest config ai') to enable AI features."
+            "No LLM model configured. Set NEST_AI_MODEL"
+            " (or run 'nest config ai') to enable AI features."
         )
         return None
 
@@ -433,7 +434,8 @@ def create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter |
     )
     if not vision_model:
         logger.warning(
-            "No vision model configured. Set NEST_AI_VISION_MODEL (or run 'nest config ai') to enable vision features."
+            "No vision model configured. Set NEST_AI_VISION_MODEL"
+            " (or run 'nest config ai') to enable vision features."
         )
         return None
 
