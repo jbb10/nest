@@ -2,6 +2,21 @@
 
 All notable changes to Nest.
 
+## [v1.2.1] - 2026-04-20
+
+### Bug Fixes
+
+- **tests**: clear all NEST_AI_* env vars in no-AI e2e test
+- **tests**: update test to match corrected user-invocable spelling
+- **llm**: wrap long warning strings to satisfy line-length lint
+- **agents**: correct user-invocable typo in sub-agent templates
+- **llm**: remove hardcoded model defaults, standardise NEST_AI_* env vars
+
+### Maintenance
+
+- update uv.lock
+- add DELETE/ to gitignore
+- update uv.lock
 ## [v1.2.0] - 2026-04-01
 
 ### Bug Fixes
