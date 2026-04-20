@@ -16,3 +16,4 @@ _nest_context/
 
 # Nest error logs (generated during processing)
 .nest_errors.log
+DELETE/
