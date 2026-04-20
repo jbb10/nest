@@ -178,10 +178,10 @@ class TestRenderAll:
 
         assert "_nest_context/" in result["nest.agent.md"]
 
-    def test_render_all_subagents_have_user_invokable_false(
+    def test_render_all_subagents_have_user_invocable_false(
         self, mock_filesystem: MockFileSystem
     ) -> None:
-        """AC3: all subagent templates have user-invokable: false."""
+        """AC3: all subagent templates have user-invocable: false."""
         writer = VSCodeAgentWriter(filesystem=mock_filesystem)
         subagent_files = [
             "nest-master-researcher.agent.md",
@@ -192,8 +192,8 @@ class TestRenderAll:
         result = writer.render_all()
 
         for filename in subagent_files:
-            assert "user-invokable: false" in result[filename], (
-                f"{filename} missing user-invokable: false"
+            assert "user-invocable: false" in result[filename], (
+                f"{filename} missing user-invocable: false"
             )
 
     def test_render_all_subagent_names_match_coordinator_agents_list(
