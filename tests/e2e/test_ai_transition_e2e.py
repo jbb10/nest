@@ -78,6 +78,9 @@ class TestAITransitionE2E:
         # Build a clean env that strips all AI keys so the subprocess sees no AI config.
         # run_cli starts from os.environ.copy(), so we need to remove keys there temporarily.
         ai_keys = (
+            "NEST_AI_API_KEY",
+            "NEST_AI_ENDPOINT",
+            "NEST_AI_MODEL",
             "NEST_API_KEY",
             "NEST_BASE_URL",
             "NEST_TEXT_MODEL",

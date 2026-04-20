@@ -177,10 +177,10 @@ class MockVisionServer:
         mock credentials regardless of the existing shell environment.
         """
         return {
-            "NEST_API_KEY": "mock-api-key-for-e2e-testing",
-            "NEST_BASE_URL": f"http://127.0.0.1:{self.port}/v1",
-            "NEST_VISION_MODEL": "mock-vision-model",
-            "NEST_TEXT_MODEL": "mock-text-model",
+            "NEST_AI_API_KEY": "mock-api-key-for-e2e-testing",
+            "NEST_AI_ENDPOINT": f"http://127.0.0.1:{self.port}/v1",
+            "NEST_AI_VISION_MODEL": "mock-vision-model",
+            "NEST_AI_MODEL": "mock-text-model",
         }
 
 

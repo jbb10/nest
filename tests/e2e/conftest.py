@@ -17,10 +17,10 @@ import pytest
 # These are set unconditionally so that AI-gated e2e tests always run.
 # The endpoint is an Azure-hosted test proxy with a restricted key.
 _TEST_AI_DEFAULTS: dict[str, str] = {
-    "NEST_BASE_URL": "https://jbb-ai-proxy.azurewebsites.net/v1",
-    "NEST_API_KEY": "sk-uL2extH7mOufI0Y5FYAtDg",
-    "NEST_TEXT_MODEL": "gpt-4.1",
-    "NEST_VISION_MODEL": "gpt-4.1",
+    "NEST_AI_ENDPOINT": "https://jbb-ai-proxy.azurewebsites.net/v1",
+    "NEST_AI_API_KEY": "sk-uL2extH7mOufI0Y5FYAtDg",
+    "NEST_AI_MODEL": "gpt-4.1",
+    "NEST_AI_VISION_MODEL": "gpt-4.1",
 }
 
 for _key, _val in _TEST_AI_DEFAULTS.items():
@@ -45,7 +45,11 @@ skip_without_docling = pytest.mark.skipif(
 
 def ai_available() -> bool:
     """Check if an AI API key is configured in the environment."""
-    return bool(os.environ.get("NEST_API_KEY") or os.environ.get("OPENAI_API_KEY"))
+    return bool(
+        os.environ.get("NEST_AI_API_KEY")
+        or os.environ.get("NEST_API_KEY")
+        or os.environ.get("OPENAI_API_KEY")
+    )
 
 
 skip_without_ai = pytest.mark.skipif(
@@ -58,6 +62,10 @@ def ai_env_vars() -> dict[str, str]:
     """Return AI env vars from current environment for subprocess."""
     env: dict[str, str] = {}
     for key in (
+        "NEST_AI_API_KEY",
+        "NEST_AI_ENDPOINT",
+        "NEST_AI_MODEL",
+        "NEST_AI_VISION_MODEL",
         "NEST_API_KEY",
         "NEST_BASE_URL",
         "NEST_TEXT_MODEL",

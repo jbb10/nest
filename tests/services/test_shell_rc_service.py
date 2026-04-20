@@ -161,9 +161,9 @@ class TestGenerateConfigBlock:
         block = service.generate_config_block(
             "https://api.openai.com/v1", "gpt-4o-mini", "sk-test", "bash"
         )
-        assert 'export NEST_BASE_URL="https://api.openai.com/v1"' in block
-        assert 'export NEST_TEXT_MODEL="gpt-4o-mini"' in block
-        assert 'export NEST_API_KEY="sk-test"' in block
+        assert 'export NEST_AI_ENDPOINT="https://api.openai.com/v1"' in block
+        assert 'export NEST_AI_MODEL="gpt-4o-mini"' in block
+        assert 'export NEST_AI_API_KEY="sk-test"' in block
 
     def test_generate_config_block_zsh(self) -> None:
         """Zsh block uses 'export VAR=\"val\"' syntax (same as bash)."""
@@ -171,7 +171,7 @@ class TestGenerateConfigBlock:
         block = service.generate_config_block(
             "https://api.openai.com/v1", "gpt-4o-mini", "sk-test", "zsh"
         )
-        assert 'export NEST_BASE_URL="https://api.openai.com/v1"' in block
+        assert 'export NEST_AI_ENDPOINT="https://api.openai.com/v1"' in block
 
     def test_generate_config_block_fish(self) -> None:
         """Fish block uses 'set -gx VAR \"val\"' syntax."""
@@ -179,17 +179,17 @@ class TestGenerateConfigBlock:
         block = service.generate_config_block(
             "https://api.openai.com/v1", "gpt-4o-mini", "sk-test", "fish"
         )
-        assert 'set -gx NEST_BASE_URL "https://api.openai.com/v1"' in block
-        assert 'set -gx NEST_TEXT_MODEL "gpt-4o-mini"' in block
-        assert 'set -gx NEST_API_KEY "sk-test"' in block
+        assert 'set -gx NEST_AI_ENDPOINT "https://api.openai.com/v1"' in block
+        assert 'set -gx NEST_AI_MODEL "gpt-4o-mini"' in block
+        assert 'set -gx NEST_AI_API_KEY "sk-test"' in block
 
     def test_generate_config_block_contains_all_vars(self) -> None:
         """Block contains all three env var names."""
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "model", "key", "bash")
-        assert "NEST_BASE_URL" in block
-        assert "NEST_TEXT_MODEL" in block
-        assert "NEST_API_KEY" in block
+        assert "NEST_AI_ENDPOINT" in block
+        assert "NEST_AI_MODEL" in block
+        assert "NEST_AI_API_KEY" in block
 
     def test_generate_config_block_has_sentinel_comments(self) -> None:
         """Block starts with BLOCK_START and ends with BLOCK_END."""
@@ -204,9 +204,9 @@ class TestGenerateConfigBlock:
         block = service.generate_config_block(
             "https://api.openai.com/v1", "gpt-4o-mini", "sk-test", "powershell"
         )
-        assert "$Env:NEST_BASE_URL = 'https://api.openai.com/v1'" in block
-        assert "$Env:NEST_TEXT_MODEL = 'gpt-4o-mini'" in block
-        assert "$Env:NEST_API_KEY = 'sk-test'" in block
+        assert "$Env:NEST_AI_ENDPOINT = 'https://api.openai.com/v1'" in block
+        assert "$Env:NEST_AI_MODEL = 'gpt-4o-mini'" in block
+        assert "$Env:NEST_AI_API_KEY = 'sk-test'" in block
 
 
 class TestWriteConfig:
@@ -224,9 +224,9 @@ class TestWriteConfig:
         # Assert
         content = rc_path.read_text(encoding="utf-8")
         assert BLOCK_START in content
-        assert 'export NEST_BASE_URL="https://api.openai.com/v1"' in content
-        assert 'export NEST_TEXT_MODEL="gpt-4o-mini"' in content
-        assert 'export NEST_API_KEY="sk-test"' in content
+        assert 'export NEST_AI_ENDPOINT="https://api.openai.com/v1"' in content
+        assert 'export NEST_AI_MODEL="gpt-4o-mini"' in content
+        assert 'export NEST_AI_API_KEY="sk-test"' in content
         assert BLOCK_END in content
 
     def test_write_config_creates_parent_dirs(self, tmp_path: Path) -> None:
@@ -241,7 +241,7 @@ class TestWriteConfig:
         # Assert
         assert rc_path.exists()
         content = rc_path.read_text(encoding="utf-8")
-        assert 'set -gx NEST_BASE_URL "https://api.openai.com/v1"' in content
+        assert 'set -gx NEST_AI_ENDPOINT "https://api.openai.com/v1"' in content
 
     def test_write_config_powershell_creates_profile(self, tmp_path: Path) -> None:
         """PowerShell profile created with $Env: syntax."""
@@ -257,9 +257,9 @@ class TestWriteConfig:
         # Assert
         assert rc_path.exists()
         content = rc_path.read_text(encoding="utf-8")
-        assert "$Env:NEST_BASE_URL = 'https://api.openai.com/v1'" in content
-        assert "$Env:NEST_TEXT_MODEL = 'gpt-4o-mini'" in content
-        assert "$Env:NEST_API_KEY = 'sk-test'" in content
+        assert "$Env:NEST_AI_ENDPOINT = 'https://api.openai.com/v1'" in content
+        assert "$Env:NEST_AI_MODEL = 'gpt-4o-mini'" in content
+        assert "$Env:NEST_AI_API_KEY = 'sk-test'" in content
         assert BLOCK_START in content
         assert BLOCK_END in content
 
@@ -292,7 +292,7 @@ class TestWriteConfig:
         # Assert
         content = rc_path.read_text(encoding="utf-8")
         assert content.count(BLOCK_START) == 1
-        assert 'export NEST_API_KEY="sk-new"' in content
+        assert 'export NEST_AI_API_KEY="sk-new"' in content
         assert "sk-old" not in content
 
     def test_write_config_preserves_surrounding_content(self, tmp_path: Path) -> None:
@@ -316,7 +316,7 @@ class TestWriteConfig:
         assert "export FOO=bar" in content
         assert "# after" in content
         assert "export BAZ=qux" in content
-        assert 'export NEST_BASE_URL="https://ep2"' in content
+        assert 'export NEST_AI_ENDPOINT="https://ep2"' in content
 
     def test_write_config_idempotent_triple_run(self, tmp_path: Path) -> None:
         """Run 3 times → only one block exists."""
@@ -428,31 +428,31 @@ class TestEscapeShellValue:
         """Double quotes are escaped."""
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "m", 'sk-ab"cd', "bash")
-        assert 'export NEST_API_KEY="sk-ab\\"cd"' in block
+        assert 'export NEST_AI_API_KEY="sk-ab\\"cd"' in block
 
     def test_escapes_backslashes(self) -> None:
         """Backslashes are escaped."""
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "m", "sk-ab\\cd", "bash")
-        assert 'export NEST_API_KEY="sk-ab\\\\cd"' in block
+        assert 'export NEST_AI_API_KEY="sk-ab\\\\cd"' in block
 
     def test_escapes_backticks(self) -> None:
         """Backticks are escaped."""
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "m", "sk-ab`cd", "bash")
-        assert 'export NEST_API_KEY="sk-ab\\`cd"' in block
+        assert 'export NEST_AI_API_KEY="sk-ab\\`cd"' in block
 
     def test_escapes_dollar_signs(self) -> None:
         """Dollar signs are escaped."""
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "m", "sk-ab$cd", "bash")
-        assert 'export NEST_API_KEY="sk-ab\\$cd"' in block
+        assert 'export NEST_AI_API_KEY="sk-ab\\$cd"' in block
 
     def test_fish_escapes_double_quotes(self) -> None:
         """Fish syntax also escapes double quotes."""
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "m", 'sk-ab"cd', "fish")
-        assert 'set -gx NEST_API_KEY "sk-ab\\"cd"' in block
+        assert 'set -gx NEST_AI_API_KEY "sk-ab\\"cd"' in block
 
 
 class TestEscapePowershellValue:
@@ -462,19 +462,19 @@ class TestEscapePowershellValue:
         """Single quotes are doubled in PowerShell single-quoted strings."""
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "m", "sk-ab'cd", "powershell")
-        assert "$Env:NEST_API_KEY = 'sk-ab''cd'" in block
+        assert "$Env:NEST_AI_API_KEY = 'sk-ab''cd'" in block
 
     def test_dollar_signs_not_escaped_in_powershell(self) -> None:
         """Dollar signs are literal inside PowerShell single-quoted strings."""
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "m", "sk-ab$cd", "powershell")
-        assert "$Env:NEST_API_KEY = 'sk-ab$cd'" in block
+        assert "$Env:NEST_AI_API_KEY = 'sk-ab$cd'" in block
 
     def test_backslashes_not_escaped_in_powershell(self) -> None:
         """Backslashes are literal inside PowerShell single-quoted strings."""
         service = ShellRCService()
         block = service.generate_config_block("https://ep", "m", "sk-ab\\cd", "powershell")
-        assert "$Env:NEST_API_KEY = 'sk-ab\\cd'" in block
+        assert "$Env:NEST_AI_API_KEY = 'sk-ab\\cd'" in block
 
 
 class TestSentinelOrderValidation:
