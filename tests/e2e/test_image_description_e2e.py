@@ -292,7 +292,13 @@ class TestImageDescriptionE2E:
             ["sync"],
             cwd=project_dir,
             timeout=300,
-            env={"NEST_API_KEY": "", "OPENAI_API_KEY": ""},
+            env={
+                "NEST_AI_API_KEY": "",
+                "NEST_AI_MODEL": "",
+                "NEST_AI_VISION_MODEL": "",
+                "NEST_API_KEY": "",
+                "OPENAI_API_KEY": "",
+            },
         )
 
         assert result.exit_code == 0, (
