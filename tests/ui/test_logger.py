@@ -133,3 +133,120 @@ class TestLogProcessingError:
         assert len(lines) == 2
         assert "file1.pdf" in lines[0]
         assert "file2.xlsx" in lines[1]
+
+
+class TestRichConsoleHandler:
+    """Tests for RichConsoleHandler and install_rich_console_handler."""
+
+    def _reset_nest_logger(self) -> None:
+        import logging
+
+        nest_logger = logging.getLogger("nest")
+        nest_logger.handlers.clear()
+        nest_logger.setLevel(logging.NOTSET)
+
+    def test_warning_routed_to_ui_warning(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A WARNING from nest.* should be forwarded to ui.messages.warning."""
+        import logging
+
+        from nest.ui import messages
+        from nest.ui.logger import install_rich_console_handler
+
+        self._reset_nest_logger()
+
+        captured: list[str] = []
+        monkeypatch.setattr(messages, "warning", lambda msg: captured.append(msg))
+
+        install_rich_console_handler()
+
+        logging.getLogger("nest.adapters.file_discovery").warning(
+            "Skipping broken symlink: %s", "/tmp/foo"
+        )
+
+        assert captured == ["Skipping broken symlink: /tmp/foo"]
+        self._reset_nest_logger()
+
+    def test_error_routed_to_ui_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An ERROR from nest.* should be forwarded to ui.messages.error."""
+        import logging
+
+        from nest.ui import messages
+        from nest.ui.logger import install_rich_console_handler
+
+        self._reset_nest_logger()
+
+        captured: list[str] = []
+        monkeypatch.setattr(messages, "error", lambda msg: captured.append(msg))
+
+        install_rich_console_handler()
+
+        logging.getLogger("nest.services.sync_service").error("boom")
+
+        assert captured == ["boom"]
+        self._reset_nest_logger()
+
+    def test_third_party_records_are_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Records from non-nest namespaces must not reach the UI."""
+        import logging
+
+        from nest.ui import messages
+        from nest.ui.logger import install_rich_console_handler
+
+        self._reset_nest_logger()
+
+        warned: list[str] = []
+        monkeypatch.setattr(messages, "warning", lambda msg: warned.append(msg))
+
+        install_rich_console_handler()
+
+        # Attach the same handler instance to a third-party logger to prove
+        # the namespace filter (not just propagation) blocks the record.
+        from nest.ui.logger import RichConsoleHandler
+
+        for h in logging.getLogger("nest").handlers:
+            if isinstance(h, RichConsoleHandler):
+                logging.getLogger("docling").addHandler(h)
+                logging.getLogger("docling").warning("noisy")
+                logging.getLogger("docling").removeHandler(h)
+                break
+
+        assert warned == []
+        self._reset_nest_logger()
+
+    def test_error_log_namespace_is_excluded(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Records from nest.error_log.* (file-only sync errors) must be skipped."""
+        from nest.ui import messages
+        from nest.ui.logger import install_rich_console_handler, setup_error_logger
+
+        self._reset_nest_logger()
+
+        captured: list[str] = []
+        monkeypatch.setattr(messages, "error", lambda msg: captured.append(msg))
+
+        install_rich_console_handler()
+
+        log_file = tmp_path / "errors.log"
+        err_logger = setup_error_logger(log_file, service_name="sync")
+        err_logger.error("file.pdf: failure")
+
+        assert captured == []
+        self._reset_nest_logger()
+
+    def test_install_is_idempotent(self) -> None:
+        """Calling install twice must not add duplicate handlers."""
+        import logging
+
+        from nest.ui.logger import RichConsoleHandler, install_rich_console_handler
+
+        self._reset_nest_logger()
+
+        install_rich_console_handler()
+        install_rich_console_handler()
+
+        handlers = [
+            h for h in logging.getLogger("nest").handlers if isinstance(h, RichConsoleHandler)
+        ]
+        assert len(handlers) == 1
+        self._reset_nest_logger()

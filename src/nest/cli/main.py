@@ -10,6 +10,7 @@ from nest.cli.init_cmd import init_command
 from nest.cli.status_cmd import status_command
 from nest.cli.sync_cmd import sync_command
 from nest.cli.update_cmd import update_command
+from nest.ui.logger import install_rich_console_handler
 
 app = typer.Typer()
 
@@ -40,6 +41,7 @@ def _suppress_third_party_loggers() -> None:
 def main() -> None:
     """Entry point for the nest CLI."""
     _suppress_third_party_loggers()
+    install_rich_console_handler()
     app()
 
 

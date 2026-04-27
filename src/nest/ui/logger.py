@@ -76,3 +76,65 @@ def log_processing_error(
         error: Error message describing the failure.
     """
     logger.error("%s: %s", file_path.name, error)
+
+
+class RichConsoleHandler(logging.Handler):
+    """Logging handler that routes ``nest.*`` log records to the Rich console.
+
+    Bridges stdlib ``logging`` to ``ui.messages`` so library code can stay
+    UI-agnostic (using ``logger.warning(...)``) while still surfacing
+    user-relevant messages during CLI runs.
+
+    Filters:
+        - Only records from the ``nest`` namespace are emitted (third-party
+          loggers are already silenced in ``cli/main.py``).
+        - The ``nest.error_log.*`` namespace is excluded; those records are
+          file-only sync error logs (see :func:`setup_error_logger`).
+
+    Routing:
+        - ``WARNING`` → :func:`nest.ui.messages.warning`
+        - ``ERROR`` / ``CRITICAL`` → :func:`nest.ui.messages.error`
+        - Lower levels are ignored.
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        # Lazy import to avoid a circular import at module load
+        # (ui.messages -> rich; logger.py is imported very early).
+        from nest.ui.messages import error as ui_error
+        from nest.ui.messages import warning as ui_warning
+
+        name = record.name
+        if not (name == "nest" or name.startswith("nest.")):
+            return
+        if name.startswith("nest.error_log."):
+            return
+
+        try:
+            message = record.getMessage()
+        except Exception:  # noqa: BLE001 - never let logging crash the app
+            self.handleError(record)
+            return
+
+        if record.levelno >= logging.ERROR:
+            ui_error(message)
+        elif record.levelno >= logging.WARNING:
+            ui_warning(message)
+
+
+def install_rich_console_handler() -> None:
+    """Attach :class:`RichConsoleHandler` to the ``nest`` logger once.
+
+    Idempotent: re-invocation will not add duplicate handlers. Intended to
+    be called from the CLI entry point so library code (adapters/services)
+    can emit user-visible messages via standard ``logger.warning(...)``
+    calls without importing UI modules.
+    """
+    nest_logger = logging.getLogger("nest")
+    if nest_logger.level > logging.WARNING or nest_logger.level == logging.NOTSET:
+        nest_logger.setLevel(logging.WARNING)
+
+    for existing in nest_logger.handlers:
+        if isinstance(existing, RichConsoleHandler):
+            return
+
+    nest_logger.addHandler(RichConsoleHandler(level=logging.WARNING))
