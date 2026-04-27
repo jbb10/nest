@@ -2,6 +2,19 @@
 
 All notable changes to Nest.
 
+## [v1.3.0] - 2026-04-27
+
+### Bug Fixes
+
+- **file_discovery**: keep symlinked files under sources dir, skip broken links
+
+### Features
+
+- **logger**: route nest.* log warnings/errors to Rich console
+
+### Maintenance
+
+- update uv.lock
 ## [v1.2.1] - 2026-04-20
 
 ### Bug Fixes
