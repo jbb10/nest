@@ -4,9 +4,13 @@ This module provides the FileDiscoveryAdapter which implements recursive
 file discovery with extension filtering.
 """
 
+import logging
+import os
 from pathlib import Path
 
 from nest.adapters.protocols import FileDiscoveryProtocol
+
+logger = logging.getLogger(__name__)
 
 
 class FileDiscoveryAdapter(FileDiscoveryProtocol):
@@ -38,7 +42,14 @@ class FileDiscoveryAdapter(FileDiscoveryProtocol):
         discovered: list[Path] = []
 
         for path in directory.rglob("*"):
+            # Warn about broken symlinks (target missing) and skip them.
+            # is_symlink() does not follow the link; exists() does.
+            if path.is_symlink() and not path.exists():
+                logger.warning("Skipping broken symlink: %s", path)
+                continue
+
             # Ensure it's a regular file (skips directories, sockets, devices, etc.)
+            # is_file() follows symlinks, so symlinked files are accepted.
             if not path.is_file():
                 continue
 
@@ -52,7 +63,10 @@ class FileDiscoveryAdapter(FileDiscoveryProtocol):
 
             # Check extension (case-insensitive)
             if path.suffix.lower() in normalized_extensions:
-                discovered.append(path.resolve())
+                # Use abspath() rather than resolve() so symlinks remain under
+                # the sources directory (resolve() would dereference the link
+                # to its real location, breaking relative_to(sources_dir)).
+                discovered.append(Path(os.path.abspath(path)))
 
         # Sort for deterministic ordering
         return sorted(discovered)

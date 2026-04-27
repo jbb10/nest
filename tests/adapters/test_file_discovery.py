@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.protocols import FileDiscoveryProtocol
 
@@ -190,3 +192,55 @@ class TestFileDiscoveryAdapter:
 
         # Assert
         assert len(result) == 0
+
+    def test_symlinked_file_is_discovered_under_sources_dir(self, tmp_path: Path) -> None:
+        """Symlinks to files outside the search dir must remain under it.
+
+        Regression: previously discover() called Path.resolve() which dereferenced
+        symlinks to their real (external) location, breaking
+        Path.relative_to(sources_dir) downstream in DiscoveryService.
+        """
+        # Arrange: real file lives outside the sources directory
+        external_dir = tmp_path / "external"
+        external_dir.mkdir()
+        real_file = external_dir / "stakeholders.xlsx"
+        real_file.write_bytes(b"xlsx content")
+
+        sources_dir = tmp_path / "sources"
+        sources_dir.mkdir()
+        link = sources_dir / "stakeholders.xlsx"
+        link.symlink_to(real_file)
+
+        adapter = FileDiscoveryAdapter()
+
+        # Act
+        result = adapter.discover(sources_dir, {".xlsx"})
+
+        # Assert
+        assert len(result) == 1
+        # Path must remain under sources_dir, not be resolved to external_dir
+        assert result[0].is_relative_to(sources_dir)
+        assert result[0].name == "stakeholders.xlsx"
+        # And it must still be readable through the link
+        assert result[0].read_bytes() == b"xlsx content"
+
+    def test_broken_symlink_is_skipped_with_warning(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Broken symlinks should be skipped and logged, not crash discovery."""
+        import logging
+
+        # Arrange
+        (tmp_path / "good.pdf").write_bytes(b"pdf")
+        (tmp_path / "dangling.pdf").symlink_to(tmp_path / "does_not_exist.pdf")
+
+        adapter = FileDiscoveryAdapter()
+
+        # Act
+        with caplog.at_level(logging.WARNING, logger="nest.adapters.file_discovery"):
+            result = adapter.discover(tmp_path, {".pdf"})
+
+        # Assert
+        assert len(result) == 1
+        assert result[0].name == "good.pdf"
+        assert any("broken symlink" in rec.message.lower() for rec in caplog.records)
