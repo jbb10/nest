@@ -1,0 +1,1 @@
+This image contains a diagram or flowchart. Reproduce it as a Mermaid diagram in a fenced ```mermaid code block. Use the correct Mermaid diagram type (flowchart, sequenceDiagram, classDiagram, etc.). Capture all nodes, edges, and labels. Do not add a prose description.

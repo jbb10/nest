@@ -12,6 +12,7 @@ import base64
 import io
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from docling.datamodel.document import ConversionResult
@@ -24,17 +25,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_PROMPTS_DIR = Path(__file__).parent / "prompts"
 MERMAID_PROMPT = (
-    "This image contains a diagram or flowchart. "
-    "Reproduce it as a Mermaid diagram in a fenced ```mermaid code block. "
-    "Use the correct Mermaid diagram type (flowchart, sequenceDiagram, classDiagram, etc.). "
-    "Capture all nodes, edges, and labels. Do not add a prose description."
+    (_PROMPTS_DIR / "picture_mermaid_prompt.md").read_text(encoding="utf-8").rstrip("\n")
 )
-
 DESCRIPTION_PROMPT = (
-    "Describe this image concisely and accurately. "
-    "If it contains a chart or graph, summarize the key data points and trends. "
-    "Focus on information that would be useful in a technical document."
+    (_PROMPTS_DIR / "picture_description_prompt.md").read_text(encoding="utf-8").rstrip("\n")
 )
 
 MERMAID_LABELS: frozenset[str] = frozenset({"flow_chart", "block_diagram"})

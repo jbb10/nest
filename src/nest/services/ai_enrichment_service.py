@@ -8,6 +8,7 @@ trigger LLM calls. Unchanged files carry forward existing descriptions.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from nest.core.models import AIEnrichmentResult, FileMetadata
@@ -17,13 +18,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ENRICHMENT_SYSTEM_PROMPT = (
-    "You are a technical documentation assistant. "
-    "Write a concise description of the given document in at most 10 words. "
-    "Output ONLY the description text, nothing else. "
-    "Do NOT use pipe characters (|) in your output. "
-    "Do NOT include quotes around the description."
-)
+_PROMPT_FILE = Path(__file__).parent / "prompts" / "enrichment_system_prompt.md"
+ENRICHMENT_SYSTEM_PROMPT = _PROMPT_FILE.read_text(encoding="utf-8").rstrip("\n")
 
 
 class AIEnrichmentService:

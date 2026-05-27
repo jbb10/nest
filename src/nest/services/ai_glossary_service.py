@@ -20,28 +20,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-GLOSSARY_SYSTEM_PROMPT = (
-    "You are a technical glossary assistant. Given a project document (or a section "
-    "of one), extract every term that a consultant or developer joining this project "
-    "would need to look up.\n\n"
-    "{PROJECT_CONTEXT_BLOCK}\n\n"
-    "Extract terms into this EXACT format, one per line, no header row, no other text:\n"
-    "| <Term> | <Category> | <Definition> |\n\n"
-    "Categories: Acronym, Organization, Product/Platform, Domain Term, Role, "
-    "Standard, System\n\n"
-    "Rules:\n"
-    "- INCLUDE: project-specific acronyms, client/vendor/partner names, named "
-    "products and platforms, industry-specific standards, regulatory bodies, "
-    "custom roles, integration systems, and any term whose meaning in THIS "
-    "project would not be obvious.\n"
-    "- EXCLUDE: universally known technical terms (e.g., API, HTTP, JSON, Agile, "
-    "CI/CD). The test: would a senior technical consultant already know this "
-    "without project context? If yes, exclude it.\n"
-    "- Definitions must be at most 10 words, referencing the project context where possible.\n"
-    "- For acronyms, include the expansion in the definition.\n"
-    "- Do NOT use pipe characters (|) within any cell value.\n"
-    "- If no glossary-worthy terms are found, output nothing."
-)
+_PROMPT_FILE = Path(__file__).parent / "prompts" / "glossary_system_prompt.md"
+GLOSSARY_SYSTEM_PROMPT = _PROMPT_FILE.read_text(encoding="utf-8").rstrip("\n")
 
 VALID_CATEGORIES = {
     "Acronym",
@@ -158,9 +138,13 @@ class AIGlossaryService:
                     already_extracted.add(term_lower)
                     terms_added += 1
 
-        # Write glossary if we have new terms
+        # Write glossary if we have new terms, or create an empty one so the
+        # sync-service backfill check (`not glossary_path.exists()`) does not
+        # re-invoke AI on every subsequent sync when no terms were extracted.
         if new_rows:
             self._write_glossary(glossary_path, existing_rows, new_rows)
+        elif files_processed > 0 and not glossary_path.exists():
+            self._write_glossary(glossary_path, existing_rows, [])
 
         return AIGlossaryResult(
             terms_added=terms_added,
