@@ -2,6 +2,11 @@
 
 All notable changes to Nest.
 
+## [v1.3.1] - 2026-05-28
+
+### Refactoring
+
+- **services**: extract AI prompts to external files and improve glossary prompt
 ## [v1.3.0] - 2026-04-27
 
 ### Bug Fixes
