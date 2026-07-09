@@ -2,6 +2,11 @@
 
 All notable changes to Nest.
 
+## [v1.3.2] - 2026-07-09
+
+### Bug Fixes
+
+- **build**: remove redundant force-include causing wheel build failure
 ## [v1.3.1] - 2026-05-28
 
 ### Refactoring
