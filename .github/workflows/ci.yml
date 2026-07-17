@@ -1,0 +1,96 @@
+name: CI
+
+# Continuous integration gate.
+# Runs on every pull request targeting main and on direct pushes to main.
+# main is protected: this workflow must pass before a PR can be merged.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Fail fast and keep uv output deterministic in CI.
+  UV_FROZEN: "1"
+
+jobs:
+  # ── Static quality gate: lint, formatting, and strict type checking ──────────
+  quality:
+    name: Lint · Format · Types
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install project + dev dependencies
+        run: uv sync --dev
+
+      - name: Lint (ruff)
+        run: make lint
+
+      - name: Format check (ruff)
+        run: make format-check
+
+      - name: Type check (pyright strict)
+        run: make typecheck
+
+  # ── Unit / integration test matrix across supported Python versions ──────────
+  # e2e tests are intentionally excluded here: they require ~1.5 GB of Docling
+  # ML models and are far too slow/heavy for per-PR CI. They run locally via
+  # `make test-e2e` and as part of the local `make ci` release gate.
+  test:
+    name: Tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install project + dev dependencies
+        run: uv sync --dev
+
+      - name: Run unit & integration tests
+        run: make test
+
+  # ── Aggregate status check ───────────────────────────────────────────────────
+  # Single required check to configure in branch protection, independent of the
+  # matrix dimensions above.
+  ci-success:
+    name: CI success
+    if: always()
+    needs: [quality, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all jobs succeeded
+        run: |
+          if [ "${{ needs.quality.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ]; then
+            echo "One or more CI jobs failed."
+            exit 1
+          fi
+          echo "All CI jobs passed."

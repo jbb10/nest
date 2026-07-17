@@ -1,5 +1,9 @@
 # Nest
 
+[![CI](https://github.com/jbb10/nest/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jbb10/nest/actions/workflows/ci.yml)
+[![Release](https://github.com/jbb10/nest/actions/workflows/release.yml/badge.svg)](https://github.com/jbb10/nest/actions/workflows/release.yml)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+
 **Turn your project documents into an AI-powered knowledge base for VS Code Copilot.**
 
 Drop PDFs, Excel files, and PowerPoints into a folder. Nest converts them to Markdown and creates a custom **Nest** agent that knows your project inside and out.
@@ -221,7 +225,7 @@ uv run pyright
 
 The codebase uses a **protocol-based dependency injection** pattern — adapters implement protocols, services consume them. See `src/nest/adapters/protocols.py` for the interface definitions.
 
-**Branching:** Feature branches off `main`, merged via PR. Use `feat/`, `fix/`, or `chore/` prefixes.
+**Branching, CI, and releases:** `main` is protected and always releasable. Work happens on short-lived `feat/`, `fix/`, `chore/`, `docs/`, or `ci/` branches, merged via PR after CI passes. Commits and PR titles follow [Conventional Commits](https://www.conventionalcommits.org/), which drive the automated version bump and changelog. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full branching and release-pipeline architecture.
 
 ---
 

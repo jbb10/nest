@@ -1,0 +1,82 @@
+name: Release
+
+# Release pipeline.
+#
+# Trigger: a semver tag (vX.Y.Z) is pushed to the repository. Tags are created
+# and pushed by the local `scripts/release.sh` flow (or `make release`), which
+# bumps the version, regenerates CHANGELOG.md, runs the full `make ci` gate, and
+# pushes the commit + tag. This workflow turns that tag into a real, published
+# GitHub Release.
+#
+# Responsibilities:
+#   1. Verify the pushed tag matches the version declared in pyproject.toml.
+#   2. Build the sdist + wheel with a clean, reproducible toolchain.
+#   3. Extract the release notes for this version from the changelog.
+#   4. Publish a GitHub Release with the notes and build artifacts attached.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history for changelog)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Resolve version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >>"$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >>"$GITHUB_OUTPUT"
+
+      - name: Verify tag matches pyproject.toml version
+        run: |
+          PROJECT_VERSION="$(uv version --short 2>/dev/null || \
+            grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')"
+          echo "Tag version:     ${{ steps.version.outputs.version }}"
+          echo "Project version: ${PROJECT_VERSION}"
+          if [ "${PROJECT_VERSION}" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::Tag ${{ steps.version.outputs.tag }} does not match pyproject.toml version ${PROJECT_VERSION}."
+            exit 1
+          fi
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Generate release notes
+        id: notes
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        env:
+          OUTPUT: RELEASE_NOTES.md
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: ${{ steps.notes.outputs.changelog }}
+          files: dist/*
+          fail_on_unmatched_files: true
