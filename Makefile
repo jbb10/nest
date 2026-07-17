@@ -9,10 +9,12 @@
 #   test         — Run unit/integration tests (excludes e2e)
 #   test-e2e     — Run end-to-end tests (requires Docling models)
 #   test-all     — Run all tests
-#   ci           — Full pre-release validation suite
-#   release      — Run release script
+#   ci           — Full local validation suite (matches GitHub Actions CI)
+#
+# Releases are cut automatically by release-please in CI — there is no local
+# release target. See CONTRIBUTING.md.
 
-.PHONY: lint format-check format typecheck test test-e2e test-all ci release
+.PHONY: lint format-check format typecheck test test-e2e test-all ci
 
 lint:
 	uv run ruff check .
@@ -35,6 +37,3 @@ test-e2e:
 test-all: test test-e2e
 
 ci: lint format-check typecheck test-all
-
-release:
-	./scripts/release.sh --yes

@@ -38,7 +38,8 @@ gitGraph
    commit id: "test: cover"
    checkout main
    merge feat/example tag: "squash-merge"
-   commit id: "v1.4.0" tag: "release.sh → v1.4.0"
+   commit id: "release PR"
+   commit id: "v1.4.0" tag: "release-please"
 ```
 
 ---
@@ -47,8 +48,8 @@ gitGraph
 
 All commits and PR titles follow
 [Conventional Commits](https://www.conventionalcommits.org/). This is not
-cosmetic: the release tooling (`git-cliff` + `scripts/release.sh`) derives the
-semantic version bump and the changelog directly from commit subjects.
+cosmetic: **release-please** derives the semantic version bump and the changelog
+directly from commit subjects on `main`.
 
 ```
 <type>(<optional scope>): <subject>
@@ -63,7 +64,8 @@ feat!: drop Python 3.9 support        # breaking change → major
 - `feat!:` / `fix!:` / `BREAKING CHANGE:` → **major** bump
 
 PRs are **squash-merged**, so the PR title becomes the commit subject on `main`.
-The `PR Title` workflow enforces the Conventional Commit format.
+The `PR Validation` workflow enforces the Conventional Commit format (and checks
+the branch-name convention).
 
 ---
 
@@ -96,18 +98,20 @@ Two workflows guard every pull request (see [.github/workflows/](.github/workflo
 - **CI** (`ci.yml`) — runs on every PR to `main` and on pushes to `main`:
   - `quality`: lint, format check, and strict `pyright` type checking.
   - `test`: unit + integration tests across Python 3.10, 3.11, and 3.12.
+  - `e2e`: full end-to-end suite against real Docling. The ~2.5 GB of ML models
+    are cached between runs; AI-gated tests use the shared test proxy from
+    `tests/e2e/conftest.py`.
   - `ci-success`: single aggregate check to require in branch protection.
 
-  e2e tests are **not** run in CI: they need ~1.5 GB of Docling ML models and
-  are far too slow/heavy per PR. Run them locally with `make test-e2e`.
+- **PR Validation** (`pr-validation.yml`) — validates the Conventional Commit
+  format of the PR title (required) and the branch-name convention (advisory).
 
-- **PR Title** (`pr-title.yml`) — validates the Conventional Commit format of
-  the PR title so squash-merge subjects stay release-compatible.
+### Branch protection for `main`
 
-### Recommended branch protection for `main`
+Configured to enforce the trunk-based flow:
 
-- Require a pull request before merging (at least 1 approval).
-- Require the **`CI success`** status check to pass.
+- Require a pull request before merging.
+- Require the **`CI success`** and **`Validate PR title`** status checks to pass.
 - Require branches to be up to date before merging.
 - Require linear history (squash-merge only).
 
@@ -115,51 +119,34 @@ Two workflows guard every pull request (see [.github/workflows/](.github/workflo
 
 ## Release pipeline
 
-Releasing is a two-stage pipeline: a **local, guarded step** that produces the
-version bump and tag, and a **CI step** that publishes the release.
+Releases are **fully automated by [release-please](https://github.com/googleapis/release-please)** —
+there is no local release script. A release is simply: the change is on `main`,
+tagged with a proper semver tag, and published as a GitHub Release with generated
+notes.
 
-### 1. Cut the release locally
+### How it works
 
-From an up-to-date `main`:
+1. Every push to `main` runs the **Release** workflow (`release.yml`), which
+   inspects the Conventional Commits since the last release and maintains a
+   standing **release PR** that bumps the version (`pyproject.toml` and
+   `src/nest/__init__.py`) and updates `CHANGELOG.md`.
+2. **Merging that release PR** makes release-please create the `vX.Y.Z` git tag
+   and a GitHub Release with the accumulated notes.
+3. The workflow then builds the sdist + wheel with `uv build` and attaches them
+   to the release.
 
-```bash
-make release          # → ./scripts/release.sh --yes
-```
-
-`scripts/release.sh`:
-
-1. Verifies a clean working tree on `main` and pulls the latest.
-2. Determines the bump (major/minor/patch) from Conventional Commits since the
-   last tag (override with `--patch` / `--minor` / `--major`).
-3. Updates `pyproject.toml` and `src/nest/__init__.py`.
-4. Regenerates `CHANGELOG.md` with `git-cliff`.
-5. Runs the full `make ci` gate and rolls back on failure.
-6. Creates the `chore(release): vX.Y.Z` commit, the annotated `vX.Y.Z` tag, and
-   moves the `latest` tag.
-7. Pushes the branch and tags after a final confirmation.
-
-Requires: `uv`, `git`, `git-cliff`, `perl`.
-
-### 2. Publish via GitHub Actions
-
-Pushing the `vX.Y.Z` tag triggers the **Release** workflow (`release.yml`),
-which:
-
-1. Verifies the tag matches the `pyproject.toml` version.
-2. Builds the sdist + wheel with `uv build`.
-3. Extracts the release notes for the version with `git-cliff`.
-4. Publishes a GitHub Release with the notes and build artifacts attached.
+That's the whole release: review and merge the release PR when you want to ship.
+The version bump is derived from commit types (`feat` → minor, `fix` → patch,
+`feat!`/`BREAKING CHANGE:` → major).
 
 ```mermaid
 flowchart LR
-    A[PR merged to main] --> B[make release]
-    B --> C[bump + changelog + make ci]
-    C --> D[commit + tag vX.Y.Z]
-    D --> E[git push tag]
-    E --> F[release.yml]
-    F --> G[uv build]
-    F --> H[git-cliff notes]
-    G & H --> I[GitHub Release]
+    A[PRs merged to main] --> B[release.yml on push]
+    B --> C[release-please opens/updates release PR]
+    C --> D[maintainer merges release PR]
+    D --> E[tag vX.Y.Z + GitHub Release + notes]
+    E --> F[uv build]
+    F --> G[artifacts attached to release]
 ```
 
 ### Installing a released version
@@ -167,5 +154,4 @@ flowchart LR
 ```bash
 uv tool install git+https://github.com/jbb10/nest            # latest default branch
 uv tool install git+https://github.com/jbb10/nest@vX.Y.Z     # a specific release
-uv tool install git+https://github.com/jbb10/nest@latest     # newest release tag
 ```

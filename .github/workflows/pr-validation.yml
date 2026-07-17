@@ -1,0 +1,70 @@
+name: PR Validation
+
+# Guards that keep pull requests compatible with the automated release pipeline.
+#
+# Because releases are cut by release-please from the Conventional Commit history
+# on main, and PRs are squash-merged (the PR title becomes the commit subject),
+# a well-formed PR title is what keeps semantic versioning and changelog
+# generation automatic. Branch-name validation is a lighter convention check.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+concurrency:
+  group: pr-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Conventional Commit PR title (required) ──────────────────────────────────
+  title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Conventional Commit format
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Allowed types mirror release-please-config.json changelog-sections.
+          types: |
+            feat
+            fix
+            docs
+            perf
+            refactor
+            test
+            chore
+            ci
+            build
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The PR title subject must start with a lowercase letter, e.g.
+            "feat(sync): add parallel processing".
+
+  # ── Branch naming convention (advisory) ──────────────────────────────────────
+  # Optional convention check. Automated branches (release-please, dependabot)
+  # are exempt.
+  branch-name:
+    name: Validate branch name
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name prefix
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          if [[ "$BRANCH" == release-please--* || "$BRANCH" == dependabot/* ]]; then
+            echo "Automated branch '$BRANCH' — skipping convention check."
+            exit 0
+          fi
+          if [[ "$BRANCH" =~ ^(feat|fix|docs|refactor|test|chore|ci|build|perf)/[a-z0-9._-]+$ ]]; then
+            echo "Branch name '$BRANCH' follows the convention."
+            exit 0
+          fi
+          echo "::error::Branch '$BRANCH' does not follow the naming convention."
+          echo "Expected: <type>/<short-description>, e.g. feat/sync-parallelism"
+          echo "Allowed types: feat, fix, docs, refactor, test, chore, ci, build, perf"
+          exit 1

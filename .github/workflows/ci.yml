@@ -49,9 +49,7 @@ jobs:
         run: make typecheck
 
   # ── Unit / integration test matrix across supported Python versions ──────────
-  # e2e tests are intentionally excluded here: they require ~1.5 GB of Docling
-  # ML models and are far too slow/heavy for per-PR CI. They run locally via
-  # `make test-e2e` and as part of the local `make ci` release gate.
+  # Fast tests only. The full e2e suite runs in the dedicated `e2e` job below.
   test:
     name: Tests (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -77,19 +75,55 @@ jobs:
       - name: Run unit & integration tests
         run: make test
 
+  # ── End-to-end tests ─────────────────────────────────────────────────────────
+  # Full e2e suite against real Docling. Requires ~2.5 GB of ML models, which we
+  # cache between runs. Run on a single Python version to keep runtime bounded.
+  # AI-gated e2e tests use the shared test proxy configured in tests/e2e/conftest.py.
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install project + dev dependencies
+        run: uv sync --dev
+
+      - name: Cache Docling ML models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/docling
+          key: docling-models-v1
+
+      - name: Download Docling models (if not cached)
+        run: >-
+          uv run python -c "from nest.adapters.docling_downloader import
+          DoclingModelDownloader as D; D().download_if_needed(progress=False)"
+
+      - name: Run end-to-end tests
+        run: make test-e2e
+
   # ── Aggregate status check ───────────────────────────────────────────────────
   # Single required check to configure in branch protection, independent of the
   # matrix dimensions above.
   ci-success:
     name: CI success
     if: always()
-    needs: [quality, test]
+    needs: [quality, test, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all jobs succeeded
         run: |
           if [ "${{ needs.quality.result }}" != "success" ] || \
-             [ "${{ needs.test.result }}" != "success" ]; then
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.e2e.result }}" != "success" ]; then
             echo "One or more CI jobs failed."
             exit 1
           fi

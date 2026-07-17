@@ -1,82 +1,64 @@
 name: Release
 
-# Release pipeline.
+# Continuous delivery via release-please.
 #
-# Trigger: a semver tag (vX.Y.Z) is pushed to the repository. Tags are created
-# and pushed by the local `scripts/release.sh` flow (or `make release`), which
-# bumps the version, regenerates CHANGELOG.md, runs the full `make ci` gate, and
-# pushes the commit + tag. This workflow turns that tag into a real, published
-# GitHub Release.
+# A "release" is: the change is on main, tagged with a proper semver tag, and
+# published as a GitHub Release with generated notes. This workflow makes that
+# fully automatic and driven entirely from the pipeline (no local scripts).
 #
-# Responsibilities:
-#   1. Verify the pushed tag matches the version declared in pyproject.toml.
-#   2. Build the sdist + wheel with a clean, reproducible toolchain.
-#   3. Extract the release notes for this version from the changelog.
-#   4. Publish a GitHub Release with the notes and build artifacts attached.
+# How it works:
+#   1. On every push to main, release-please inspects the Conventional Commits
+#      since the last release and maintains a standing "release PR" that bumps
+#      the version (pyproject.toml + src/nest/__init__.py) and updates
+#      CHANGELOG.md.
+#   2. When you merge that release PR, release-please creates the git tag and a
+#      GitHub Release with the accumulated notes.
+#   3. This workflow then builds the sdist + wheel and attaches them to the
+#      release.
 on:
   push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+    branches: [main]
 
+# Never cancel a release mid-flight.
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
-  release:
-    name: Build & publish release
+  release-please:
+    name: Release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (full history for changelog)
-        uses: actions/checkout@v4
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@v4
         with:
-          fetch-depth: 0
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
+
+      # The steps below only run when a release was actually created
+      # (i.e. a release PR was merged in this push).
+      - name: Checkout
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
 
       - name: Set up uv
+        if: ${{ steps.release.outputs.release_created }}
         uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
-      - name: Resolve version from tag
-        id: version
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
-          echo "tag=${TAG}" >>"$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >>"$GITHUB_OUTPUT"
-
-      - name: Verify tag matches pyproject.toml version
-        run: |
-          PROJECT_VERSION="$(uv version --short 2>/dev/null || \
-            grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')"
-          echo "Tag version:     ${{ steps.version.outputs.version }}"
-          echo "Project version: ${PROJECT_VERSION}"
-          if [ "${PROJECT_VERSION}" != "${{ steps.version.outputs.version }}" ]; then
-            echo "::error::Tag ${{ steps.version.outputs.tag }} does not match pyproject.toml version ${PROJECT_VERSION}."
-            exit 1
-          fi
-
       - name: Build sdist and wheel
+        if: ${{ steps.release.outputs.release_created }}
         run: uv build
 
-      - name: Generate release notes
-        id: notes
-        uses: orhun/git-cliff-action@v4
-        with:
-          config: cliff.toml
-          args: --latest --strip header
+      - name: Attach artifacts to the release
+        if: ${{ steps.release.outputs.release_created }}
         env:
-          OUTPUT: RELEASE_NOTES.md
-
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: ${{ steps.version.outputs.tag }}
-          body_path: ${{ steps.notes.outputs.changelog }}
-          files: dist/*
-          fail_on_unmatched_files: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.release.outputs.tag_name }}" dist/* --clobber
