@@ -97,7 +97,8 @@ Two workflows guard every pull request (see [.github/workflows/](.github/workflo
 
 - **CI** (`ci.yml`) — runs on every PR to `main` and on pushes to `main`:
   - `quality`: lint, format check, and strict `pyright` type checking.
-  - `test`: unit + integration tests across Python 3.10, 3.11, and 3.12.
+  - `test`: unit + integration tests (single run — `uv` installs a compatible
+    Python from the project's `requires-python`).
   - `e2e`: full end-to-end suite against real Docling. The ~2.5 GB of ML models
     are cached between runs; AI-gated tests use the shared test proxy from
     `tests/e2e/conftest.py`.
@@ -123,20 +124,25 @@ Releases are **fully automated by [release-please](https://github.com/googleapis
 there is no local release script. A release is simply: the change is on `main`,
 tagged with a proper semver tag, and published as a GitHub Release with generated
 notes.
+The day-to-day flow
 
-### How it works
+A developer merging a feature PR **does not** wait for release-please and does
+**not** approve anything extra. You just merge your feature PR and move on.
 
-1. Every push to `main` runs the **Release** workflow (`release.yml`), which
-   inspects the Conventional Commits since the last release and maintains a
-   standing **release PR** that bumps the version (`pyproject.toml` and
-   `src/nest/__init__.py`) and updates `CHANGELOG.md`.
-2. **Merging that release PR** makes release-please create the `vX.Y.Z` git tag
-   and a GitHub Release with the accumulated notes.
-3. The workflow then builds the sdist + wheel with `uv build` and attaches them
-   to the release.
+1. **Merge your feature/fix PR** to `main`. That's it — your work is done. CI
+   publishes nothing yet.
+2. In the background, release-please keeps a **release PR** (branch
+   `release-please--main`, titled e.g. *"chore(main): release nest 1.4.0"*)
+   open and continuously up to date. It accumulates every merged Conventional
+   Commit, computes the next version, and previews the `CHANGELOG.md` entries.
+   You never edit this by hand — it regenerates itself on each merge.
+3. **When the maintainer decides "let's cut a release"**, they simply merge that
+   existing release PR. This is the single deliberate human action.
+4. On that merge, release-please creates the `vX.Y.Z` tag and the GitHub Release
+   with notes, and the workflow attaches the built `dist/*` artifacts.
 
-That's the whole release: review and merge the release PR when you want to ship.
-The version bump is derived from commit types (`feat` → minor, `fix` → patch,
+In short: feature-PR authors merge and forget; the **only** deliberate step is
+the maintainer merging the standing release PR whenever they want to shipmmit types (`feat` → minor, `fix` → patch,
 `feat!`/`BREAKING CHANGE:` → major).
 
 ```mermaid
