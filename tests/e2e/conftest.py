@@ -19,8 +19,8 @@ import pytest
 _TEST_AI_DEFAULTS: dict[str, str] = {
     "NEST_AI_ENDPOINT": "https://jbb-ai-proxy.azurewebsites.net/v1",
     "NEST_AI_API_KEY": "sk-uL2extH7mOufI0Y5FYAtDg",
-    "NEST_AI_MODEL": "gpt-4.1",
-    "NEST_AI_VISION_MODEL": "gpt-4.1",
+    "NEST_AI_MODEL": "gpt-5-nano",
+    "NEST_AI_VISION_MODEL": "gpt-5-nano",
 }
 
 for _key, _val in _TEST_AI_DEFAULTS.items():

@@ -73,11 +73,15 @@ jobs:
 
   # ── End-to-end tests ─────────────────────────────────────────────────────────
   # Full e2e suite against real Docling. Requires ~2.5 GB of ML models, which we
-  # cache between runs. Run on a single Python version to keep runtime bounded.
+  # cache between runs. Runs on all supported platforms (public repo = free).
   # AI-gated e2e tests use the shared test proxy configured in tests/e2e/conftest.py.
   e2e:
-    name: E2E tests
-    runs-on: ubuntu-latest
+    name: E2E tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -95,16 +99,20 @@ jobs:
       - name: Cache Docling ML models
         uses: actions/cache@v4
         with:
-          path: ~/.cache/docling
+          path: |
+            ~/.cache/docling
+            ~\AppData\Local\docling\cache
           key: docling-models-v1
 
       - name: Download Docling models (if not cached)
+        shell: bash
         run: >-
           uv run python -c "from nest.adapters.docling_downloader import
           DoclingModelDownloader as D; D().download_if_needed(progress=False)"
 
       - name: Run end-to-end tests
-        run: make test-e2e
+        shell: bash
+        run: uv run pytest -m "e2e" --timeout=60 -v
 
   # ── Aggregate status check ───────────────────────────────────────────────────
   # Single required check to configure in branch protection, independent of the

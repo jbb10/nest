@@ -1,5 +1,6 @@
 """Tests for sync command CLI."""
 
+import re
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -12,6 +13,14 @@ from nest.core.models import SyncResult
 from nest.core.paths import AI_SEEN_MARKER, NEST_META_DIR
 
 runner = CliRunner()
+
+# Rich/Typer emits ANSI escape sequences in help output.  Strip them before
+# asserting flag names so tests work reliably on CI and locally.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+
+
+def _plain(output: str) -> str:
+    return _ANSI_RE.sub("", output)
 
 
 class TestValidateOnError:
@@ -43,12 +52,13 @@ class TestSyncCommandHelp:
         result = runner.invoke(app, ["sync", "--help"])
 
         assert result.exit_code == 0
-        assert "--on-error" in result.output
-        assert "--dry-run" in result.output
-        assert "--force" in result.output
-        assert "--no-clean" in result.output
-        assert "--no-ai" in result.output
-        assert "--dir" in result.output
+        output = _plain(result.output)
+        assert "--on-error" in output
+        assert "--dry-run" in output
+        assert "--force" in output
+        assert "--no-clean" in output
+        assert "--no-ai" in output
+        assert "--dir" in output
 
 
 class TestSyncCommandFlags:
@@ -58,20 +68,22 @@ class TestSyncCommandFlags:
         """Default --on-error should be 'skip'."""
         # This is tested implicitly - the CLI accepts no --on-error
         result = runner.invoke(app, ["sync", "--help"])
-        assert "default: skip" in result.output
+        assert "default: skip" in _plain(result.output)
 
     def test_dry_run_flag_accepted(self) -> None:
         """--dry-run flag should be parsed."""
         # Note: Will fail because no project exists, but flag should be parsed
         result = runner.invoke(app, ["sync", "--dry-run"])
         # Check that it didn't fail due to flag parsing
-        assert "--dry-run" not in result.output or "error" not in result.output.lower()
+        output = _plain(result.output)
+        assert "--dry-run" not in output or "error" not in output.lower()
 
     def test_force_flag_accepted(self) -> None:
         """--force flag should be parsed."""
         result = runner.invoke(app, ["sync", "--force"])
         # Check that it didn't fail due to flag parsing
-        assert "--force" not in result.output or "error" not in result.output.lower()
+        output = _plain(result.output)
+        assert "--force" not in output or "error" not in output.lower()
 
 
 class TestSyncProjectValidation:
@@ -83,19 +95,19 @@ class TestSyncProjectValidation:
         result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
 
         assert result.exit_code == 1
-        assert "No Nest project found" in result.output
+        assert "No Nest project found" in _plain(result.output)
 
     def test_sync_error_message_shows_reason(self, tmp_path: Path) -> None:
         """Error should explain why (manifest not found)."""
         result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
 
-        assert ".nest/manifest.json not found" in result.output
+        assert ".nest/manifest.json not found" in _plain(result.output)
 
     def test_sync_error_message_shows_action(self, tmp_path: Path) -> None:
         """Error should suggest running nest init."""
         result = runner.invoke(app, ["sync", "--dir", str(tmp_path)])
 
-        assert "nest init" in result.output
+        assert "nest init" in _plain(result.output)
 
 
 class TestDisplaySyncSummaryAggregatedTokens:
