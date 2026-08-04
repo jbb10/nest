@@ -110,7 +110,7 @@ jobs:
           path: |
             ~/.cache/docling
             ~\AppData\Local\docling\cache
-          key: docling-models-v1
+          key: docling-models-v2
 
       - name: Download Docling models (if not cached)
         shell: bash
