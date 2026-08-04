@@ -74,6 +74,7 @@ jobs:
   # ── End-to-end tests ─────────────────────────────────────────────────────────
   # Full e2e suite against real Docling. Requires ~2.5 GB of ML models, which we
   # cache between runs. Runs on all supported platforms (public repo = free).
+  # macOS needs gfortran (scipy build dep); windows needs UTF-8 mode for Rich.
   # AI-gated e2e tests use the shared test proxy configured in tests/e2e/conftest.py.
   e2e:
     name: E2E tests (${{ matrix.os }})
@@ -87,6 +88,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install gfortran (macOS, scipy build dep)
+        if: runner.os == 'macOS'
+        run: brew install gfortran
+
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
@@ -95,6 +100,9 @@ jobs:
 
       - name: Install project + dev dependencies
         run: uv sync --dev
+        env:
+          # Force UTF-8 on Windows so Rich unicode output doesn't crash
+          PYTHONUTF8: "1"
 
       - name: Cache Docling ML models
         uses: actions/cache@v4
@@ -113,6 +121,8 @@ jobs:
       - name: Run end-to-end tests
         shell: bash
         run: uv run pytest -m "e2e" --timeout=60 -v
+        env:
+          PYTHONUTF8: "1"
 
   # ── Aggregate status check ───────────────────────────────────────────────────
   # Single required check to configure in branch protection, independent of the
