@@ -1,8 +1,8 @@
 # Contributing to Nest
 
 This document describes how changes flow from a working branch to a published
-release. The goal is a **trunk-based workflow** with a protected `main`, fast
-automated validation on every change, and a fully repeatable release pipeline.
+release. Nest uses a **trunk-based workflow**: a protected `main`, fast automated
+validation on every change, and a fully repeatable release pipeline.
 
 ---
 
@@ -124,25 +124,25 @@ Releases are **fully automated by [release-please](https://github.com/googleapis
 there is no local release script. A release is simply: the change is on `main`,
 tagged with a proper semver tag, and published as a GitHub Release with generated
 notes.
-The day-to-day flow
 
-A developer merging a feature PR **does not** wait for release-please and does
-**not** approve anything extra. You just merge your feature PR and move on.
+### The day-to-day flow
 
-1. **Merge your feature/fix PR** to `main`. That's it — your work is done. CI
-   publishes nothing yet.
-2. In the background, release-please keeps a **release PR** (branch
-   `release-please--main`, titled e.g. *"chore(main): release nest 1.4.0"*)
-   open and continuously up to date. It accumulates every merged Conventional
-   Commit, computes the next version, and previews the `CHANGELOG.md` entries.
-   You never edit this by hand — it regenerates itself on each merge.
-3. **When the maintainer decides "let's cut a release"**, they simply merge that
-   existing release PR. This is the single deliberate human action.
-4. On that merge, release-please creates the `vX.Y.Z` tag and the GitHub Release
-   with notes, and the workflow attaches the built `dist/*` artifacts.
+Merging a feature PR is an ordinary merge — there is no release step and nothing
+extra to approve.
 
-In short: feature-PR authors merge and forget; the **only** deliberate step is
-the maintainer merging the standing release PR whenever they want to shipmmit types (`feat` → minor, `fix` → patch,
+1. **Merge the feature/fix PR** to `main`. No release happens yet.
+2. Release-please maintains a standing **release PR** (branch
+   `release-please--main`, titled e.g. *"chore(main): release nest 1.4.0"*) that
+   stays up to date. It accumulates every merged Conventional Commit, computes
+   the next version, and previews the `CHANGELOG.md` entries. It regenerates
+   itself on each merge — it is never edited by hand.
+3. **To cut a release**, merge that release PR. This is the only deliberate
+   release action.
+4. On that merge, release-please creates the `vX.Y.Z` tag and a GitHub Release
+   with the accumulated notes, and the workflow attaches the built `dist/*`
+   artifacts.
+
+The version bump is derived from commit types (`feat` → minor, `fix` → patch,
 `feat!`/`BREAKING CHANGE:` → major).
 
 ```mermaid
