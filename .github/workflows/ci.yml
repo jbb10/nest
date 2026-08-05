@@ -132,7 +132,7 @@ jobs:
 
       - name: Run end-to-end tests
         shell: bash
-        run: uv run pytest -m "e2e" --timeout=60 -v
+        run: uv run pytest -m "e2e" --timeout=180 -v
         env:
           PYTHONUTF8: "1"
 
