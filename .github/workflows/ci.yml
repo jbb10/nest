@@ -35,6 +35,7 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
+          prune-cache: false
 
       - name: Install project + dev dependencies
         run: uv sync --dev
@@ -64,6 +65,8 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
+          prune-cache: false
+          save-cache: false
 
       - name: Install project + dev dependencies
         run: uv sync --dev
@@ -93,6 +96,9 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
+          prune-cache: false
+          # The quality job owns the shared Ubuntu cache entry.
+          save-cache: ${{ matrix.os == 'windows-latest' }}
 
       - name: Install project + dev dependencies
         run: uv sync --dev
@@ -100,19 +106,29 @@ jobs:
           # Force UTF-8 on Windows so Rich unicode output doesn't crash
           PYTHONUTF8: "1"
 
-      - name: Cache Docling ML models
-        uses: actions/cache@v4
+      - name: Restore Docling ML models
+        id: docling-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cache/docling
             ~\AppData\Local\docling\cache
           key: docling-models-v2
 
-      - name: Download Docling models (if not cached)
+      - name: Prepare Docling ML models
         shell: bash
         run: >-
           uv run python -c "from nest.adapters.docling_downloader import
           DoclingModelDownloader as D; D().download_if_needed(progress=False)"
+
+      - name: Save Docling ML models
+        if: steps.docling-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/docling
+            ~\AppData\Local\docling\cache
+          key: ${{ steps.docling-cache.outputs.cache-primary-key }}
 
       - name: Run end-to-end tests
         shell: bash

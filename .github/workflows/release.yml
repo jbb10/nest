@@ -50,8 +50,7 @@ jobs:
         if: ${{ steps.release.outputs.release_created }}
         uses: astral-sh/setup-uv@v6
         with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
+          enable-cache: false
 
       - name: Build sdist and wheel
         if: ${{ steps.release.outputs.release_created }}
