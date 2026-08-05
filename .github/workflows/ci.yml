@@ -33,9 +33,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-          prune-cache: false
+          enable-cache: false
 
       - name: Install project + dev dependencies
         run: uv sync --dev
@@ -63,10 +61,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-          prune-cache: false
-          save-cache: false
+          enable-cache: false
 
       - name: Install project + dev dependencies
         run: uv sync --dev
@@ -94,11 +89,7 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v6
         with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-          prune-cache: false
-          # The quality job owns the shared Ubuntu cache entry.
-          save-cache: ${{ matrix.os == 'windows-latest' }}
+          enable-cache: false
 
       - name: Install project + dev dependencies
         run: uv sync --dev
