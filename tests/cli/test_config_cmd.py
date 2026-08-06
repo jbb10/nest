@@ -3,11 +3,11 @@
 from pathlib import Path
 from unittest.mock import patch
 
+from tests.helpers import strip_ansi
 from typer.testing import CliRunner
 
 from nest.cli.config_cmd import _display_path, _mask_key
 from nest.cli.main import app
-from tests.helpers import strip_ansi
 
 runner = CliRunner()
 

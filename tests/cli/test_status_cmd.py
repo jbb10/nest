@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
+from tests.helpers import strip_ansi
 from typer.testing import CliRunner
 
 from nest.adapters.manifest import ManifestAdapter
 from nest.cli.main import app
 from nest.core.models import Manifest
-from tests.helpers import strip_ansi
 
 runner = CliRunner()
 

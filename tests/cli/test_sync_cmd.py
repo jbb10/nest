@@ -4,13 +4,13 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import typer
+from tests.helpers import strip_ansi
 from typer.testing import CliRunner
 
 from nest.cli.main import app
 from nest.cli.sync_cmd import _display_sync_summary, _validate_on_error
 from nest.core.models import SyncResult
 from nest.core.paths import AI_SEEN_MARKER, NEST_META_DIR
-from tests.helpers import strip_ansi
 
 runner = CliRunner()
 
