@@ -24,6 +24,8 @@ Conventional Commit type of the change:
 | `test/`    | Tests only                                | none           |
 | `chore/`   | Tooling, deps, housekeeping               | none           |
 | `ci/`      | CI/CD and pipeline changes                | none           |
+| `build/`   | Build system or packaging changes         | none           |
+| `perf/`    | Performance improvement                   | patch          |
 
 Example: `feat/sync-parallelism`, `fix/symlink-discovery`.
 

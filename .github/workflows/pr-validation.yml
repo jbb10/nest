@@ -28,7 +28,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # Allowed types mirror release-please-config.json changelog-sections.
+          # Allowed types — single source of truth: CONTRIBUTING.md.
+          # Must match the branch-name regex and release-please-config.json
+          # changelog-sections below.
           types: |
             feat
             fix
@@ -66,5 +68,5 @@ jobs:
           fi
           echo "::error::Branch '$BRANCH' does not follow the naming convention."
           echo "Expected: <type>/<short-description>, e.g. feat/sync-parallelism"
-          echo "Allowed types: feat, fix, docs, refactor, test, chore, ci, build, perf"
+          echo "Allowed types: feat, fix, docs, refactor, test, chore, ci, build, perf — see CONTRIBUTING.md"
           exit 1

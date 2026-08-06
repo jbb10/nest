@@ -3,6 +3,12 @@
   (e.g. `feat(sync): add parallel processing`) because release automation
   derives the semantic version bump from commit/PR history.
 -->
+<!--
+  Allowed types are defined in CONTRIBUTING.md (the single source of truth).
+  Current set: feat, fix, docs, perf, refactor, test, chore, ci, build.
+  See release-please-config.json changelog-sections for the corresponding
+  changelog section headings.
+-->
 
 ## Summary
 
@@ -13,7 +19,7 @@
 - [ ] `fix` — bug fix (patch)
 - [ ] `feat` — new feature (minor)
 - [ ] breaking change (`feat!` / `fix!` / `BREAKING CHANGE:`) (major)
-- [ ] `chore` / `docs` / `refactor` / `test` / `ci` (no release)
+- [ ] `chore` / `docs` / `refactor` / `test` / `ci` / `build` / `perf` (see CONTRIBUTING.md)
 
 ## Checklist
 
