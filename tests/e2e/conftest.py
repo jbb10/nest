@@ -13,12 +13,12 @@ from pathlib import Path
 
 import pytest
 
-# ── Default AI credentials for the test proxy ─────────────────────────────────
-# These are set unconditionally so that AI-gated e2e tests always run.
-# The endpoint is an Azure-hosted test proxy with a restricted key.
+# ── Default AI test-proxy settings ────────────────────────────────────────────
+# The endpoint is an Azure-hosted test proxy. The API key MUST be provided via
+# the NEST_AI_API_KEY environment variable (set as a GitHub Actions secret in
+# CI). AI-gated tests will skip when the key is absent.
 _TEST_AI_DEFAULTS: dict[str, str] = {
     "NEST_AI_ENDPOINT": "https://jbb-ai-proxy.azurewebsites.net/v1",
-    "NEST_AI_API_KEY": "sk-uL2extH7mOufI0Y5FYAtDg",
     "NEST_AI_MODEL": "gpt-5-nano",
     "NEST_AI_VISION_MODEL": "gpt-5-nano",
 }

@@ -126,6 +126,7 @@ jobs:
         run: uv run pytest -m "e2e" --timeout=180 -v
         env:
           PYTHONUTF8: "1"
+          NEST_AI_API_KEY: ${{ secrets.NEST_AI_API_KEY }}
 
   # ── Aggregate status check ───────────────────────────────────────────────────
   # Single required check to configure in branch protection, independent of the
