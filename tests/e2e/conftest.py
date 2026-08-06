@@ -122,6 +122,8 @@ def run_cli(
         args: Command arguments (without 'nest' prefix).
         cwd: Working directory for the command.
         timeout: Timeout in seconds. Default 300s for Docling processing.
+        env: Optional extra environment variables merged into the subprocess
+            environment. Falls back to os.environ defaults for AI credentials.
 
     Returns:
         CLIResult with exit code, stdout, and stderr.
