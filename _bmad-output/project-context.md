@@ -27,7 +27,7 @@ _This file contains critical rules and patterns that AI agents must follow when 
 | Pyright | strict | Type checking (matches VSCode/Pylance) |
 | Ruff | latest | Linting + formatting (replaces flake8/black/isort) |
 | pytest | latest | Testing framework |
-| git-cliff | latest | Changelog generation |
+| release-please | latest | Changelog + version automation (replaced git-cliff) |
 
 **Runtime Requirements:**
 - Docling models: ~1.5-2GB cached at `~/.cache/docling/`
@@ -309,6 +309,9 @@ git checkout -b feat/{story-key}-{short-description}
 - `refactor/` — Code restructure
 - `test/` — Test additions
 - `docs/` — Documentation
+- `ci/` — CI/CD pipeline changes
+- `build/` — Build system / packaging
+- `perf/` — Performance improvements
 
 **Conventional Commits (MANDATORY):**
 ```
@@ -329,9 +332,11 @@ feat(agent)!: change agent file format    ← Breaking change
 | `docs`, `chore`, `refactor`, `test` | None |
 
 **Commit Rules:**
-1. Scope = module name (sync, init, doctor, agent, manifest)
+1. Scope encouraged (module name: sync, init, doctor, agent, manifest) but not
+   strictly required — PRs are squash-merged so the PR title is what ends up on
+   main and what release-please reads. See CONTRIBUTING.md for details.
 2. Imperative mood ("add" not "added")
-3. Run `./scripts/ci-lint.sh` before committing
+3. Run `make ci` before committing (lint + format + types + tests — single source of truth in Makefile)
 
 ---
 
@@ -339,14 +344,16 @@ feat(agent)!: change agent file format    ← Breaking change
 
 **Before EVERY commit, run:**
 ```bash
-./scripts/ci-lint.sh && ./scripts/ci-typecheck.sh && ./scripts/ci-test.sh
+make ci          # lint + format-check + typecheck + tests (incl. e2e)
 ```
 
-**CI Scripts:**
-- `ci-lint.sh` — Ruff check + format
-- `ci-typecheck.sh` — Pyright strict
-- `ci-test.sh` — pytest with coverage
-- `ci-integration.sh` — Docling processing tests
+**CI targets (see Makefile):**
+- `make lint` — Ruff check
+- `make format-check` — Ruff format check
+- `make typecheck` — Pyright strict
+- `make test` — pytest unit/integration
+- `make test-e2e` — Docling processing tests with E2E_TIMEOUT override
+- `make scan-secrets` — gitleaks secret scan
 
 ---
 
