@@ -16,8 +16,8 @@
 
 ## Type of change
 
-- [ ] `fix` — bug fix (patch)
-- [ ] `feat` — new feature (minor)
+- [ ] `fix` - bug fix (patch)
+- [ ] `feat` - new feature (minor)
 - [ ] breaking change (`feat!` / `fix!` / `BREAKING CHANGE:`) (major)
 - [ ] `chore` / `docs` / `refactor` / `test` / `ci` / `build` / `perf` (see CONTRIBUTING.md)
 

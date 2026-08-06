@@ -28,7 +28,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          # Allowed types — single source of truth: CONTRIBUTING.md.
+          # Allowed types - single source of truth: CONTRIBUTING.md.
           # Must match the branch-name regex and release-please-config.json
           # changelog-sections below.
           types: |
@@ -59,7 +59,7 @@ jobs:
           BRANCH: ${{ github.head_ref }}
         run: |
           if [[ "$BRANCH" == release-please--* || "$BRANCH" == dependabot/* ]]; then
-            echo "Automated branch '$BRANCH' — skipping convention check."
+            echo "Automated branch '$BRANCH' - skipping convention check."
             exit 0
           fi
           if [[ "$BRANCH" =~ ^(feat|fix|docs|refactor|test|chore|ci|build|perf)/[a-z0-9._-]+$ ]]; then
@@ -68,5 +68,5 @@ jobs:
           fi
           echo "::error::Branch '$BRANCH' does not follow the naming convention."
           echo "Expected: <type>/<short-description>, e.g. feat/sync-parallelism"
-          echo "Allowed types: feat, fix, docs, refactor, test, chore, ci, build, perf — see CONTRIBUTING.md"
+          echo "Allowed types: feat, fix, docs, refactor, test, chore, ci, build, perf - see CONTRIBUTING.md"
           exit 1

@@ -4,12 +4,10 @@ This document describes how changes flow from a working branch to a published
 release. Nest uses a **trunk-based workflow**: a protected `main`, fast automated
 validation on every change, and a fully repeatable release pipeline.
 
----
-
 ## Branching strategy
 
 `main` is the single long-lived branch. It is always releasable and is
-protected — nothing lands on it except through a reviewed pull request that
+protected - nothing lands on it except through a reviewed pull request that
 passes CI.
 
 All work happens on **short-lived branches** cut from `main` and named after the
@@ -44,8 +42,6 @@ gitGraph
    commit id: "v1.4.0" tag: "release-please"
 ```
 
----
-
 ## Commit and PR conventions
 
 All commits and PR titles follow
@@ -69,8 +65,6 @@ PRs are **squash-merged**, so the PR title becomes the commit subject on `main`.
 The `PR Validation` workflow enforces the Conventional Commit format (and checks
 the branch-name convention).
 
----
-
 ## Local validation
 
 The [`Makefile`](Makefile) is the single source of truth for every check. Run
@@ -91,22 +85,20 @@ make test          # unit + integration tests (fast)
 make test-e2e      # end-to-end tests (require Docling ML models, slow)
 ```
 
----
-
 ## Continuous integration
 
 Two workflows guard every pull request (see [.github/workflows/](.github/workflows)):
 
-- **CI** (`ci.yml`) — runs on every PR to `main` and on pushes to `main`:
+- **CI** (`ci.yml`) - runs on every PR to `main` and on pushes to `main`:
   - `quality`: lint, format check, and strict `pyright` type checking.
-  - `test`: unit + integration tests (single run — `uv` installs a compatible
+  - `test`: unit + integration tests (single run - `uv` installs a compatible
     Python from the project's `requires-python`).
   - `e2e`: full end-to-end suite against real Docling. The ~2.5 GB of ML models
     are cached between runs; AI-gated tests use the shared test proxy from
     `tests/e2e/conftest.py`.
   - `ci-success`: single aggregate check to require in branch protection.
 
-- **PR Validation** (`pr-validation.yml`) — validates the Conventional Commit
+- **PR Validation** (`pr-validation.yml`) - validates the Conventional Commit
   format of the PR title (required) and the branch-name convention (advisory).
 
 ### Branch protection for `main`
@@ -118,18 +110,16 @@ Configured to enforce the trunk-based flow:
 - Require branches to be up to date before merging.
 - Require linear history (squash-merge only).
 
----
-
 ## Release pipeline
 
-Releases are **fully automated by [release-please](https://github.com/googleapis/release-please)** —
+Releases are **fully automated by [release-please](https://github.com/googleapis/release-please)** -
 there is no local release script. A release is simply: the change is on `main`,
 tagged with a proper semver tag, and published as a GitHub Release with generated
 notes.
 
 ### The day-to-day flow
 
-Merging a feature PR is an ordinary merge — there is no release step and nothing
+Merging a feature PR is an ordinary merge - there is no release step and nothing
 extra to approve.
 
 1. **Merge the feature/fix PR** to `main`. No release happens yet.
@@ -137,7 +127,7 @@ extra to approve.
    `release-please--main`, titled e.g. *"chore(main): release nest 1.4.0"*) that
    stays up to date. It accumulates every merged Conventional Commit, computes
    the next version, and previews the `CHANGELOG.md` entries. It regenerates
-   itself on each merge — it is never edited by hand.
+   itself on each merge - it is never edited by hand.
 3. **To cut a release**, merge that release PR. This is the only deliberate
    release action.
 4. On that merge, release-please creates the `vX.Y.Z` tag and a GitHub Release
