@@ -47,6 +47,15 @@ jobs:
       - name: Type check (pyright strict)
         run: make typecheck
 
+      - name: Install gitleaks
+        run: |
+          curl -sL https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz \
+            | tar xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Secret scan (gitleaks)
+        run: make scan-secrets
+
   # ── Unit / integration tests ─────────────────────────────────────────────────
   # Single, fast run. CI tests one representative Python version (uv selects a
   # compatible interpreter from the project's python requirement). The full e2e
