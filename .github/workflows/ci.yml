@@ -97,6 +97,8 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
+    env:
+      PYTHONUTF8: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -128,6 +130,7 @@ jobs:
           key: docling-models-v2-${{ runner.os }}
 
       - name: Prepare Docling ML models
+        if: steps.docling-cache.outputs.cache-hit != 'true'
         shell: bash
         run: >-
           uv run python -c "from nest.adapters.docling_downloader import
@@ -146,7 +149,6 @@ jobs:
         shell: bash
         run: make test-e2e E2E_TIMEOUT=180
         env:
-          PYTHONUTF8: "1"
           NEST_AI_API_KEY: ${{ secrets.NEST_AI_API_KEY }}
 
   # ── Aggregate status check ───────────────────────────────────────────────────
@@ -159,11 +161,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify all jobs succeeded
+        shell: bash
         run: |
-          if [ "${{ needs.quality.result }}" != "success" ] || \
-             [ "${{ needs.test.result }}" != "success" ] || \
-             [ "${{ needs.e2e.result }}" != "success" ]; then
-            echo "One or more CI jobs failed."
-            exit 1
-          fi
+          # Collect results from all upstream jobs
+          for job_result in \
+            "${{ needs.quality.result }}" \
+            "${{ needs.test.result }}" \
+            "${{ needs.e2e.result }}"; do
+            if [[ "$job_result" != "success" ]]; then
+              echo "One or more CI jobs failed."
+              exit 1
+            fi
+          done
           echo "All CI jobs passed."
