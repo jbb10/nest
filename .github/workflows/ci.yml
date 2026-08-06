@@ -138,7 +138,7 @@ jobs:
 
       - name: Run end-to-end tests
         shell: bash
-        run: uv run pytest -m "e2e" --timeout=180 -v
+        run: make test-e2e E2E_TIMEOUT=180
         env:
           PYTHONUTF8: "1"
           NEST_AI_API_KEY: ${{ secrets.NEST_AI_API_KEY }}
