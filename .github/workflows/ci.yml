@@ -112,6 +112,12 @@ jobs:
       - name: Install project + dev dependencies
         run: uv sync --dev
 
+      # Cache key format: docling-models-v2-${{ runner.os }}
+      # v2 = second generation (switched from per-OS to shared, then back to
+      # per-OS). Bump the version number whenever the model set or cache layout
+      # changes to avoid serving stale entries.
+      # No restore-keys — a cache miss must re-download rather than potentially
+      # serving models built for a different Python version or OS.
       - name: Restore Docling ML models
         id: docling-cache
         uses: actions/cache/restore@v4
@@ -119,7 +125,7 @@ jobs:
           path: |
             ~/.cache/docling
             ~\AppData\Local\docling\cache
-          key: docling-models-v2
+          key: docling-models-v2-${{ runner.os }}
 
       - name: Prepare Docling ML models
         shell: bash

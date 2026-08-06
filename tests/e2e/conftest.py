@@ -33,7 +33,9 @@ def docling_available() -> bool:
         import docling  # noqa: F401
     except ImportError:
         return False
-    cache_dir = Path.home() / ".cache" / "docling"
+    from nest.adapters.docling_downloader import DoclingModelDownloader
+
+    cache_dir = DoclingModelDownloader().get_cache_path()
     return cache_dir.exists() and any(cache_dir.iterdir())
 
 
