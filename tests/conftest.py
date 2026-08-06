@@ -6,8 +6,13 @@ This module provides reusable fixtures for testing Nest components.
 from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
 
 from nest.core.models import Manifest
+
+# Load environment variables from .env (if present) for local development.
+# CI provides these via repository secrets instead.
+load_dotenv()
 
 
 class MockFileSystem:

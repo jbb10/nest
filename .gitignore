@@ -14,6 +14,9 @@ _nest_context/
 # OS metadata
 .DS_Store
 
+# Environment / secrets (see .env.example for required vars)
+.env
+
 # Nest error logs (generated during processing)
 .nest_errors.log
 DELETE/

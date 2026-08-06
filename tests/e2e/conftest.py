@@ -12,6 +12,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
+
+# Load environment variables from .env (if present) so NEST_AI_API_KEY and
+# other optional vars are picked up automatically during local development.
+load_dotenv()
 
 # ── Default AI test-proxy settings ────────────────────────────────────────────
 # The endpoint is an Azure-hosted test proxy. The API key MUST be provided via
