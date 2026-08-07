@@ -17,8 +17,6 @@ def _has_ai_key() -> bool:
     return bool(
         os.environ.get("NEST_AI_API_KEY")
         or os.environ.get("NEST_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
-        or os.environ.get("AZURE_OPENAI_API_KEY")
     )
 
 

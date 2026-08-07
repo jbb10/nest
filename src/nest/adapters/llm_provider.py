@@ -170,10 +170,10 @@ class AzureOpenAIAdapter:
 def create_llm_provider() -> OpenAIAdapter | AzureOpenAIAdapter | None:
     """Auto-detect AI credentials from environment variables.
 
-    Fallback chain:
-        API key:  NEST_AI_API_KEY → NEST_API_KEY → OPENAI_API_KEY → None
-        Endpoint: NEST_AI_ENDPOINT → NEST_BASE_URL → OPENAI_BASE_URL → https://api.openai.com/v1
-        Model:    NEST_AI_MODEL → NEST_TEXT_MODEL → OPENAI_MODEL → None
+    Fallback chain (Nest-prefixed vars only):
+        API key:  NEST_AI_API_KEY → NEST_API_KEY → None
+        Endpoint: NEST_AI_ENDPOINT → NEST_BASE_URL → https://api.openai.com/v1
+        Model:    NEST_AI_MODEL → NEST_TEXT_MODEL → None
 
     If no model is configured, returns None so callers can skip AI features
     rather than silently sending a wrong model name to the API.
@@ -187,7 +187,6 @@ def create_llm_provider() -> OpenAIAdapter | AzureOpenAIAdapter | None:
     api_key = (
         os.environ.get("NEST_AI_API_KEY")
         or os.environ.get("NEST_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
     )
     if not api_key:
         return None
@@ -195,13 +194,11 @@ def create_llm_provider() -> OpenAIAdapter | AzureOpenAIAdapter | None:
     endpoint = (
         os.environ.get("NEST_AI_ENDPOINT")
         or os.environ.get("NEST_BASE_URL")
-        or os.environ.get("OPENAI_BASE_URL")
         or DEFAULT_ENDPOINT
     )
     model = (
         os.environ.get("NEST_AI_MODEL")
         or os.environ.get("NEST_TEXT_MODEL")
-        or os.environ.get("OPENAI_MODEL")
     )
     if not model:
         logger.warning(
@@ -389,11 +386,11 @@ class AzureOpenAIVisionAdapter:
 def create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter | None:
     """Auto-detect AI credentials from environment variables for vision use.
 
-    Fallback chain:
-        API key:      NEST_AI_API_KEY → NEST_API_KEY → OPENAI_API_KEY → None
-        Endpoint:     NEST_AI_ENDPOINT → NEST_BASE_URL → OPENAI_BASE_URL → https://api.openai.com/v1
-        Vision model: NEST_AI_VISION_MODEL → NEST_VISION_MODEL → OPENAI_VISION_MODEL
-                      → NEST_AI_MODEL → NEST_TEXT_MODEL → OPENAI_MODEL → None
+    Fallback chain (Nest-prefixed vars only):
+        API key:      NEST_AI_API_KEY → NEST_API_KEY → None
+        Endpoint:     NEST_AI_ENDPOINT → NEST_BASE_URL → https://api.openai.com/v1
+        Vision model: NEST_AI_VISION_MODEL → NEST_VISION_MODEL
+                      → NEST_AI_MODEL → NEST_TEXT_MODEL → None
 
     The text-model env vars are used as a fallback for all endpoint types so
     that a single ``NEST_AI_MODEL`` configuration enables both text and vision
@@ -411,7 +408,6 @@ def create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter |
     api_key = (
         os.environ.get("NEST_AI_API_KEY")
         or os.environ.get("NEST_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
     )
     if not api_key:
         return None
@@ -419,7 +415,6 @@ def create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter |
     endpoint = (
         os.environ.get("NEST_AI_ENDPOINT")
         or os.environ.get("NEST_BASE_URL")
-        or os.environ.get("OPENAI_BASE_URL")
         or DEFAULT_ENDPOINT
     )
     # Vision-specific model env vars take priority; fall back to the text model
@@ -427,10 +422,8 @@ def create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter |
     vision_model = (
         os.environ.get("NEST_AI_VISION_MODEL")
         or os.environ.get("NEST_VISION_MODEL")
-        or os.environ.get("OPENAI_VISION_MODEL")
         or os.environ.get("NEST_AI_MODEL")
         or os.environ.get("NEST_TEXT_MODEL")
-        or os.environ.get("OPENAI_MODEL")
     )
     if not vision_model:
         logger.warning(

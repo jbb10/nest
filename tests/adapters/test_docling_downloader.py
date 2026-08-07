@@ -24,13 +24,23 @@ class TestDoclingModelDownloader:
     """Tests for DoclingModelDownloader adapter."""
 
     def test_are_models_cached_when_folders_exist(self, tmp_path: Path) -> None:
-        """Test cache detection returns True when folders exist."""
+        """Test cache detection returns True when folders and marker exist."""
+        downloader = DoclingModelDownloader()
+        cache_dir = tmp_path / "models" / "docling-project--docling-models"
+        cache_dir.mkdir(parents=True)
+        (tmp_path / "models" / DoclingModelDownloader.MARKER_FILENAME).touch()
+        with patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)):
+            result = downloader.are_models_cached()
+        assert result is True
+
+    def test_are_models_cached_when_marker_missing(self, tmp_path: Path) -> None:
+        """Test cache detection returns False when folders exist but marker is absent."""
         downloader = DoclingModelDownloader()
         cache_dir = tmp_path / "models" / "docling-project--docling-models"
         cache_dir.mkdir(parents=True)
         with patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)):
             result = downloader.are_models_cached()
-        assert result is True
+        assert result is False
 
     def test_are_models_cached_when_folders_missing(self, tmp_path: Path) -> None:
         """Test cache detection returns False when folders missing."""
@@ -51,6 +61,7 @@ class TestDoclingModelDownloader:
         downloader = DoclingModelDownloader()
         cache_dir = tmp_path / "models" / "docling-project--docling-models"
         cache_dir.mkdir(parents=True)
+        (tmp_path / "models" / DoclingModelDownloader.MARKER_FILENAME).touch()
         mock_download = MagicMock()
         with (
             patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),

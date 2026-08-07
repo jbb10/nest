@@ -55,7 +55,6 @@ def ai_available() -> bool:
     return bool(
         os.environ.get("NEST_AI_API_KEY")
         or os.environ.get("NEST_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
     )
 
 
@@ -77,10 +76,6 @@ def ai_env_vars() -> dict[str, str]:
         "NEST_BASE_URL",
         "NEST_TEXT_MODEL",
         "NEST_VISION_MODEL",
-        "OPENAI_API_KEY",
-        "OPENAI_BASE_URL",
-        "OPENAI_MODEL",
-        "OPENAI_VISION_MODEL",
     ):
         val = os.environ.get(key)
         if val:

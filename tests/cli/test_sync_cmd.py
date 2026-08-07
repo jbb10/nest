@@ -184,7 +184,7 @@ class TestDisplaySyncSummaryAggregatedTokens:
             console,
             Path("/tmp/errors.log"),
             ai_status_note=(
-                "not configured (run 'nest config ai' or set NEST_AI_API_KEY / OPENAI_API_KEY)"
+                "not configured (run 'nest config ai' or set NEST_AI_API_KEY)"
             ),
         )
 
@@ -238,13 +238,13 @@ class TestDisplaySyncSummaryFirstRun:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="OPENAI_API_KEY",
+            ai_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
         full_output = "\n".join(lines)
         assert "AI enrichment enabled" in full_output
-        assert "OPENAI_API_KEY" in full_output
+        assert "NEST_API_KEY" in full_output
 
     def test_display_sync_summary_creates_marker_file(self, tmp_path: Path) -> None:
         """.ai_seen file created after first AI use."""
@@ -262,7 +262,7 @@ class TestDisplaySyncSummaryFirstRun:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="OPENAI_API_KEY",
+            ai_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
@@ -288,7 +288,7 @@ class TestDisplaySyncSummaryFirstRun:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="OPENAI_API_KEY",
+            ai_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
@@ -307,7 +307,7 @@ class TestDisplaySyncSummaryFirstRun:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="OPENAI_API_KEY",
+            ai_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 

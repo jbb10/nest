@@ -96,19 +96,16 @@ def ai_command(
     current_endpoint = (
         os.environ.get("NEST_AI_ENDPOINT")
         or os.environ.get("NEST_BASE_URL")
-        or os.environ.get("OPENAI_BASE_URL")
         or "https://api.openai.com/v1"
     )
     current_model = (
         os.environ.get("NEST_AI_MODEL")
         or os.environ.get("NEST_TEXT_MODEL")
-        or os.environ.get("OPENAI_MODEL")
         or ""
     )
     current_key = (
         os.environ.get("NEST_AI_API_KEY")
         or os.environ.get("NEST_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
         or ""
     )
 
