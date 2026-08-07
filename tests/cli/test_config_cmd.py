@@ -3,7 +3,6 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from tests.helpers import strip_ansi
 from typer.testing import CliRunner
 
 from nest.cli.config_cmd import _display_path, _mask_key
@@ -55,13 +54,13 @@ class TestConfigAiHelp:
         """'nest config ai --help' displays help text."""
         result = runner.invoke(app, ["config", "ai", "--help"])
         assert result.exit_code == 0
-        assert "--remove" in strip_ansi(result.output)
+        assert "--remove" in result.output
 
     def test_config_help_shows_ai_subcommand(self) -> None:
         """'nest config --help' lists 'ai' subcommand."""
         result = runner.invoke(app, ["config", "--help"])
         assert result.exit_code == 0
-        assert "ai" in strip_ansi(result.output)
+        assert "ai" in result.output
 
 
 class TestConfigAiRemove:
@@ -82,7 +81,7 @@ class TestConfigAiRemove:
             result = runner.invoke(app, ["config", "ai", "--remove"])
 
         assert result.exit_code == 0
-        assert "No Nest AI configuration found" in strip_ansi(result.output)
+        assert "No Nest AI configuration found" in result.output
 
     def test_config_ai_remove_with_block(self, tmp_path: Path) -> None:
         """--remove with block shows success message."""
@@ -102,7 +101,7 @@ class TestConfigAiRemove:
             result = runner.invoke(app, ["config", "ai", "--remove"])
 
         assert result.exit_code == 0
-        assert "AI configuration removed" in strip_ansi(result.output)
+        assert "AI configuration removed" in result.output
 
 
 class TestConfigAiInteractive:
@@ -126,8 +125,8 @@ class TestConfigAiInteractive:
             )
 
         assert result.exit_code == 0
-        assert "Shell: zsh" in strip_ansi(result.output)
-        assert "Added to" in strip_ansi(result.output)
+        assert "Shell: zsh" in result.output
+        assert "Added to" in result.output
 
     def test_config_ai_writes_expected_exports_for_azure_endpoint(self, tmp_path: Path) -> None:
         """Azure endpoint input writes standard Nest AI env vars only."""
