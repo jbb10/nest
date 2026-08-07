@@ -184,22 +184,14 @@ def create_llm_provider() -> OpenAIAdapter | AzureOpenAIAdapter | None:
     Returns:
         Configured adapter if API key and model found, None otherwise.
     """
-    api_key = (
-        os.environ.get("NEST_AI_API_KEY")
-        or os.environ.get("NEST_API_KEY")
-    )
+    api_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY")
     if not api_key:
         return None
 
     endpoint = (
-        os.environ.get("NEST_AI_ENDPOINT")
-        or os.environ.get("NEST_BASE_URL")
-        or DEFAULT_ENDPOINT
+        os.environ.get("NEST_AI_ENDPOINT") or os.environ.get("NEST_BASE_URL") or DEFAULT_ENDPOINT
     )
-    model = (
-        os.environ.get("NEST_AI_MODEL")
-        or os.environ.get("NEST_TEXT_MODEL")
-    )
+    model = os.environ.get("NEST_AI_MODEL") or os.environ.get("NEST_TEXT_MODEL")
     if not model:
         logger.warning(
             "No LLM model configured. Set NEST_AI_MODEL"
@@ -405,17 +397,12 @@ def create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter |
     Returns:
         Configured vision adapter if API key and model found, None otherwise.
     """
-    api_key = (
-        os.environ.get("NEST_AI_API_KEY")
-        or os.environ.get("NEST_API_KEY")
-    )
+    api_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY")
     if not api_key:
         return None
 
     endpoint = (
-        os.environ.get("NEST_AI_ENDPOINT")
-        or os.environ.get("NEST_BASE_URL")
-        or DEFAULT_ENDPOINT
+        os.environ.get("NEST_AI_ENDPOINT") or os.environ.get("NEST_BASE_URL") or DEFAULT_ENDPOINT
     )
     # Vision-specific model env vars take priority; fall back to the text model
     # env vars so a single NEST_AI_MODEL config enables both text and vision.

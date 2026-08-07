@@ -14,10 +14,7 @@ from .conftest import run_cli
 
 
 def _has_ai_key() -> bool:
-    return bool(
-        os.environ.get("NEST_AI_API_KEY")
-        or os.environ.get("NEST_API_KEY")
-    )
+    return bool(os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY"))
 
 
 @pytest.mark.e2e

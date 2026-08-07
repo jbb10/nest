@@ -52,10 +52,7 @@ skip_without_docling = pytest.mark.skipif(
 
 def ai_available() -> bool:
     """Check if an AI API key is configured in the environment."""
-    return bool(
-        os.environ.get("NEST_AI_API_KEY")
-        or os.environ.get("NEST_API_KEY")
-    )
+    return bool(os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY"))
 
 
 skip_without_ai = pytest.mark.skipif(

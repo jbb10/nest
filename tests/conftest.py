@@ -6,12 +6,11 @@ This module provides reusable fixtures for testing Nest components.
 import os
 
 # Disable ANSI color output deterministically before any Nest/Rich/Click code
-# is imported, so CLI capture (CliRunner) and Rich Consoles never emit escape
-# sequences. CI sets these too, but pinning them here makes tests deterministic
-# locally and removes the need for a strip_ansi helper. Both vars are part of
-# the standard no-color convention: Click and Rich honor NO_COLOR; CI is the
-# conventional "we are not a terminal" signal.
-os.environ.setdefault("NO_COLOR", "1")
+# is imported. Typer forces Rich terminal output when GITHUB_ACTIONS is set,
+# even though CliRunner defaults to color=False. NO_COLOR removes colors but
+# leaves ANSI text styles, so use Typer's import-time terminal opt-out as well.
+os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
+os.environ["NO_COLOR"] = "1"
 os.environ.setdefault("CI", "1")
 
 from pathlib import Path
