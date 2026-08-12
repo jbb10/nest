@@ -102,9 +102,7 @@ jobs:
   # cache between runs. Runs on all supported platforms (public repo = free).
   # windows needs UTF-8 mode for Rich.
   # AI-gated e2e tests use the shared test proxy configured in tests/e2e/conftest.py.
-  # TEMPORARILY DISABLED during CI caching experiments. Revert the if: false below.
   e2e:
-    if: false
     name: E2E tests (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -178,13 +176,12 @@ jobs:
       - name: Verify all jobs succeeded
         shell: bash
         run: |
-          # Collect results from all upstream jobs.
-          # e2e may be "skipped" during caching experiments.
+          # Collect results from all upstream jobs
           for job_result in \
             "${{ needs.quality.result }}" \
             "${{ needs.test.result }}" \
             "${{ needs.e2e.result }}"; do
-            if [[ "$job_result" != "success" && "$job_result" != "skipped" ]]; then
+            if [[ "$job_result" != "success" ]]; then
               echo "One or more CI jobs failed."
               exit 1
             fi
