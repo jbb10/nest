@@ -135,7 +135,7 @@ jobs:
       # serving models built for a different Python version or OS.
       - name: Restore Docling ML models
         id: docling-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.cache/docling
@@ -151,7 +151,7 @@ jobs:
 
       - name: Save Docling ML models
         if: steps.docling-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             ~/.cache/docling
