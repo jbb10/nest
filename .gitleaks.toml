@@ -1,0 +1,59 @@
+# Gitleaks configuration for nest.
+#
+# Extends the built-in default rule set and adds a global allowlist that
+# excludes generated, vendored, and build directories from scanning. These
+# directories contain third-party code and test fixtures that trigger
+# false-positive secret detections (e.g. DNA test sequences in the regex
+# package match the AWS access-token pattern by entropy).
+#
+# The scan runs in dir mode (filesystem scan of the working tree, not git
+# history) so .gitignore alone does not exclude paths. This allowlist is
+# the authority for what gets scanned.
+#
+# See https://github.com/gitleaks/gitleaks for config documentation.
+
+title = "nest gitleaks configuration"
+
+[extend]
+useDefault = true
+
+# Global allowlist - findings matching any criterion here are ignored across
+# all rules. Paths are matched as regex against the finding file path.
+[[allowlists]]
+description = "Exclude generated, vendored, and build directories from secret scanning"
+paths = [
+  # Python virtual environments (installed third-party packages)
+  '''(^|/)\.venv/''',
+  '''(^|/)venv/''',
+  # Python build artifacts
+  '''(^|/)build/''',
+  '''(^|/)dist/''',
+  '''(^|/)\.eggs/''',
+  '''(^|/)src/[^/]+\.egg-info/''',
+  # Python caches
+  '''(^|/)__pycache__/''',
+  '''(^|/)\.pytest_cache/''',
+  '''(^|/)\.ruff_cache/''',
+  '''(^|/)\.mypy_cache/''',
+  # uv lock and cache
+  '''(^|/)uv\.lock''',
+  '''(^|/)\.uv-cache/''',
+  # Node / JS artifacts
+  '''(^|/)node_modules/''',
+  '''(^|/)package-lock\.json''',
+  '''(^|/)yarn\.lock''',
+  # Build tooling metadata
+  '''(^|/)Makefile$''',
+  # Documentation and planning artifacts (_bmad* dirs are BMAD agent config
+  # and generated planning docs, not source code)
+  '''(^|/)_bmad/''',
+  '''(^|/)_bmad-output/''',
+  '''(^|/)CHANGELOG\.md$''',
+  # Binary and media files
+  '''\.(?:png|jpe?g|gif|svg|bmp|ico|webp|tiff?|pdf|zip|tar(?:\.gz)?|gz|woff2?|eot|ttf)$''',
+  # This config file itself
+  '''\.gitleaks\.toml$''',
+  # Local environment files hold real secrets by design (gitignored).
+  # Keep .env.example scannable to catch real secrets in the template.
+  '''(^|/)\.env$''',
+]

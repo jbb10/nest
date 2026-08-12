@@ -1,0 +1,189 @@
+name: CI
+
+# Continuous integration gate.
+# Runs on every pull request targeting main and on direct pushes to main.
+# main is protected: this workflow must pass before a PR can be merged.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Fail fast and keep uv output deterministic in CI.
+  UV_FROZEN: "1"
+
+jobs:
+  # ── Static quality gate: lint, formatting, and strict type checking ──────────
+  # Uses CPU-only PyTorch to avoid downloading ~1.8 GB of nvidia-CUDA wheels.
+  # The quality job never runs torch inference, so CUDA is unnecessary.
+  #
+  # UV_INDEX (CPU PyTorch) takes priority over UV_DEFAULT_INDEX (PyPI), and
+  # UV_INDEX_STRATEGY=unsafe-best-match lets uv pick the best version across
+  # both indexes. --upgrade-package torch/torchvision/triton forces uv to
+  # re-resolve those packages (ignoring lockfile pins to the CUDA wheel).
+  # UV_FROZEN is not overridden here; the lockfile is still used for all other
+  # packages, keeping the resolution fast and deterministic.
+  quality:
+    name: Lint · Format · Types
+    runs-on: ubuntu-latest
+    env:
+      UV_FROZEN: "0"
+      UV_INDEX: https://download.pytorch.org/whl/cpu
+      UV_DEFAULT_INDEX: https://pypi.org/simple
+      UV_INDEX_STRATEGY: unsafe-best-match
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          cache-suffix: ${{ runner.os }}-lint
+
+      - name: Install project + dev dependencies (CPU-only torch)
+        run: uv sync --dev --upgrade-package torch --upgrade-package torchvision --upgrade-package triton
+
+      - name: Lint (ruff)
+        run: make lint
+
+      - name: Format check (ruff)
+        run: make format-check
+
+      - name: Type check (pyright strict)
+        run: make typecheck
+
+      - name: Install gitleaks
+        run: |
+          curl -sL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            | tar xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Secret scan (gitleaks)
+        run: make scan-secrets
+
+  # ── Unit / integration tests ─────────────────────────────────────────────────
+  # Single, fast run. CI tests one representative Python version (uv selects a
+  # compatible interpreter from the project's python requirement). The full e2e
+  # suite runs in the dedicated `e2e` job below.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          cache-suffix: ${{ runner.os }}
+          prune-cache: true
+
+      - name: Install project + dev dependencies
+        run: uv sync --dev
+
+      - name: Run unit & integration tests
+        run: make test
+
+  # ── End-to-end tests ─────────────────────────────────────────────────────────
+  # Full e2e suite against real Docling. Requires ~2.5 GB of ML models, which we
+  # cache between runs. Runs on all supported platforms (public repo = free).
+  # windows needs UTF-8 mode for Rich.
+  # AI-gated e2e tests use the shared test proxy configured in tests/e2e/conftest.py.
+  e2e:
+    name: E2E tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+          cache-suffix: ${{ runner.os }}
+          prune-cache: true
+
+      - name: Install project + dev dependencies
+        run: uv sync --dev
+
+      # Cache key format: docling-models-v2-${{ runner.os }}
+      # v2 = second generation (switched from per-OS to shared, then back to
+      # per-OS). Bump the version number whenever the model set or cache layout
+      # changes to avoid serving stale entries.
+      # No restore-keys — a cache miss must re-download rather than potentially
+      # serving models built for a different Python version or OS.
+      - name: Restore Docling ML models
+        id: docling-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/docling
+            ~\AppData\Local\docling\cache
+          key: docling-models-v2-${{ runner.os }}
+
+      - name: Prepare Docling ML models
+        if: steps.docling-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: >-
+          uv run python -c "from nest.adapters.docling_downloader import
+          DoclingModelDownloader as D; D().download_if_needed(progress=False)"
+
+      - name: Save Docling ML models
+        if: steps.docling-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/docling
+            ~\AppData\Local\docling\cache
+          key: ${{ steps.docling-cache.outputs.cache-primary-key }}
+
+      - name: Run end-to-end tests
+        shell: bash
+        run: make test-e2e E2E_TIMEOUT=180
+        env:
+          NEST_AI_API_KEY: ${{ secrets.NEST_AI_API_KEY }}
+
+  # ── Aggregate status check ───────────────────────────────────────────────────
+  # Single required check to configure in branch protection, independent of the
+  # matrix dimensions above.
+  ci-success:
+    name: CI success
+    if: always()
+    needs: [quality, test, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all jobs succeeded
+        shell: bash
+        run: |
+          # Collect results from all upstream jobs
+          for job_result in \
+            "${{ needs.quality.result }}" \
+            "${{ needs.test.result }}" \
+            "${{ needs.e2e.result }}"; do
+            if [[ "$job_result" != "success" ]]; then
+              echo "One or more CI jobs failed."
+              exit 1
+            fi
+          done
+          echo "All CI jobs passed."

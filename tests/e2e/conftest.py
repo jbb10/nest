@@ -12,15 +12,20 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
 
-# ── Default AI credentials for the test proxy ─────────────────────────────────
-# These are set unconditionally so that AI-gated e2e tests always run.
-# The endpoint is an Azure-hosted test proxy with a restricted key.
+# Load environment variables from .env (if present) so NEST_AI_API_KEY and
+# other optional vars are picked up automatically during local development.
+load_dotenv()
+
+# ── Default AI test-proxy settings ────────────────────────────────────────────
+# The endpoint is an Azure-hosted test proxy. The API key MUST be provided via
+# the NEST_AI_API_KEY environment variable (set as a GitHub Actions secret in
+# CI). AI-gated tests will skip when the key is absent.
 _TEST_AI_DEFAULTS: dict[str, str] = {
     "NEST_AI_ENDPOINT": "https://jbb-ai-proxy.azurewebsites.net/v1",
-    "NEST_AI_API_KEY": "sk-uL2extH7mOufI0Y5FYAtDg",
-    "NEST_AI_MODEL": "gpt-4.1",
-    "NEST_AI_VISION_MODEL": "gpt-4.1",
+    "NEST_AI_MODEL": "gpt-5-nano",
+    "NEST_AI_VISION_MODEL": "gpt-5-nano",
 }
 
 for _key, _val in _TEST_AI_DEFAULTS.items():
@@ -33,7 +38,9 @@ def docling_available() -> bool:
         import docling  # noqa: F401
     except ImportError:
         return False
-    cache_dir = Path.home() / ".cache" / "docling"
+    from nest.adapters.docling_downloader import DoclingModelDownloader
+
+    cache_dir = DoclingModelDownloader().get_cache_path()
     return cache_dir.exists() and any(cache_dir.iterdir())
 
 
@@ -45,11 +52,7 @@ skip_without_docling = pytest.mark.skipif(
 
 def ai_available() -> bool:
     """Check if an AI API key is configured in the environment."""
-    return bool(
-        os.environ.get("NEST_AI_API_KEY")
-        or os.environ.get("NEST_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
-    )
+    return bool(os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY"))
 
 
 skip_without_ai = pytest.mark.skipif(
@@ -70,10 +73,6 @@ def ai_env_vars() -> dict[str, str]:
         "NEST_BASE_URL",
         "NEST_TEXT_MODEL",
         "NEST_VISION_MODEL",
-        "OPENAI_API_KEY",
-        "OPENAI_BASE_URL",
-        "OPENAI_MODEL",
-        "OPENAI_VISION_MODEL",
     ):
         val = os.environ.get(key)
         if val:
@@ -120,6 +119,8 @@ def run_cli(
         args: Command arguments (without 'nest' prefix).
         cwd: Working directory for the command.
         timeout: Timeout in seconds. Default 300s for Docling processing.
+        env: Optional extra environment variables merged into the subprocess
+            environment. Falls back to os.environ defaults for AI credentials.
 
     Returns:
         CLIResult with exit code, stdout, and stderr.

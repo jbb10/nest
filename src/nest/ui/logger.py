@@ -7,6 +7,8 @@ NEVER use this for user-facing messages - use messages.py Rich helpers.
 This module is for diagnostic/error log files only.
 """
 
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 

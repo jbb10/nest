@@ -84,9 +84,6 @@ class TestAITransitionE2E:
             "NEST_API_KEY",
             "NEST_BASE_URL",
             "NEST_TEXT_MODEL",
-            "OPENAI_API_KEY",
-            "OPENAI_BASE_URL",
-            "OPENAI_MODEL",
         )
         saved = {k: os.environ.pop(k) for k in ai_keys if k in os.environ}
         try:

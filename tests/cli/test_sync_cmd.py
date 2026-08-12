@@ -43,12 +43,13 @@ class TestSyncCommandHelp:
         result = runner.invoke(app, ["sync", "--help"])
 
         assert result.exit_code == 0
-        assert "--on-error" in result.output
-        assert "--dry-run" in result.output
-        assert "--force" in result.output
-        assert "--no-clean" in result.output
-        assert "--no-ai" in result.output
-        assert "--dir" in result.output
+        output = result.output
+        assert "--on-error" in output
+        assert "--dry-run" in output
+        assert "--force" in output
+        assert "--no-clean" in output
+        assert "--no-ai" in output
+        assert "--dir" in output
 
 
 class TestSyncCommandFlags:
@@ -65,13 +66,15 @@ class TestSyncCommandFlags:
         # Note: Will fail because no project exists, but flag should be parsed
         result = runner.invoke(app, ["sync", "--dry-run"])
         # Check that it didn't fail due to flag parsing
-        assert "--dry-run" not in result.output or "error" not in result.output.lower()
+        output = result.output
+        assert "--dry-run" not in output or "error" not in output.lower()
 
     def test_force_flag_accepted(self) -> None:
         """--force flag should be parsed."""
         result = runner.invoke(app, ["sync", "--force"])
         # Check that it didn't fail due to flag parsing
-        assert "--force" not in result.output or "error" not in result.output.lower()
+        output = result.output
+        assert "--force" not in output or "error" not in output.lower()
 
 
 class TestSyncProjectValidation:
@@ -180,9 +183,7 @@ class TestDisplaySyncSummaryAggregatedTokens:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_status_note=(
-                "not configured (run 'nest config ai' or set NEST_AI_API_KEY / OPENAI_API_KEY)"
-            ),
+            ai_status_note=("not configured (run 'nest config ai' or set NEST_AI_API_KEY)"),
         )
 
         status_lines = [line for line in lines if "AI:" in line]
@@ -235,13 +236,13 @@ class TestDisplaySyncSummaryFirstRun:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="OPENAI_API_KEY",
+            ai_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
         full_output = "\n".join(lines)
         assert "AI enrichment enabled" in full_output
-        assert "OPENAI_API_KEY" in full_output
+        assert "NEST_API_KEY" in full_output
 
     def test_display_sync_summary_creates_marker_file(self, tmp_path: Path) -> None:
         """.ai_seen file created after first AI use."""
@@ -259,7 +260,7 @@ class TestDisplaySyncSummaryFirstRun:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="OPENAI_API_KEY",
+            ai_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
@@ -285,7 +286,7 @@ class TestDisplaySyncSummaryFirstRun:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="OPENAI_API_KEY",
+            ai_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
@@ -304,7 +305,7 @@ class TestDisplaySyncSummaryFirstRun:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="OPENAI_API_KEY",
+            ai_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 

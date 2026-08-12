@@ -1,0 +1,63 @@
+name: Release
+
+# Continuous delivery via release-please.
+#
+# A "release" is: the change is on main, tagged with a proper semver tag, and
+# published as a GitHub Release with generated notes. This workflow makes that
+# fully automatic and driven entirely from the pipeline (no local scripts).
+#
+# How it works:
+#   1. On every push to main, release-please inspects the Conventional Commits
+#      since the last release and maintains a standing "release PR" that bumps
+#      the version (pyproject.toml + src/nest/__init__.py) and updates
+#      CHANGELOG.md.
+#   2. When you merge that release PR, release-please creates the git tag and a
+#      GitHub Release with the accumulated notes.
+#   3. This workflow then builds the sdist + wheel and attaches them to the
+#      release.
+on:
+  push:
+    branches: [main]
+
+# Never cancel a release mid-flight.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
+
+      # The steps below only run when a release was actually created
+      # (i.e. a release PR was merged in this push).
+      - name: Checkout
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        if: ${{ steps.release.outputs.release_created }}
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: false
+
+      - name: Build sdist and wheel
+        if: ${{ steps.release.outputs.release_created }}
+        run: uv build
+
+      - name: Attach artifacts to the release
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ steps.release.outputs.tag_name }}" dist/* --clobber

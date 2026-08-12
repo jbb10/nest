@@ -37,8 +37,13 @@ class TestDetectShell:
         assert service.detect_shell() == "fish"
 
     def test_detect_shell_returns_unknown_for_csh(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """$SHELL=/bin/csh → returns 'unknown'."""
+        """$SHELL=/bin/csh → returns 'unknown'.
+
+        Also clears PSModulePath because the CI runner has PowerShell installed,
+        which would make detect_shell() return 'powershell' instead.
+        """
         monkeypatch.setenv("SHELL", "/bin/csh")
+        monkeypatch.delenv("PSModulePath", raising=False)
         service = ShellRCService()
         assert service.detect_shell() == "unknown"
 

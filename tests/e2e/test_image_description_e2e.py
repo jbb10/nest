@@ -297,7 +297,6 @@ class TestImageDescriptionE2E:
                 "NEST_AI_MODEL": "",
                 "NEST_AI_VISION_MODEL": "",
                 "NEST_API_KEY": "",
-                "OPENAI_API_KEY": "",
             },
         )
 

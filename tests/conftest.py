@@ -3,11 +3,26 @@
 This module provides reusable fixtures for testing Nest components.
 """
 
+import os
+
+# Disable ANSI color output deterministically before any Nest/Rich/Click code
+# is imported. Typer forces Rich terminal output when GITHUB_ACTIONS is set,
+# even though CliRunner defaults to color=False. NO_COLOR removes colors but
+# leaves ANSI text styles, so use Typer's import-time terminal opt-out as well.
+os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
+os.environ["NO_COLOR"] = "1"
+os.environ.setdefault("CI", "1")
+
 from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
 
 from nest.core.models import Manifest
+
+# Load environment variables from .env (if present) for local development.
+# CI provides these via repository secrets instead.
+load_dotenv()
 
 
 class MockFileSystem:

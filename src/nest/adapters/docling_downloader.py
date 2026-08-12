@@ -56,14 +56,27 @@ class DoclingModelDownloader:
     ]
     # Approximate total size of all models in MB
     REQUIRED_DISK_SPACE_MB = 2500
+    # Marker file written only after a successful full download.
+    # Guards against truncated/partial cache restores that pass a
+    # folder-existence check but are missing model data.
+    MARKER_FILENAME = ".download_complete"
 
     def are_models_cached(self) -> bool:
         """Check if required models are already cached.
 
+        Uses a marker file written only after a successful full download,
+        so truncated or partial cache restores are detected and trigger a
+        fresh download.
+
         Returns:
-            True if all required model folders exist, False otherwise.
+            True if all required model folders exist and the completion
+            marker is present, False otherwise.
         """
         cache_dir = self.get_cache_path()
+        marker = cache_dir / self.MARKER_FILENAME
+
+        if not marker.exists():
+            return False
 
         for folder in self.REQUIRED_CACHE_FOLDERS:
             if not (cache_dir / folder).exists():
@@ -140,6 +153,10 @@ class DoclingModelDownloader:
                     with_picture_classifier=self.DEFAULT_MODELS["picture_classifier"],
                     with_rapidocr=self.DEFAULT_MODELS["rapidocr"],
                 )
+                # Write marker file to confirm full download completed.
+                marker = self.get_cache_path() / self.MARKER_FILENAME
+                marker.parent.mkdir(parents=True, exist_ok=True)
+                marker.touch()
                 return  # Success!
             except Exception as e:
                 last_exception = e
@@ -158,6 +175,10 @@ class DoclingModelDownloader:
         """Clean up partial downloads on failure."""
         cache_dir = self.get_cache_path()
         if cache_dir.exists():
+            # Remove marker first (signals incomplete state even if rmtree
+            # is interrupted), then clean up model folders.
+            marker = cache_dir / self.MARKER_FILENAME
+            marker.unlink(missing_ok=True)
             shutil.rmtree(cache_dir, ignore_errors=True)
 
     def get_cache_size(self) -> int:
