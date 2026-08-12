@@ -3,6 +3,10 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Virtual environments (never commit a .venv)
+.venv/
+venv/
+
 # Raw documents excluded from version control (processed versions in _nest_context/)
 raw_inbox/
 _nest_sources/

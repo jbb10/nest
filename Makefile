@@ -40,6 +40,6 @@ test-e2e:
 test-all: test test-e2e
 
 scan-secrets:
-	gitleaks detect --source . --no-git -v
+	gitleaks dir --config .gitleaks.toml -v
 
 ci: lint format-check typecheck scan-secrets test-all
