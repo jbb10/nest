@@ -1,3 +1,3 @@
 """Nest - AI-powered document context tool for projects."""
 
-__version__ = "1.3.2"  # x-release-please-version
+__version__ = "1.3.3"  # x-release-please-version
