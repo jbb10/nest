@@ -44,7 +44,7 @@ jobs:
       # (i.e. a release PR was merged in this push).
       - name: Checkout
         if: ${{ steps.release.outputs.release_created }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up uv
         if: ${{ steps.release.outputs.release_created }}
