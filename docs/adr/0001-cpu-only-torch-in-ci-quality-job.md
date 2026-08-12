@@ -43,3 +43,7 @@ execute docling/torch code.
 - If a future dependency pulls a different package from the CPU PyTorch index at
   an incompatible version, `UV_INDEX_STRATEGY=unsafe-best-match` will pick the
   best version across both indexes rather than failing.
+- GitHub-hosted runners have no GPUs, so no CI job exercises the CUDA code path
+  regardless of which torch wheel is installed. The test and e2e jobs install
+  the full CUDA torch but run everything on CPU at runtime. The GPU path must be
+  tested locally on an NVIDIA machine before relying on GPU-specific behavior.

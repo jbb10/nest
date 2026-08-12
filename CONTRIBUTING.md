@@ -98,6 +98,12 @@ Two workflows guard every pull request (see [.github/workflows/](.github/workflo
     `tests/e2e/conftest.py`.
   - `ci-success`: single aggregate check to require in branch protection.
 
+  GitHub-hosted runners have no GPUs, so CI always runs torch on CPU regardless
+  of which wheel is installed. The CUDA code path is never exercised in CI.
+  Test the GPU path locally on a machine with an NVIDIA GPU before relying on
+  GPU-specific behavior. See ADR-0001 for the CPU-only torch optimization in the
+  quality job.
+
 - **PR Validation** (`pr-validation.yml`) - validates the Conventional Commit
   format of the PR title (required) and the branch-name convention (advisory).
 
