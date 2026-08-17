@@ -15,6 +15,9 @@ _nest_sources/
 .nest_manifest.json
 _nest_context/
 
+# Node.js / Sandbox
+node_modules/
+
 # OS metadata
 .DS_Store
 
