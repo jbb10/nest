@@ -2,6 +2,18 @@
 
 All notable changes to Nest.
 
+## [1.3.3](https://github.com/jbb10/nest/compare/v1.3.2...v1.3.3) (2026-10-08)
+
+
+### Bug Fixes
+
+* **discovery:** follow symlinked and junctioned folders in sources ([#18](https://github.com/jbb10/nest/issues/18)) ([4e047ef](https://github.com/jbb10/nest/commit/4e047ef918168b6b684adbbee5ab6c721ff95eff))
+
+
+### CI/CD
+
+* optimize GitHub Actions caching ([#2](https://github.com/jbb10/nest/issues/2)) ([7bdd0c1](https://github.com/jbb10/nest/commit/7bdd0c1e5bf4781f571da3ebd50e9f0bf4a888d5))
+
 ## [v1.3.2] - 2026-07-09
 
 ### Bug Fixes
@@ -215,4 +227,3 @@ All notable changes to Nest.
 ### Testing
 
 - Add missing test coverage for CLI integration (Story 1.4)
-
