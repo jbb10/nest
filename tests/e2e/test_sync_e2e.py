@@ -5,6 +5,8 @@ and real Docling processing.
 """
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -407,3 +409,106 @@ class TestSyncPassthroughE2E:
         assert "report.pdf" in manifest["files"]
         assert manifest["files"]["report.pdf"]["status"] == "skipped"
         assert "conflicts" in manifest["files"]["report.pdf"].get("error", "").lower()
+
+
+def _link_dir(link: Path, target: Path, kind: str) -> None:
+    if kind == "junction":
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], check=True)
+    else:
+        link.symlink_to(target, target_is_directory=True)
+
+
+@pytest.mark.e2e
+class TestSyncLinkedFoldersE2E:
+    """Folders linked into _nest_sources/ are synced like regular folders."""
+
+    @pytest.fixture(
+        params=[
+            "symlink",
+            pytest.param(
+                "junction",
+                marks=pytest.mark.skipif(sys.platform != "win32", reason="Windows only"),
+            ),
+        ]
+    )
+    def link_kind(self, request: pytest.FixtureRequest) -> str:
+        return request.param
+
+    @pytest.fixture
+    def shared(self, initialized_project: Path) -> Path:
+        shared = initialized_project.parent / f"{initialized_project.name}-shared"
+        (shared / "team").mkdir(parents=True)
+        (shared / "team" / "notes.txt").write_text("linked notes")
+        return shared
+
+    def test_linked_folder_is_synced_and_reported_by_status(
+        self, initialized_project: Path, shared: Path, link_kind: str
+    ) -> None:
+        project_dir = initialized_project
+        _link_dir(project_dir / "_nest_sources" / "shared", shared, link_kind)
+
+        status = run_cli(["status"], cwd=project_dir)
+        assert status.exit_code == 0, status.stdout
+        assert "New: 1" in status.stdout, status.stdout
+
+        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+        assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
+
+        output = project_dir / "_nest_context" / "shared" / "team" / "notes.txt"
+        assert output.read_text() == "linked notes"
+        manifest = json.loads((project_dir / ".nest" / "manifest.json").read_text())
+        assert manifest["files"]["shared/team/notes.txt"]["status"] == "success"
+        index_content = (project_dir / ".nest" / "00_MASTER_INDEX.md").read_text()
+        assert "shared/team/notes.txt" in index_content
+
+    def test_outputs_survive_while_linked_folder_is_offline(
+        self, initialized_project: Path, shared: Path, link_kind: str
+    ) -> None:
+        project_dir = initialized_project
+        _link_dir(project_dir / "_nest_sources" / "shared", shared, link_kind)
+        assert run_cli(["sync", "--no-ai"], cwd=project_dir).exit_code == 0
+        output = project_dir / "_nest_context" / "shared" / "team" / "notes.txt"
+
+        offline = shared.with_name(shared.name + "-offline")
+        shared.rename(offline)
+        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+        assert result.exit_code == 0, result.stdout
+        assert output.exists(), "Output deleted while linked folder was offline"
+
+        offline.rename(shared)
+        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+        assert result.exit_code == 0, result.stdout
+        assert "processed: 0" in result.stdout.lower(), result.stdout
+        assert output.read_text() == "linked notes"
+
+    def test_removing_link_cleans_up_outputs(
+        self, initialized_project: Path, shared: Path, link_kind: str
+    ) -> None:
+        project_dir = initialized_project
+        link = project_dir / "_nest_sources" / "shared"
+        _link_dir(link, shared, link_kind)
+        assert run_cli(["sync", "--no-ai"], cwd=project_dir).exit_code == 0
+
+        if link_kind == "junction":
+            link.rmdir()
+        else:
+            link.unlink()
+        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+
+        assert result.exit_code == 0, result.stdout
+        assert not (project_dir / "_nest_context" / "shared" / "team" / "notes.txt").exists()
+        assert (shared / "team" / "notes.txt").exists(), "Link target must never be touched"
+
+    @pytest.mark.timeout(120)
+    def test_link_loop_does_not_hang_sync(
+        self, initialized_project: Path, shared: Path, link_kind: str
+    ) -> None:
+        project_dir = initialized_project
+        _link_dir(project_dir / "_nest_sources" / "shared", shared, link_kind)
+        _link_dir(shared / "team" / "loop", shared, link_kind)
+
+        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+
+        assert result.exit_code == 0, result.stdout
+        assert (project_dir / "_nest_context" / "shared" / "team" / "notes.txt").exists()
+        assert not (project_dir / "_nest_context" / "shared" / "team" / "loop").exists()

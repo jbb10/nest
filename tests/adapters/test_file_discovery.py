@@ -244,3 +244,104 @@ class TestFileDiscoveryAdapter:
         assert len(result) == 1
         assert result[0].name == "good.pdf"
         assert any("broken symlink" in rec.message.lower() for rec in caplog.records)
+
+
+class TestFileDiscoverySymlinkedDirectories:
+    """Directory symlinks inside the sources directory are followed."""
+
+    def test_files_in_symlinked_directory_are_discovered_under_link_path(
+        self, tmp_path: Path
+    ) -> None:
+        shared = tmp_path / "shared"
+        (shared / "team").mkdir(parents=True)
+        (shared / "team" / "notes.txt").write_text("linked")
+        sources = tmp_path / "sources"
+        sources.mkdir()
+        (sources / "local.txt").write_text("local")
+        (sources / "shared").symlink_to(shared, target_is_directory=True)
+
+        result = FileDiscoveryAdapter().discover(sources, {".txt"})
+
+        assert [p.relative_to(sources).as_posix() for p in result] == [
+            "local.txt",
+            "shared/team/notes.txt",
+        ]
+        assert result[1].read_text() == "linked"
+
+    @pytest.mark.timeout(10)
+    def test_link_to_ancestor_is_skipped_with_warning(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging
+
+        sources = tmp_path / "sources"
+        (sources / "sub").mkdir(parents=True)
+        (sources / "sub" / "doc.txt").write_text("x")
+        (sources / "sub" / "back").symlink_to(sources, target_is_directory=True)
+        (sources / "project").symlink_to(tmp_path, target_is_directory=True)
+
+        with caplog.at_level(logging.WARNING, logger="nest.adapters.file_discovery"):
+            result = FileDiscoveryAdapter().discover(sources, {".txt"})
+
+        assert [p.relative_to(sources).as_posix() for p in result] == ["sub/doc.txt"]
+        loop_warnings = [r for r in caplog.records if "loop" in r.message.lower()]
+        assert len(loop_warnings) == 2
+
+    @pytest.mark.timeout(10)
+    def test_loop_through_external_directories_terminates(self, tmp_path: Path) -> None:
+        a = tmp_path / "a"
+        b = tmp_path / "b"
+        a.mkdir()
+        b.mkdir()
+        (a / "a.txt").write_text("a")
+        (b / "b.txt").write_text("b")
+        (a / "to_b").symlink_to(b, target_is_directory=True)
+        (b / "to_a").symlink_to(a, target_is_directory=True)
+        sources = tmp_path / "sources"
+        sources.mkdir()
+        (sources / "a").symlink_to(a, target_is_directory=True)
+
+        result = FileDiscoveryAdapter().discover(sources, {".txt"})
+
+        assert [p.relative_to(sources).as_posix() for p in result] == [
+            "a/a.txt",
+            "a/to_b/b.txt",
+        ]
+
+    def test_broken_directory_symlink_is_skipped_with_warning(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        import logging
+
+        (tmp_path / "good.txt").write_text("x")
+        (tmp_path / "offline").symlink_to(tmp_path / "unmounted", target_is_directory=True)
+
+        with caplog.at_level(logging.WARNING, logger="nest.adapters.file_discovery"):
+            result = FileDiscoveryAdapter().discover(tmp_path, {".txt"})
+
+        assert [p.name for p in result] == ["good.txt"]
+        assert any("broken symlink" in rec.message.lower() for rec in caplog.records)
+
+    def test_hidden_symlinked_directory_is_ignored(self, tmp_path: Path) -> None:
+        shared = tmp_path / "shared"
+        shared.mkdir()
+        (shared / "doc.txt").write_text("x")
+        sources = tmp_path / "sources"
+        sources.mkdir()
+        (sources / ".shared").symlink_to(shared, target_is_directory=True)
+
+        assert FileDiscoveryAdapter().discover(sources, {".txt"}) == []
+
+    def test_sources_directory_that_is_itself_a_symlink(self, tmp_path: Path) -> None:
+        real = tmp_path / "real"
+        (real / "sub").mkdir(parents=True)
+        (real / "sub" / "doc.txt").write_text("x")
+        sources = tmp_path / "sources"
+        sources.symlink_to(real, target_is_directory=True)
+
+        result = FileDiscoveryAdapter().discover(sources, {".txt"})
+
+        assert [p.relative_to(sources).as_posix() for p in result] == ["sub/doc.txt"]
+
+    def test_missing_directory_returns_empty_list(self, tmp_path: Path) -> None:
+        assert FileDiscoveryAdapter().discover(tmp_path / "missing", {".txt"}) == []

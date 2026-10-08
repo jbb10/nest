@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
+from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.checksum import compute_sha256
@@ -23,6 +24,14 @@ def _write_context_file(project_root: Path, relative: str, content: str = "# doc
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
     return path
+
+
+def _service() -> StatusService:
+    return StatusService(
+        filesystem=FileSystemAdapter(),
+        manifest=ManifestAdapter(),
+        file_discovery=FileDiscoveryAdapter(),
+    )
 
 
 class TestStatusService:
@@ -68,7 +77,7 @@ class TestStatusService:
         )
         ManifestAdapter().save(project_root, manifest)
 
-        service = StatusService(filesystem=FileSystemAdapter(), manifest=ManifestAdapter())
+        service = _service()
         report = service.get_status(project_root)
 
         assert report.source_total == 3
@@ -92,7 +101,7 @@ class TestStatusService:
         )
         ManifestAdapter().save(project_root, manifest)
 
-        service = StatusService(filesystem=FileSystemAdapter(), manifest=ManifestAdapter())
+        service = _service()
         report = service.get_status(project_root)
 
         assert report.source_total == 0
@@ -113,7 +122,7 @@ class TestStatusService:
         )
         ManifestAdapter().save(project_root, manifest)
 
-        service = StatusService(filesystem=FileSystemAdapter(), manifest=ManifestAdapter())
+        service = _service()
         report = service.get_status(project_root)
 
         assert report.context_files == 2  # notes.txt + doc.md
@@ -134,7 +143,22 @@ class TestStatusService:
         )
         ManifestAdapter().save(project_root, manifest)
 
-        service = StatusService(filesystem=FileSystemAdapter(), manifest=ManifestAdapter())
+        service = _service()
         report = service.get_status(project_root)
 
         assert report.context_files == 1  # only doc.md, png excluded
+
+    def test_sources_count_matches_what_sync_discovers(self, tmp_path: Path) -> None:
+        project_root = tmp_path / "project"
+        _write_source_file(project_root, "local.txt", b"local")
+        _write_source_file(project_root, ".hidden/skipped.txt", b"hidden")
+        shared = tmp_path / "shared"
+        shared.mkdir()
+        (shared / "linked.txt").write_text("linked")
+        (project_root / SOURCES_DIR / "shared").symlink_to(shared, target_is_directory=True)
+        ManifestAdapter().save(project_root, Manifest(nest_version="0.0.0", files={}))
+
+        report = _service().get_status(project_root)
+
+        assert report.source_total == 2
+        assert report.source_new == 2
