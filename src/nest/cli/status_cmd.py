@@ -8,6 +8,7 @@ from typing import Annotated
 
 import typer
 
+from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.exceptions import NestError
@@ -26,6 +27,7 @@ def create_status_service() -> StatusService:
     return StatusService(
         filesystem=FileSystemAdapter(),
         manifest=ManifestAdapter(),
+        file_discovery=FileDiscoveryAdapter(),
     )
 
 

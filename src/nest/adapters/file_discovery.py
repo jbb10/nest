@@ -6,6 +6,7 @@ file discovery with extension filtering.
 
 import logging
 import os
+from collections.abc import Iterator
 from pathlib import Path
 
 from nest.adapters.protocols import FileDiscoveryProtocol
@@ -25,7 +26,8 @@ class FileDiscoveryAdapter(FileDiscoveryProtocol):
 
         Searches the given directory and all subdirectories for files
         matching the specified extensions. Hidden files and directories
-        (starting with '.') are excluded.
+        (starting with '.') are excluded. Directory links (symlinks and
+        Windows junctions) are followed; links that loop are skipped.
 
         Args:
             directory: Root directory to search.
@@ -41,10 +43,11 @@ class FileDiscoveryAdapter(FileDiscoveryProtocol):
 
         discovered: list[Path] = []
 
-        for path in directory.rglob("*"):
-            # Warn about broken symlinks (target missing) and skip them.
-            # is_symlink() does not follow the link; exists() does.
-            if path.is_symlink() and not path.exists():
+        for path in _walk(directory):
+            # Warn about broken links (target missing) and skip them.
+            # lexists() does not follow links; exists() does. This also covers
+            # Windows junctions, which is_symlink() does not report.
+            if os.path.lexists(path) and not path.exists():
                 logger.warning("Skipping broken symlink: %s", path)
                 continue
 
@@ -70,3 +73,46 @@ class FileDiscoveryAdapter(FileDiscoveryProtocol):
 
         # Sort for deterministic ordering
         return sorted(discovered)
+
+
+def _walk(directory: Path) -> Iterator[Path]:
+    """Yield every entry below ``directory``, descending into directory links.
+
+    Hidden directories are not entered. A directory that resolves to itself or
+    one of its ancestors is skipped with a warning, since entering it would
+    recurse forever.
+    """
+    root = Path(os.path.abspath(directory))
+    root_ancestors = frozenset(
+        _identity(p) for base in (root, Path(os.path.realpath(root))) for p in (base, *base.parents)
+    )
+    pending: list[tuple[Path, frozenset[str]]] = [(directory, root_ancestors)]
+    while pending:
+        current, ancestors = pending.pop()
+        try:
+            with os.scandir(current) as it:
+                entries = list(it)
+        except OSError as e:
+            if current is not directory:
+                logger.warning("Skipping unreadable directory: %s (%s)", current, e)
+            continue
+        for entry in entries:
+            path = current / entry.name
+            yield path
+            if entry.name.startswith("."):
+                continue
+            try:
+                # entry.is_dir() is True for a dangling junction on Windows.
+                if not (entry.is_dir() and os.path.isdir(path)):
+                    continue
+            except OSError:
+                continue
+            identity = _identity(path)
+            if identity in ancestors:
+                logger.warning("Skipping symlink loop: %s", path)
+                continue
+            pending.append((path, ancestors | {identity}))
+
+
+def _identity(path: Path) -> str:
+    return os.path.normcase(os.path.realpath(path))

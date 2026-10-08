@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from nest import __version__
-from nest.adapters.protocols import FileSystemProtocol, ManifestProtocol
+from nest.adapters.protocols import FileDiscoveryProtocol, FileSystemProtocol, ManifestProtocol
 from nest.core.checksum import compute_sha256
 from nest.core.models import Manifest
 from nest.core.orphan_detector import OrphanDetector
@@ -47,16 +47,23 @@ class StatusReport:
 class StatusService:
     """Compute project status by comparing sources, context, and manifest."""
 
-    def __init__(self, filesystem: FileSystemProtocol, manifest: ManifestProtocol) -> None:
+    def __init__(
+        self,
+        filesystem: FileSystemProtocol,
+        manifest: ManifestProtocol,
+        file_discovery: FileDiscoveryProtocol,
+    ) -> None:
         """Initialize status service.
 
         Args:
             filesystem: Filesystem operations adapter.
             manifest: Manifest operations adapter.
+            file_discovery: Source discovery adapter, shared with sync.
         """
 
         self._filesystem = filesystem
         self._manifest = manifest
+        self._file_discovery = file_discovery
         self._orphan_detector = OrphanDetector()
 
     def get_status(self, project_root: Path) -> StatusReport:
@@ -121,10 +128,7 @@ class StatusService:
         if not self._filesystem.exists(sources_dir):
             return (0, 0, 0, 0)
 
-        supported = {ext.lower() for ext in ALL_SOURCE_EXTENSIONS}
-        source_files = [
-            p for p in self._filesystem.list_files(sources_dir) if p.suffix.lower() in supported
-        ]
+        source_files = self._file_discovery.discover(sources_dir, set(ALL_SOURCE_EXTENSIONS))
 
         new_count = 0
         modified_count = 0

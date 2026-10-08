@@ -190,6 +190,10 @@ You can also place Markdown, text, CSV, JSON, YAML, and other text files into `_
 
 Directory structure is preserved — organize `_nest_sources/` however you like and Nest mirrors it in `_nest_context/`.
 
+Symlinks (and Windows junctions) inside `_nest_sources/` are followed, so a shared or synced folder can be linked in instead of copied.
+Links that loop back on themselves are skipped with a warning.
+If a linked folder is temporarily unavailable (unmounted drive, offline share), its outputs in `_nest_context/` are kept until the link is removed.
+
 ### Tips
 
 - **Use descriptive filenames** — `acme-sow-v2.pdf` beats `Document1.pdf`

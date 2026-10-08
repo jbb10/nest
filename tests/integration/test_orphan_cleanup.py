@@ -259,3 +259,76 @@ class TestOrphanCleanupIntegration:
         # Verify no orphans detected (source exists)
         assert len(result.orphans_detected) == 0
         assert output_file.exists()
+
+
+class TestOrphanCleanupLinkedSources:
+    """Outputs of sources reached through links survive while the link target is offline."""
+
+    @staticmethod
+    def _project(tmp_path: Path, outputs: dict[str, str]) -> tuple[Path, OrphanService]:
+        project_root = tmp_path / "project"
+        (project_root / SOURCES_DIR).mkdir(parents=True)
+        context = project_root / CONTEXT_DIR
+        for source_key, output in outputs.items():
+            (context / output).parent.mkdir(parents=True, exist_ok=True)
+            (context / output).write_text(f"# {source_key}")
+        manifest = Manifest(
+            nest_version="1.0.0",
+            project_name="test",
+            files={
+                key: FileEntry(
+                    sha256="abc123",
+                    processed_at=datetime.now(),
+                    output=output,
+                    status="success",
+                )
+                for key, output in outputs.items()
+            },
+        )
+        adapter = ManifestAdapter()
+        adapter.save(project_root, manifest)
+        return project_root, OrphanService(FileSystemAdapter(), adapter, project_root)
+
+    def test_output_kept_while_linked_folder_is_offline(self, tmp_path: Path) -> None:
+        project_root, service = self._project(
+            tmp_path, {"shared/team/notes.txt": "shared/team/notes.txt"}
+        )
+        (project_root / SOURCES_DIR / "shared").symlink_to(
+            tmp_path / "unmounted", target_is_directory=True
+        )
+
+        result = service.cleanup(no_clean=False)
+
+        assert result.orphans_detected == []
+        assert (project_root / CONTEXT_DIR / "shared/team/notes.txt").exists()
+
+    def test_output_kept_while_linked_file_is_offline(self, tmp_path: Path) -> None:
+        project_root, service = self._project(tmp_path, {"plan.pdf": "plan.md"})
+        (project_root / SOURCES_DIR / "plan.pdf").symlink_to(tmp_path / "unmounted.pdf")
+
+        result = service.cleanup(no_clean=False)
+
+        assert result.orphans_detected == []
+        assert (project_root / CONTEXT_DIR / "plan.md").exists()
+
+    def test_output_removed_when_file_deleted_inside_reachable_linked_folder(
+        self, tmp_path: Path
+    ) -> None:
+        project_root, service = self._project(tmp_path, {"shared/notes.txt": "shared/notes.txt"})
+        (tmp_path / "shared").mkdir()
+        (project_root / SOURCES_DIR / "shared").symlink_to(
+            tmp_path / "shared", target_is_directory=True
+        )
+
+        result = service.cleanup(no_clean=False)
+
+        assert result.orphans_removed == ["shared/notes.txt"]
+        assert not (project_root / CONTEXT_DIR / "shared/notes.txt").exists()
+
+    def test_output_removed_when_link_itself_is_deleted(self, tmp_path: Path) -> None:
+        project_root, service = self._project(tmp_path, {"shared/notes.txt": "shared/notes.txt"})
+
+        result = service.cleanup(no_clean=False)
+
+        assert result.orphans_removed == ["shared/notes.txt"]
+        assert not (project_root / CONTEXT_DIR / "shared/notes.txt").exists()
