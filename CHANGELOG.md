@@ -2,6 +2,22 @@
 
 All notable changes to Nest.
 
+## [2.0.0](https://github.com/jbb10/nest/compare/v1.3.3...v2.0.0) (2026-10-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* Python 3.10 is no longer supported.
+
+### Features
+
+* require Python 3.11 or newer ([#21](https://github.com/jbb10/nest/issues/21)) ([ed0ed41](https://github.com/jbb10/nest/commit/ed0ed4169df1cd94a6f1903cf6e5471709ed5501))
+
+
+### Bug Fixes
+
+* **sync:** record every file outcome through one contract ([#23](https://github.com/jbb10/nest/issues/23)) ([0a3477f](https://github.com/jbb10/nest/commit/0a3477f2e02592b2cfebfcc23058b76a2eb8212a))
+
 ## [1.3.3](https://github.com/jbb10/nest/compare/v1.3.2...v1.3.3) (2026-10-08)
 
 
