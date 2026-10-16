@@ -2,21 +2,16 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING
 
-from docling_core.types.doc.base import ImageRefMode
-
-from nest.core.exceptions import ProcessingError
-from nest.core.models import DiscoveredFile, DiscoveryResult, DryRunResult, SyncResult
+from nest.core.models import DiscoveryResult, DryRunResult, FileMetadata, SyncResult
 from nest.core.paths import (
     CONTEXT_DIR,
     GLOSSARY_FILE,
     INDEX_HINTS_FILE,
     NEST_META_DIR,
     SOURCES_DIR,
-    is_passthrough_extension,
 )
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService, parse_index_descriptions
@@ -24,25 +19,29 @@ from nest.services.manifest_service import ManifestService
 from nest.services.metadata_service import MetadataExtractorService
 from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
-from nest.ui.logger import log_processing_error
+from nest.services.sync_conversion import ConversionPhase
+from nest.services.sync_enrichment import EnrichmentPhase
+from nest.services.sync_outcomes import OnError, OutcomeRecorder, ProgressCallback, SyncLedger
 
 if TYPE_CHECKING:
     from nest.adapters.docling_processor import DoclingProcessor
-    from nest.core.models import AIEnrichmentResult, AIGlossaryResult
     from nest.services.ai_enrichment_service import AIEnrichmentService
     from nest.services.ai_glossary_service import AIGlossaryService
     from nest.services.picture_description_service import PictureDescriptionService
 
 logger = logging.getLogger(__name__)
 
-# Type alias for progress callback function
-ProgressCallback = Callable[[str], None]
+__all__ = ["ProgressCallback", "SyncService"]
+
+LEGACY_GLOSSARY_HINTS_FILE = "00_GLOSSARY_HINTS.yaml"
 
 
 class SyncService:
-    """Orchestrator for the document sync process.
+    """Runs the document sync pipeline.
 
-    Coordinates discovery, processing, manifest updates, orphan cleanup, and index generation.
+    Phases, in order: conversion (with collision resolution and vision),
+    manifest commit, orphan cleanup, metadata extraction, AI enrichment,
+    and index generation.
     """
 
     def __init__(
@@ -60,641 +59,133 @@ class SyncService:
         picture_description_service: PictureDescriptionService | None = None,
         vision_docling_processor: DoclingProcessor | None = None,
     ) -> None:
-        """Initialize SyncService.
-
-        Args:
-            discovery: Service for file discovery.
-            output: Service for document processing and output mirroring.
-            manifest: Service for manifest tracking.
-            orphan: Service for orphan file cleanup.
-            index: Service for master index generation.
-            metadata: Service for metadata extraction and hints.
-            project_root: Root directory of the project.
-            error_logger: Logger for writing errors to .nest/errors.log (AC5).
-            ai_enrichment: Optional AI enrichment service for generating descriptions.
-            ai_glossary: Optional AI glossary service for generating glossary definitions.
-            picture_description_service: Optional service for vision-based image descriptions.
-            vision_docling_processor: Optional DoclingProcessor with enable_classification=True.
-        """
         self._discovery = discovery
-        self._output = output
         self._manifest = manifest
         self._orphan = orphan
         self._index = index
         self._metadata = metadata
         self._project_root = project_root
         self._error_logger = error_logger
-        self._ai_enrichment = ai_enrichment
-        self._ai_glossary = ai_glossary
-        self._picture_description_service = picture_description_service
-        self._vision_docling_processor = vision_docling_processor
+        self._context_dir = project_root / CONTEXT_DIR
+        self._meta_dir = project_root / NEST_META_DIR
+        self._conversion = ConversionPhase(
+            output=output,
+            sources_dir=project_root / SOURCES_DIR,
+            context_dir=self._context_dir,
+            picture_description=picture_description_service,
+            vision_processor=vision_docling_processor,
+        )
+        self._enrichment = EnrichmentPhase(
+            project_root=project_root,
+            context_dir=self._context_dir,
+            enrichment=ai_enrichment,
+            glossary=ai_glossary,
+        )
+
+    @property
+    def vision_enabled(self) -> bool:
+        """True when image description runs during conversion."""
+        return self._conversion.vision_enabled
 
     def discover(self, force: bool = False) -> DiscoveryResult:
-        """Run file discovery.
-
-        Args:
-            force: If True, reprocess all files regardless of checksum.
-
-        Returns:
-            DiscoveryResult containing new, modified, and unchanged files.
-        """
+        """Classify source files as new, modified, or unchanged."""
         return self._discovery.discover_changes(self._project_root, force=force)
 
     def sync(
         self,
         no_clean: bool = False,
-        on_error: Literal["skip", "fail"] = "skip",
+        on_error: OnError = "skip",
         dry_run: bool = False,
         force: bool = False,
         progress_callback: ProgressCallback | None = None,
         ai_progress_callback: Callable[[str], None] | None = None,
         changes: DiscoveryResult | None = None,
     ) -> SyncResult | DryRunResult:
-        """Execute the sync process.
+        """Execute the sync pipeline.
 
         Args:
-            no_clean: If True, detect but don't remove orphan files.
-            on_error: Error handling strategy:
-                - "skip" (default): Log error, skip file, continue processing.
-                - "fail": Raise exception immediately on first failure.
-            dry_run: If True, analyze files but don't process/modify anything.
-            force: If True, reprocess all files regardless of checksum.
-            progress_callback: Optional callback called with filename after each file.
-            ai_progress_callback: Optional callback for AI phase progress. Receives
-                ``"start"`` when the AI phase begins and a summary string
-                (e.g., ``"4 descriptions, 3 glossary terms"``) when it completes.
-            changes: Optional pre-calculated discovery result. If None, discovery is performed.
-
-        Returns:
-            SyncResult for normal sync, DryRunResult for dry run.
+            no_clean: Detect orphans but do not remove them.
+            on_error: ``"skip"`` records failures and continues; ``"fail"``
+                raises ``ProcessingError`` on the first failed file.
+            dry_run: Report what would change without modifying anything.
+            force: Reprocess all files and regenerate the glossary input set.
+            progress_callback: Called with the file name once per attempted file.
+            ai_progress_callback: Called with ``"start"`` when AI work begins and
+                with a summary string when it completes.
+            changes: Pre-computed discovery result; discovered when omitted.
 
         Raises:
-            ProcessingError: If on_error="fail" and a file fails processing.
+            ProcessingError: In ``on_error="fail"`` mode, on the first failed file.
         """
         logger.info("Starting sync process...")
-
-        # 1. Discovery
         if changes is None:
             changes = self.discover(force=force)
 
-        # Dry run mode - analyze only, no modifications
         if dry_run:
-            orphans = self._orphan.detect_orphans()
             return DryRunResult(
                 new_count=len(changes.new_files),
                 modified_count=len(changes.modified_files),
                 unchanged_count=len(changes.unchanged_files),
-                orphan_count=len(orphans),
+                orphan_count=len(self._orphan.detect_orphans()),
             )
 
-        files_to_process = changes.new_files + changes.modified_files
-        skipped_count = len(changes.unchanged_files)
-        processed_count = 0
-        failed_count = 0
+        ledger = SyncLedger(skipped=len(changes.unchanged_files))
+        recorder = OutcomeRecorder(
+            self._manifest, ledger, on_error, self._error_logger, progress_callback
+        )
+        self._conversion.run(changes.new_files + changes.modified_files, recorder, ledger)
 
-        # 2. Processing Loop
-        raw_inbox = self._project_root / SOURCES_DIR
-        output_dir = self._project_root / CONTEXT_DIR
-
-        # Pre-scan for name collisions between passthrough and Docling files
-        files_to_process, collision_skipped = self._resolve_collisions(files_to_process, raw_inbox)
-
-        # Record collision-skipped files in manifest
-        for skipped_file in collision_skipped:
-            self._manifest.record_skipped(
-                skipped_file.path,
-                skipped_file.checksum,
-                skipped_file.collision_reason or "Output path collision with passthrough file",
-            )
-            skipped_count += 1
-
-        if files_to_process:
-            logger.info("Processing %d files...", len(files_to_process))
-
-        # Vision stats accumulators
-        images_described = 0
-        images_mermaid = 0
-        images_skipped = 0
-        vision_prompt_tokens = 0
-        vision_completion_tokens = 0
-
-        # Phase 1: Process all files; collect vision-eligible docling files for Phase 2
-        deferred_vision: list[tuple[DiscoveredFile, Any, Path]] = []
-
-        for file_info in files_to_process:
-            if is_passthrough_extension(file_info.path.suffix):
-                # Passthrough files always use the standard output path
-                try:
-                    result = self._output.process_file(file_info.path, raw_inbox, output_dir)
-
-                    if progress_callback is not None:
-                        progress_callback(file_info.path.name)
-
-                    if result.status == "success":
-                        if result.output_path is None:
-                            logger.error(
-                                "Processing succeeded but output_path is None: %s",
-                                file_info.path,
-                            )
-                            self._manifest.record_failure(
-                                file_info.path,
-                                file_info.checksum,
-                                "Internal error: output_path missing",
-                            )
-                            failed_count += 1
-                        else:
-                            self._manifest.record_success(
-                                file_info.path,
-                                file_info.checksum,
-                                result.output_path,
-                            )
-                            processed_count += 1
-                    elif result.status == "failed":
-                        error_msg = result.error or "Unknown error"
-                        self._manifest.record_failure(
-                            file_info.path,
-                            file_info.checksum,
-                            error_msg,
-                        )
-                        failed_count += 1
-                        if self._error_logger:
-                            log_processing_error(self._error_logger, file_info.path, error_msg)
-                        if on_error == "fail":
-                            raise ProcessingError(
-                                f"Processing failed for {file_info.path.name}: {error_msg}",
-                                source_path=file_info.path,
-                            )
-                    else:
-                        self._manifest.record_failure(
-                            file_info.path,
-                            file_info.checksum,
-                            result.error or "Unknown error",
-                        )
-                        failed_count += 1
-                except ProcessingError:
-                    raise
-                except Exception as e:
-                    logger.exception("Unexpected error processing %s", file_info.path)
-                    error_msg = str(e)
-                    self._manifest.record_failure(file_info.path, file_info.checksum, error_msg)
-                    failed_count += 1
-                    if self._error_logger:
-                        log_processing_error(self._error_logger, file_info.path, error_msg)
-                    if on_error == "fail":
-                        raise
-
-            elif (
-                self._picture_description_service is not None
-                and self._vision_docling_processor is not None
-            ):
-                # Vision-eligible docling file: convert now, describe in Phase 2
-                try:
-                    conv_result = self._vision_docling_processor.convert(file_info.path)
-                    output_path = self._output.compute_docling_output_path(
-                        file_info.path, raw_inbox, output_dir
-                    )
-                    deferred_vision.append((file_info, conv_result, output_path))
-                except ProcessingError:
-                    raise
-                except Exception as e:
-                    logger.exception("Docling convert failed for %s", file_info.path)
-                    error_msg = str(e)
-                    self._manifest.record_failure(file_info.path, file_info.checksum, error_msg)
-                    failed_count += 1
-                    if self._error_logger:
-                        log_processing_error(self._error_logger, file_info.path, error_msg)
-                    if progress_callback is not None:
-                        progress_callback(file_info.path.name)
-                    if on_error == "fail":
-                        raise ProcessingError(
-                            f"Docling convert failed: {error_msg}",
-                            source_path=file_info.path,
-                        ) from e
-
-            else:
-                # Standard docling path (no vision)
-                try:
-                    result = self._output.process_file(file_info.path, raw_inbox, output_dir)
-
-                    if progress_callback is not None:
-                        progress_callback(file_info.path.name)
-
-                    if result.status == "success":
-                        if result.output_path is None:
-                            logger.error(
-                                "Processing succeeded but output_path is None: %s",
-                                file_info.path,
-                            )
-                            self._manifest.record_failure(
-                                file_info.path,
-                                file_info.checksum,
-                                "Internal error: output_path missing",
-                            )
-                            failed_count += 1
-                        else:
-                            self._manifest.record_success(
-                                file_info.path,
-                                file_info.checksum,
-                                result.output_path,
-                            )
-                            processed_count += 1
-                    elif result.status == "failed":
-                        error_msg = result.error or "Unknown error"
-                        self._manifest.record_failure(
-                            file_info.path,
-                            file_info.checksum,
-                            error_msg,
-                        )
-                        failed_count += 1
-                        if self._error_logger:
-                            log_processing_error(self._error_logger, file_info.path, error_msg)
-                        if on_error == "fail":
-                            raise ProcessingError(
-                                f"Processing failed for {file_info.path.name}: {error_msg}",
-                                source_path=file_info.path,
-                            )
-                    else:
-                        self._manifest.record_failure(
-                            file_info.path,
-                            file_info.checksum,
-                            result.error or "Unknown error",
-                        )
-                        failed_count += 1
-                except ProcessingError:
-                    raise
-                except Exception as e:
-                    logger.exception("Unexpected error processing %s", file_info.path)
-                    error_msg = str(e)
-                    self._manifest.record_failure(file_info.path, file_info.checksum, error_msg)
-                    failed_count += 1
-                    if self._error_logger:
-                        log_processing_error(self._error_logger, file_info.path, error_msg)
-                    if on_error == "fail":
-                        raise
-
-        # Phase 2: Run image descriptions concurrently across deferred vision files
-        if deferred_vision:
-            with ThreadPoolExecutor() as executor:
-                future_to_file: dict[Future[Any], tuple[DiscoveredFile, Any, Path]] = {
-                    executor.submit(
-                        self._picture_description_service.describe,  # type: ignore[union-attr]
-                        conv_result,
-                    ): (file_info, conv_result, output_path)
-                    for file_info, conv_result, output_path in deferred_vision
-                }
-                for future in as_completed(future_to_file):
-                    file_info_, conv_result_, output_path_ = future_to_file[future]
-                    try:
-                        pds_result = future.result()
-                    except Exception as e:
-                        logger.exception("Vision describe failed for %s", file_info_.path)
-                        error_msg = str(e)
-                        self._manifest.record_failure(
-                            file_info_.path, file_info_.checksum, error_msg
-                        )
-                        failed_count += 1
-                        if self._error_logger:
-                            log_processing_error(self._error_logger, file_info_.path, error_msg)
-                        if on_error == "fail":
-                            raise ProcessingError(
-                                f"Vision describe failed: {error_msg}",
-                                source_path=file_info_.path,
-                            ) from e
-                        continue
-
-                    # Export markdown with descriptions embedded in-place
-                    markdown = conv_result_.document.export_to_markdown(
-                        image_mode=ImageRefMode.PLACEHOLDER,
-                    )
-                    output_path_.parent.mkdir(parents=True, exist_ok=True)
-                    output_path_.write_text(markdown, encoding="utf-8", newline="\n")
-                    self._manifest.record_success(
-                        file_info_.path, file_info_.checksum, output_path_
-                    )
-                    processed_count += 1
-
-                    # Accumulate vision stats
-                    images_described += pds_result.images_described
-                    images_mermaid += pds_result.images_mermaid
-                    images_skipped += pds_result.images_skipped
-                    vision_prompt_tokens += pds_result.prompt_tokens
-                    vision_completion_tokens += pds_result.completion_tokens
-
-                    if progress_callback is not None:
-                        progress_callback(file_info_.path.name)
-
-        # 3. Commit Manifest (before orphan cleanup so orphan detector knows about new files)
+        # Commit before orphan cleanup so the detector sees newly produced outputs.
         self._manifest.commit()
+        orphans = self._orphan.cleanup(no_clean=no_clean)
 
-        # 4. Orphan Cleanup (after manifest commit)
-        orphan_result = self._orphan.cleanup(no_clean=no_clean)
+        hints_path = self._meta_dir / INDEX_HINTS_FILE
+        hints = self._metadata.load_previous_hints(hints_path)
+        old_index = self._index.read_index_content()
+        descriptions = parse_index_descriptions(old_index) if old_index else {}
+        metadata = self._metadata.extract_all(self._context_dir)
+        self._metadata.write_hints(metadata, hints_path)
+        self._remove_legacy_glossary_hints()
 
-        # 5. Load old hints
-        context_dir = self._project_root / CONTEXT_DIR
-        meta_dir = self._project_root / NEST_META_DIR
-        hints_path = meta_dir / INDEX_HINTS_FILE
-        old_hints = self._metadata.load_previous_hints(hints_path)
+        self._enrichment.run(
+            metadata,
+            descriptions,
+            hints,
+            self._glossary_input(metadata, hints, force),
+            ledger,
+            ai_progress_callback,
+        )
 
-        # 6. Load old index and parse descriptions
-        old_descriptions: dict[str, str] = {}
-        old_index_content = self._index.read_index_content()
-        if old_index_content:
-            old_descriptions = parse_index_descriptions(old_index_content)
-
-        # 7. Extract metadata for all context files
-        new_metadata = self._metadata.extract_all(context_dir)
-
-        # 8. Write new hints file
-        self._metadata.write_hints(new_metadata, hints_path)
-
-        # 9. Determine which context files need glossary processing.
-        # If glossary.md is missing, process all current files so AI can backfill it
-        # after AI is configured on a previously-synced project.
-        glossary_path = meta_dir / GLOSSARY_FILE
-        if force or (new_metadata and not glossary_path.exists()):
-            changed_context_files = [context_dir / file_meta.path for file_meta in new_metadata]
-        else:
-            changed_context_files: list[Path] = []
-            for file_meta in new_metadata:
-                old_hash = old_hints.get(file_meta.path)
-                if old_hash is None or old_hash != file_meta.content_hash:
-                    changed_context_files.append(context_dir / file_meta.path)
-
-        # 10. Legacy hints cleanup — delete 00_GLOSSARY_HINTS.yaml if it exists
-        legacy_hints_path = meta_dir / "00_GLOSSARY_HINTS.yaml"
-        if legacy_hints_path.exists():
-            try:
-                legacy_hints_path.unlink()
-            except OSError:
-                logger.warning("Failed to delete legacy glossary hints: %s", legacy_hints_path)
-
-        # Parallel AI execution (after glossary hints, before index generation)
-        ai_prompt_tokens = 0
-        ai_completion_tokens = 0
-        ai_files_enriched = 0
-        ai_glossary_terms_added = 0
-        ai_glossary_prompt_tokens = 0
-        ai_glossary_completion_tokens = 0
-
-        has_enrichment_work = self._ai_enrichment is not None
-        has_glossary_work = self._ai_glossary is not None and len(changed_context_files) > 0
-
-        # Signal AI phase start
-        if ai_progress_callback is not None and (has_enrichment_work or has_glossary_work):
-            ai_progress_callback("start")
-
-        if has_enrichment_work and has_glossary_work:
-            # Both tasks have work — run in parallel
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                enrichment_future = executor.submit(
-                    self._ai_enrichment.enrich,  # type: ignore[union-attr]
-                    new_metadata,
-                    old_descriptions,
-                    old_hints,
-                )
-                glossary_future = executor.submit(
-                    self._run_glossary,
-                    changed_context_files,
-                    context_dir,
-                )
-                # Collect results (exceptions caught per-task)
-                ai_result = self._collect_enrichment_result(enrichment_future)
-                glossary_result = self._collect_glossary_result(glossary_future)
-        elif has_enrichment_work:
-            # Only enrichment — run directly (no thread overhead)
-            try:
-                ai_result = self._ai_enrichment.enrich(  # type: ignore[union-attr]
-                    new_metadata,
-                    old_descriptions,
-                    old_hints,
-                )
-            except Exception:
-                logger.exception("AI enrichment failed during sequential execution")
-                ai_result = None
-            glossary_result = None
-        elif has_glossary_work:
-            # Only glossary — run directly
-            ai_result = None
-            try:
-                glossary_result = self._run_glossary(changed_context_files, context_dir)
-            except Exception:
-                logger.exception("AI glossary generation failed during sequential execution")
-                glossary_result = None
-        else:
-            ai_result = None
-            glossary_result = None
-
-        # Apply enrichment results
-        if ai_result is not None:
-            old_descriptions.update(ai_result.descriptions)
-            for file_meta in new_metadata:
-                if file_meta.path in ai_result.descriptions:
-                    old_hints[file_meta.path] = file_meta.content_hash
-            ai_prompt_tokens = ai_result.prompt_tokens
-            ai_completion_tokens = ai_result.completion_tokens
-            ai_files_enriched = ai_result.files_enriched
-
-        # Apply glossary results
-        if glossary_result is not None:
-            ai_glossary_terms_added = glossary_result.terms_added
-            ai_glossary_prompt_tokens = glossary_result.prompt_tokens
-            ai_glossary_completion_tokens = glossary_result.completion_tokens
-
-        # Signal AI phase completion
-        if ai_progress_callback is not None and (has_enrichment_work or has_glossary_work):
-            parts: list[str] = []
-            if ai_files_enriched > 0:
-                parts.append(f"{ai_files_enriched} descriptions")
-            if ai_glossary_terms_added > 0:
-                parts.append(f"{ai_glossary_terms_added} glossary terms")
-            summary = ", ".join(parts) if parts else "cached"
-            ai_progress_callback(summary)
-
-        # 14. Generate index (table format, with description carry-forward)
-        index_content = self._index.generate_content(new_metadata, old_descriptions, old_hints)
-
-        # 15. Write new index
+        index_content = self._index.generate_content(metadata, descriptions, hints)
         self._index.write_index(index_content)
         logger.info("Master index updated.")
 
-        # 16. Count empty descriptions in generated index
-        generated_descriptions = parse_index_descriptions(index_content)
-        enrichment_needed = sum(1 for desc in generated_descriptions.values() if not desc.strip())
-
-        # Count user-curated files
-        user_curated_count = self._orphan.count_user_curated_files()
-
-        return SyncResult(
-            processed_count=processed_count,
-            skipped_count=skipped_count,
-            failed_count=failed_count,
-            orphans_removed=len(orphan_result.orphans_removed),
-            orphans_detected=len(orphan_result.orphans_detected),
-            skipped_orphan_cleanup=orphan_result.skipped,
-            user_curated_count=user_curated_count,
-            enrichment_needed=enrichment_needed,
-            ai_prompt_tokens=ai_prompt_tokens,
-            ai_completion_tokens=ai_completion_tokens,
-            ai_files_enriched=ai_files_enriched,
-            ai_glossary_terms_added=ai_glossary_terms_added,
-            ai_glossary_prompt_tokens=ai_glossary_prompt_tokens,
-            ai_glossary_completion_tokens=ai_glossary_completion_tokens,
-            vision_prompt_tokens=vision_prompt_tokens,
-            vision_completion_tokens=vision_completion_tokens,
-            images_described=images_described,
-            images_mermaid=images_mermaid,
-            images_skipped=images_skipped,
+        generated = parse_index_descriptions(index_content)
+        return ledger.to_result(
+            orphans=orphans,
+            user_curated_count=self._orphan.count_user_curated_files(),
+            enrichment_needed=sum(1 for d in generated.values() if not d.strip()),
         )
 
-    def _run_glossary(self, changed_files: list[Path], context_dir: Path) -> AIGlossaryResult:
-        """Run AI glossary generation.
+    def _glossary_input(
+        self, metadata: list[FileMetadata], old_hints: dict[str, str], force: bool
+    ) -> list[Path]:
+        """Context files whose content changed since the last sync.
 
-        Extracted to a method for ThreadPoolExecutor.submit() compatibility.
-
-        Args:
-            changed_files: List of changed/new file paths.
-            context_dir: Path to _nest_context directory.
-
-        Returns:
-            AIGlossaryResult with counts and token usage.
+        All files are included when forced, or when the glossary is missing so
+        a project synced before AI was configured gets backfilled.
         """
-        glossary_file_path = self._project_root / NEST_META_DIR / GLOSSARY_FILE
-        project_context = self._load_project_context(context_dir)
-        return self._ai_glossary.generate(  # type: ignore[union-attr]
-            changed_files,
-            context_dir,
-            glossary_file_path,
-            project_context,
-        )
-
-    def _load_project_context(self, context_dir: Path) -> str | None:
-        """Load optional project context text for glossary prompting."""
-        candidates = [
-            self._project_root / "_bmad-output" / "project-context.md",
-            self._project_root / "docs" / "project-context.md",
-            context_dir / "project-context.md",
+        glossary_missing = not (self._meta_dir / GLOSSARY_FILE).exists()
+        if force or (metadata and glossary_missing):
+            return [self._context_dir / m.path for m in metadata]
+        return [
+            self._context_dir / m.path for m in metadata if old_hints.get(m.path) != m.content_hash
         ]
-        for path in candidates:
+
+    def _remove_legacy_glossary_hints(self) -> None:
+        legacy = self._meta_dir / LEGACY_GLOSSARY_HINTS_FILE
+        if legacy.exists():
             try:
-                if path.exists():
-                    text = path.read_text(encoding="utf-8").strip()
-                    if text:
-                        return text
+                legacy.unlink()
             except OSError:
-                continue
-        return None
-
-    def _collect_enrichment_result(
-        self, future: Future[AIEnrichmentResult]
-    ) -> AIEnrichmentResult | None:
-        """Safely collect enrichment result from a future.
-
-        Args:
-            future: Future from ThreadPoolExecutor.
-
-        Returns:
-            AIEnrichmentResult or None if the task raised an exception.
-        """
-        try:
-            return future.result()
-        except Exception:
-            logger.exception("AI enrichment failed during parallel execution")
-            return None
-
-    def _collect_glossary_result(self, future: Future[AIGlossaryResult]) -> AIGlossaryResult | None:
-        """Safely collect glossary result from a future.
-
-        Args:
-            future: Future from ThreadPoolExecutor.
-
-        Returns:
-            AIGlossaryResult or None if the task raised an exception.
-        """
-        try:
-            return future.result()
-        except Exception:
-            logger.exception("AI glossary generation failed during parallel execution")
-            return None
-
-    def _resolve_collisions(
-        self,
-        files: list[DiscoveredFile],
-        raw_inbox: Path,
-    ) -> tuple[list[DiscoveredFile], list[DiscoveredFile]]:
-        """Pre-scan files for output path collisions.
-
-        When a passthrough text file and a Docling-convertible file would
-        produce the same output path (e.g., report.md from both report.md
-        source and report.pdf conversion), the passthrough file wins.
-
-        Args:
-            files: List of files to process.
-            raw_inbox: Root of sources directory.
-
-        Returns:
-            Tuple of (files_to_process, collision_skipped_files).
-        """
-        # Build output path map: output_relative -> (file, is_passthrough)
-        output_map: dict[str, tuple[DiscoveredFile, bool]] = {}
-        collision_skipped: list[DiscoveredFile] = []
-
-        for file_info in files:
-            is_pt = is_passthrough_extension(file_info.path.suffix)
-
-            try:
-                relative = file_info.path.relative_to(raw_inbox)
-            except ValueError:
-                # File not under raw_inbox — can't determine output path for collision check
-                # Add to output map with a unique key to avoid dropping it
-                unique_key = file_info.path.as_posix()
-                output_map[unique_key] = (file_info, is_pt)
-                continue
-
-            if is_pt:
-                # Passthrough files keep their extension
-                output_key = relative.as_posix()
-            else:
-                # Docling files get .md extension
-                output_key = relative.with_suffix(".md").as_posix()
-
-            if output_key in output_map:
-                existing_file, existing_is_pt = output_map[output_key]
-                if is_pt and not existing_is_pt:
-                    # Passthrough wins over Docling — skip the existing Docling file
-                    reason = (
-                        f"Skipping Docling conversion of {existing_file.path.name} "
-                        f"— output path {output_key} conflicts with passthrough "
-                        f"source file {file_info.path.name}"
-                    )
-                    logger.warning(reason)
-                    existing_file.collision_reason = reason
-                    collision_skipped.append(existing_file)
-                    output_map[output_key] = (file_info, is_pt)
-                elif not is_pt and existing_is_pt:
-                    # Passthrough already registered, skip the Docling file
-                    reason = (
-                        f"Skipping Docling conversion of {file_info.path.name} "
-                        f"— output path {output_key} conflicts with passthrough "
-                        f"source file {existing_file.path.name}"
-                    )
-                    logger.warning(reason)
-                    file_info.collision_reason = reason
-                    collision_skipped.append(file_info)
-                else:
-                    # Both same type — last one wins (unlikely but possible,
-                    # e.g., report.pdf + report.docx both → report.md)
-                    existing_file, _ = output_map[output_key]
-                    reason = (
-                        f"Output path collision: {existing_file.path.name} and "
-                        f"{file_info.path.name} both produce {output_key} "
-                        f"— keeping {file_info.path.name}"
-                    )
-                    logger.warning(reason)
-                    existing_file.collision_reason = reason
-                    collision_skipped.append(existing_file)
-                    output_map[output_key] = (file_info, is_pt)
-            else:
-                output_map[output_key] = (file_info, is_pt)
-
-        files_to_process = [f for f, _ in output_map.values()]
-        return files_to_process, collision_skipped
+                logger.warning("Failed to delete legacy glossary hints: %s", legacy)

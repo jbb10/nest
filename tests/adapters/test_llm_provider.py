@@ -21,6 +21,7 @@ from nest.adapters.llm_provider import (
     _is_azure_endpoint,
     create_llm_provider,
     create_vision_provider,
+    resolve_ai_config,
 )
 from nest.adapters.protocols import LLMProviderProtocol, VisionLLMProviderProtocol
 from nest.core.models import LLMCompletionResult
@@ -60,6 +61,48 @@ def _make_mock_response(
         response.usage = usage
 
     return response
+
+
+_AI_ENV_VARS = (
+    "NEST_AI_API_KEY",
+    "NEST_API_KEY",
+    "NEST_AI_ENDPOINT",
+    "NEST_BASE_URL",
+    "NEST_AI_MODEL",
+    "NEST_TEXT_MODEL",
+    "NEST_AI_VISION_MODEL",
+    "NEST_VISION_MODEL",
+)
+
+
+class TestResolveAIConfig:
+    @pytest.fixture(autouse=True)
+    def _clean_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for name in _AI_ENV_VARS:
+            monkeypatch.delenv(name, raising=False)
+
+    def test_returns_none_without_api_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("NEST_AI_MODEL", "gpt-4o")
+        assert resolve_ai_config() is None
+
+    def test_reports_which_variable_supplied_the_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("NEST_API_KEY", "legacy-key")
+        config = resolve_ai_config()
+        assert config is not None
+        assert config.api_key_var == "NEST_API_KEY"
+        assert config.endpoint == DEFAULT_ENDPOINT
+        assert config.text_model is None
+
+    def test_vision_model_falls_back_to_text_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("NEST_AI_API_KEY", "k")
+        monkeypatch.setenv("NEST_TEXT_MODEL", "text-m")
+        config = resolve_ai_config()
+        assert config is not None
+        assert config.vision_model == "text-m"
+
+    def test_api_key_is_hidden_from_repr(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("NEST_AI_API_KEY", "super-secret")
+        assert "super-secret" not in repr(resolve_ai_config())
 
 
 # ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass, field
 
 import openai
 
@@ -167,47 +168,95 @@ class AzureOpenAIAdapter:
             return None
 
 
-def create_llm_provider() -> OpenAIAdapter | AzureOpenAIAdapter | None:
-    """Auto-detect AI credentials from environment variables.
+@dataclass(frozen=True)
+class AIConfig:
+    """AI settings resolved from the environment.
 
-    Fallback chain (Nest-prefixed vars only):
-        API key:  NEST_AI_API_KEY → NEST_API_KEY → None
-        Endpoint: NEST_AI_ENDPOINT → NEST_BASE_URL → https://api.openai.com/v1
-        Model:    NEST_AI_MODEL → NEST_TEXT_MODEL → None
+    Attributes:
+        api_key: The API key.
+        api_key_var: Name of the environment variable the key came from.
+        endpoint: Base URL of the OpenAI-compatible or Azure endpoint.
+        text_model: Model for text completions, if configured.
+        vision_model: Model for image description, if configured.
+    """
 
-    If no model is configured, returns None so callers can skip AI features
-    rather than silently sending a wrong model name to the API.
+    api_key: str = field(repr=False)
+    api_key_var: str
+    endpoint: str
+    text_model: str | None
+    vision_model: str | None
 
-    If the resolved endpoint contains `.openai.azure.com`, an AzureOpenAIAdapter
-    is returned instead of the standard OpenAIAdapter.
+    @property
+    def is_azure(self) -> bool:
+        return _is_azure_endpoint(self.endpoint)
+
+
+def _first_env(*names: str) -> tuple[str, str] | None:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return name, value
+    return None
+
+
+def resolve_ai_config() -> AIConfig | None:
+    """Resolve AI settings from Nest-prefixed environment variables.
+
+    Fallback chains:
+        API key:      NEST_AI_API_KEY → NEST_API_KEY
+        Endpoint:     NEST_AI_ENDPOINT → NEST_BASE_URL → https://api.openai.com/v1
+        Text model:   NEST_AI_MODEL → NEST_TEXT_MODEL
+        Vision model: NEST_AI_VISION_MODEL → NEST_VISION_MODEL → the text model
 
     Returns:
-        Configured adapter if API key and model found, None otherwise.
+        The resolved configuration, or None when no API key is set.
     """
-    api_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY")
-    if not api_key:
+    key = _first_env("NEST_AI_API_KEY", "NEST_API_KEY")
+    if key is None:
         return None
-
-    endpoint = (
-        os.environ.get("NEST_AI_ENDPOINT") or os.environ.get("NEST_BASE_URL") or DEFAULT_ENDPOINT
+    endpoint = _first_env("NEST_AI_ENDPOINT", "NEST_BASE_URL")
+    text_model = _first_env("NEST_AI_MODEL", "NEST_TEXT_MODEL")
+    vision_model = _first_env("NEST_AI_VISION_MODEL", "NEST_VISION_MODEL") or text_model
+    return AIConfig(
+        api_key=key[1],
+        api_key_var=key[0],
+        endpoint=endpoint[1] if endpoint else DEFAULT_ENDPOINT,
+        text_model=text_model[1] if text_model else None,
+        vision_model=vision_model[1] if vision_model else None,
     )
-    model = os.environ.get("NEST_AI_MODEL") or os.environ.get("NEST_TEXT_MODEL")
-    if not model:
+
+
+def create_llm_provider(
+    config: AIConfig | None = None,
+) -> OpenAIAdapter | AzureOpenAIAdapter | None:
+    """Create a text LLM adapter from the resolved AI configuration.
+
+    Returns None when no API key or text model is configured, so callers skip
+    AI features rather than sending a wrong model name to the API. Azure
+    endpoints (``.openai.azure.com``) get an ``AzureOpenAIAdapter``.
+
+    Args:
+        config: Pre-resolved configuration; resolved from the environment when omitted.
+    """
+    config = config or resolve_ai_config()
+    if config is None:
+        return None
+    if not config.text_model:
         logger.warning(
             "No LLM model configured. Set NEST_AI_MODEL"
             " (or run 'nest config ai') to enable AI features."
         )
         return None
 
-    if _is_azure_endpoint(endpoint):
+    if config.is_azure:
         return AzureOpenAIAdapter(
-            api_key=api_key,
-            endpoint=endpoint,
-            deployment=model,
+            api_key=config.api_key,
+            endpoint=config.endpoint,
+            deployment=config.text_model,
             api_version=DEFAULT_AZURE_API_VERSION,
         )
 
-    return OpenAIAdapter(api_key=api_key, endpoint=endpoint, model=model)
+    return OpenAIAdapter(api_key=config.api_key, endpoint=config.endpoint, model=config.text_model)
 
 
 class OpenAIVisionAdapter:
@@ -375,56 +424,37 @@ class AzureOpenAIVisionAdapter:
             return None
 
 
-def create_vision_provider() -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter | None:
-    """Auto-detect AI credentials from environment variables for vision use.
+def create_vision_provider(
+    config: AIConfig | None = None,
+) -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter | None:
+    """Create a vision LLM adapter from the resolved AI configuration.
 
-    Fallback chain (Nest-prefixed vars only):
-        API key:      NEST_AI_API_KEY → NEST_API_KEY → None
-        Endpoint:     NEST_AI_ENDPOINT → NEST_BASE_URL → https://api.openai.com/v1
-        Vision model: NEST_AI_VISION_MODEL → NEST_VISION_MODEL
-                      → NEST_AI_MODEL → NEST_TEXT_MODEL → None
+    Returns None when no API key or vision model is configured. The vision
+    model falls back to the text model, so a single ``NEST_AI_MODEL`` enables
+    both text and vision features. Azure endpoints get an
+    ``AzureOpenAIVisionAdapter``.
 
-    The text-model env vars are used as a fallback for all endpoint types so
-    that a single ``NEST_AI_MODEL`` configuration enables both text and vision
-    features without requiring a separate ``NEST_AI_VISION_MODEL`` variable.
-
-    If no vision model can be resolved, returns None so callers can skip
-    vision features rather than sending a wrong model name to the API.
-
-    If the resolved endpoint contains `.openai.azure.com`, an
-    AzureOpenAIVisionAdapter is returned instead of OpenAIVisionAdapter.
-
-    Returns:
-        Configured vision adapter if API key and model found, None otherwise.
+    Args:
+        config: Pre-resolved configuration; resolved from the environment when omitted.
     """
-    api_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY")
-    if not api_key:
+    config = config or resolve_ai_config()
+    if config is None:
         return None
-
-    endpoint = (
-        os.environ.get("NEST_AI_ENDPOINT") or os.environ.get("NEST_BASE_URL") or DEFAULT_ENDPOINT
-    )
-    # Vision-specific model env vars take priority; fall back to the text model
-    # env vars so a single NEST_AI_MODEL config enables both text and vision.
-    vision_model = (
-        os.environ.get("NEST_AI_VISION_MODEL")
-        or os.environ.get("NEST_VISION_MODEL")
-        or os.environ.get("NEST_AI_MODEL")
-        or os.environ.get("NEST_TEXT_MODEL")
-    )
-    if not vision_model:
+    if not config.vision_model:
         logger.warning(
             "No vision model configured. Set NEST_AI_VISION_MODEL"
             " (or run 'nest config ai') to enable vision features."
         )
         return None
 
-    if _is_azure_endpoint(endpoint):
+    if config.is_azure:
         return AzureOpenAIVisionAdapter(
-            api_key=api_key,
-            endpoint=endpoint,
-            deployment=vision_model,
+            api_key=config.api_key,
+            endpoint=config.endpoint,
+            deployment=config.vision_model,
             api_version=DEFAULT_AZURE_API_VERSION,
         )
 
-    return OpenAIVisionAdapter(api_key=api_key, endpoint=endpoint, model=vision_model)
+    return OpenAIVisionAdapter(
+        api_key=config.api_key, endpoint=config.endpoint, model=config.vision_model
+    )

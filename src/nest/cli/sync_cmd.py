@@ -5,7 +5,6 @@ dry-run, force reprocessing, and orphan cleanup control.
 """
 
 import logging
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Literal
 
@@ -13,6 +12,7 @@ import typer
 
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
+from nest.adapters.llm_provider import resolve_ai_config
 from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.passthrough_processor import PassthroughProcessor
 from nest.core.exceptions import NestError, ProcessingError
@@ -24,6 +24,7 @@ from nest.core.paths import (
     NEST_META_DIR,
     SOURCES_DIR,
 )
+from nest.core.project_layout import detect_project
 from nest.services.discovery_service import DiscoveryService
 from nest.services.index_service import IndexService
 from nest.services.manifest_service import ManifestService
@@ -37,6 +38,8 @@ from nest.ui.progress import SyncProgress
 
 if TYPE_CHECKING:
     from rich.console import Console
+
+    from nest.adapters.llm_provider import AIConfig
 
 
 class NoOpProcessor:
@@ -55,6 +58,7 @@ def create_sync_service(
     project_root: Path,
     error_logger: "logging.Logger | logging.LoggerAdapter[logging.Logger] | None" = None,
     no_ai: bool = False,
+    ai_config: "AIConfig | None" = None,
 ) -> SyncService:
     """Composition root for sync service.
 
@@ -84,6 +88,7 @@ def create_sync_service(
         project_root: Root directory of the project.
         error_logger: Logger for writing errors to .nest/errors.log.
         no_ai: If True, skip AI enrichment even when API key is configured.
+        ai_config: Pre-resolved AI configuration; resolved from the environment when omitted.
 
     Returns:
         Configured SyncService with real adapters.
@@ -103,13 +108,20 @@ def create_sync_service(
     raw_inbox = project_root / SOURCES_DIR
     output_dir = project_root / CONTEXT_DIR
 
-    # AI enrichment (optional)
+    # AI enrichment and vision (optional, independent of each other)
     ai_enrichment = None
     ai_glossary = None
+    vision_docling_processor = None
+    picture_description_service = None
     if not no_ai:
-        from nest.adapters.llm_provider import create_llm_provider
+        from nest.adapters.llm_provider import (
+            create_llm_provider,
+            create_vision_provider,
+            resolve_ai_config,
+        )
 
-        llm_provider = create_llm_provider()
+        ai_config = ai_config or resolve_ai_config()
+        llm_provider = create_llm_provider(ai_config) if ai_config else None
         if llm_provider is not None:
             from nest.services.ai_enrichment_service import AIEnrichmentService
 
@@ -122,13 +134,7 @@ def create_sync_service(
                 filesystem=filesystem,
             )
 
-    # Vision provider (independent of text enrichment)
-    vision_docling_processor = None
-    picture_description_service = None
-    if not no_ai:
-        from nest.adapters.llm_provider import create_vision_provider
-
-        vision_provider = create_vision_provider()
+        vision_provider = create_vision_provider(ai_config) if ai_config else None
         if vision_provider is not None:
             from nest.adapters.docling_processor import DoclingProcessor as ClassificationProcessor
 
@@ -269,9 +275,7 @@ def sync_command(
 
     project_root = (target_dir or Path.cwd()).resolve()
 
-    # AC3: Check for Nest project (manifest must exist)
-    manifest_path = project_root / NEST_META_DIR / "manifest.json"
-    if not manifest_path.exists():
+    if not detect_project(project_root).initialized:
         error("No Nest project found")
         console.print(f"  Reason: .nest/manifest.json not found in {project_root}")
         console.print('  Action: Run `nest init "Project Name"` to initialize')
@@ -288,7 +292,10 @@ def sync_command(
     error_logger = setup_error_logger(error_log_path, service_name="sync")
 
     try:
-        service = create_sync_service(project_root, error_logger=error_logger, no_ai=no_ai)
+        ai_config = None if no_ai else resolve_ai_config()
+        service = create_sync_service(
+            project_root, error_logger=error_logger, no_ai=no_ai, ai_config=ai_config
+        )
 
         # 1. Discovery phase
         changes = service.discover(force=force)
@@ -308,13 +315,7 @@ def sync_command(
         # Calculate total for progress using discovered changes
         files_to_process_count = len(changes.new_files) + len(changes.modified_files)
 
-        # Detect AI env var key for first-run message and summary status.
-        ai_detected_key = ""
-        if not no_ai:
-            if os.environ.get("NEST_AI_API_KEY"):
-                ai_detected_key = "NEST_AI_API_KEY"
-            elif os.environ.get("NEST_API_KEY"):
-                ai_detected_key = "NEST_API_KEY"
+        ai_detected_key = ai_config.api_key_var if ai_config else ""
 
         ai_status_note = ""
         if no_ai:

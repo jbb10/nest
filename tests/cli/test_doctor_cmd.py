@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 from rich.console import Console
 
 from nest.adapters.project_checker import ProjectChecker
-from nest.cli.doctor_cmd import _count_issues
 from nest.services.doctor_service import (
     EnvironmentReport,
     EnvironmentStatus,
@@ -16,6 +15,9 @@ from nest.services.doctor_service import (
     ModelStatus,
     ProjectReport,
     ProjectStatus,
+)
+from nest.services.doctor_service import (
+    list_issues as _count_issues,
 )
 
 # ---------------------------------------------------------------------------

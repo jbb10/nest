@@ -448,5 +448,4 @@ class TestDisplaySyncSummaryVisionStats:
 
         service = create_sync_service(project_root, no_ai=True)
 
-        assert service._picture_description_service is None
-        assert service._vision_docling_processor is None
+        assert not service.vision_enabled

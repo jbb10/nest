@@ -14,6 +14,7 @@ os.environ["NO_COLOR"] = "1"
 os.environ.setdefault("CI", "1")
 
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from dotenv import load_dotenv
@@ -148,7 +149,7 @@ def mock_manifest_with_project() -> MockManifest:
 class MockModelDownloader:
     """Mock model downloader for testing.
 
-    Implements ModelDownloaderProtocol for unit tests without real downloads.
+    Implements ModelCacheProtocol for unit tests without real downloads.
     """
 
     def __init__(self, *, models_cached: bool = False) -> None:
@@ -168,6 +169,12 @@ class MockModelDownloader:
 
     def get_cache_path(self) -> Path:
         return Path.home() / ".cache" / "docling" / "models"
+
+    def get_cache_size(self) -> int:
+        return 1_800_000_000 if self._cached else 0
+
+    def get_cache_status(self) -> Literal["exists", "empty", "not_created"]:
+        return "exists" if self._cached else "not_created"
 
 
 @pytest.fixture

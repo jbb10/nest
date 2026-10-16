@@ -5,7 +5,7 @@ Handles the `nest init` command.
 
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 
@@ -37,6 +37,12 @@ class NoOpModelDownloader:
     def get_cache_path(self) -> Path:
         """Return dummy path."""
         return Path("docling-not-installed")
+
+    def get_cache_size(self) -> int:
+        return 0
+
+    def get_cache_status(self) -> Literal["exists", "empty", "not_created"]:
+        return "not_created"
 
 
 def create_init_service() -> InitService:

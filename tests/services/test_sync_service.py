@@ -460,7 +460,9 @@ class TestSyncOnErrorMode:
         assert "fail.pdf" in str(exc_info.value)
 
     def test_fail_mode_raises_on_exception(self, mock_deps):
-        """on_error=fail should re-raise exceptions immediately."""
+        """on_error=fail should abort with ProcessingError chained to the crash."""
+        from nest.core.exceptions import ProcessingError
+
         service = _create_sync_service(mock_deps)
 
         mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
@@ -474,11 +476,56 @@ class TestSyncOnErrorMode:
 
         mock_deps["output"].process_file.side_effect = RuntimeError("Unexpected crash")
 
-        with pytest.raises(RuntimeError, match="Unexpected crash"):
+        with pytest.raises(ProcessingError, match="Unexpected crash") as exc_info:
             service.sync(on_error="fail")
 
-        # Should abort after first exception
+        assert isinstance(exc_info.value.__cause__, RuntimeError)
         assert mock_deps["output"].process_file.call_count == 1
+        mock_deps["manifest"].record_failure.assert_called_once()
+
+    def test_processor_skip_is_recorded_as_skipped(self, mock_deps):
+        """A processor reporting 'skipped' yields a skipped outcome, not a failure."""
+        service = _create_sync_service(mock_deps)
+        mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
+            new_files=[DiscoveredFile(path=Path("/app/raw/a.pdf"), checksum="1", status="new")],
+        )
+        mock_deps["output"].process_file.return_value = ProcessingResult(
+            source_path=Path("/app/raw/a.pdf"), status="skipped", error="Empty document"
+        )
+
+        result = service.sync(on_error="fail")
+
+        mock_deps["manifest"].record_skipped.assert_called_once_with(
+            Path("/app/raw/a.pdf"), "1", "Empty document"
+        )
+        mock_deps["manifest"].record_failure.assert_not_called()
+        assert result.skipped_count == 1
+        assert result.failed_count == 0
+
+    def test_progress_advances_once_per_attempted_file(self, mock_deps):
+        """Progress advances for successes, failures, and crashes alike."""
+        service = _create_sync_service(mock_deps)
+        mock_deps["discovery"].discover_changes.return_value = DiscoveryResult(
+            new_files=[
+                DiscoveredFile(path=Path("/app/raw/ok.pdf"), checksum="1", status="new"),
+                DiscoveredFile(path=Path("/app/raw/bad.pdf"), checksum="2", status="new"),
+                DiscoveredFile(path=Path("/app/raw/crash.pdf"), checksum="3", status="new"),
+            ],
+        )
+        mock_deps["output"].process_file.side_effect = [
+            ProcessingResult(
+                source_path=Path("/app/raw/ok.pdf"),
+                status="success",
+                output_path=Path("/app/_nest_context/ok.md"),
+            ),
+            ProcessingResult(source_path=Path("/app/raw/bad.pdf"), status="failed", error="x"),
+            RuntimeError("boom"),
+        ]
+        progressed: list[str] = []
+
+        service.sync(progress_callback=progressed.append)
+
+        assert progressed == ["ok.pdf", "bad.pdf", "crash.pdf"]
 
     def test_skip_mode_is_default(self, mock_deps):
         """Default on_error should be skip (continue after failures)."""
@@ -1300,7 +1347,7 @@ class TestSyncAIGlossary:
         assert glossary_path_arg == tmp_path / ".nest" / "glossary.md"
         assert result.ai_glossary_terms_added == 2
 
-    def test_sync_passes_project_context_to_glossary(self, mock_deps):
+    def test_sync_passes_project_context_to_glossary(self, mock_deps, tmp_path):
         """Glossary call includes optional project context when available."""
         from nest.core.models import AIGlossaryResult, FileMetadata
         from nest.services.ai_glossary_service import AIGlossaryService
@@ -1311,6 +1358,8 @@ class TestSyncAIGlossary:
         file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
         mock_deps["metadata"].extract_all.return_value = [file_meta]
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "project-context.md").write_text("Project context text\n")
 
         service = SyncService(
             discovery=mock_deps["discovery"],
@@ -1319,11 +1368,10 @@ class TestSyncAIGlossary:
             orphan=mock_deps["orphan"],
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
-            project_root=mock_deps["project_root"],
+            project_root=tmp_path,
             ai_glossary=ai_glossary_mock,
         )
 
-        service._load_project_context = Mock(return_value="Project context text")  # type: ignore[method-assign]
         service.sync()
 
         args = ai_glossary_mock.generate.call_args.args
