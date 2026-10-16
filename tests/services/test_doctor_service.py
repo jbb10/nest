@@ -18,7 +18,7 @@ class TestPythonVersionCheck:
     """Tests for Python version validation."""
 
     def test_supported_python_version_passes(self) -> None:
-        """Python 3.10+ should pass validation."""
+        """Python 3.11+ should pass validation."""
         service = DoctorService()
 
         with patch("sys.version_info", (3, 11, 4)):
@@ -31,26 +31,26 @@ class TestPythonVersionCheck:
         assert status.suggestion is None
 
     def test_minimum_python_version_passes(self) -> None:
-        """Python 3.10.0 exactly should pass."""
+        """Python 3.11.0 exactly should pass."""
         service = DoctorService()
 
-        with patch("sys.version_info", (3, 10, 0)):
+        with patch("sys.version_info", (3, 11, 0)):
             status = service._check_python_version()
 
         assert status.status == "pass"
-        assert status.current_value == "3.10.0"
+        assert status.current_value == "3.11.0"
 
     def test_unsupported_python_version_fails(self) -> None:
-        """Python <3.10 should fail validation."""
+        """Python <3.11 should fail validation."""
         service = DoctorService()
 
-        with patch("sys.version_info", (3, 9, 1)):
+        with patch("sys.version_info", (3, 10, 14)):
             status = service._check_python_version()
 
         assert status.name == "Python"
         assert status.status == "fail"
-        assert status.current_value == "3.9.1"
-        assert "3.10" in status.message
+        assert status.current_value == "3.10.14"
+        assert "3.11" in status.message
         assert status.suggestion is not None
 
 

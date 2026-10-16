@@ -88,13 +88,13 @@ class TestCountIssues:
     def test_env_failure_reported(self) -> None:
         """Environment failure appears in issue list."""
         issues = _count_issues(
-            _make_env_report(python="fail", python_msg="requires 3.10+"),
+            _make_env_report(python="fail", python_msg="requires 3.11+"),
             None,
             None,
         )
         assert len(issues) == 1
         assert "Python check failed" in issues[0]
-        assert "requires 3.10+" in issues[0]
+        assert "requires 3.11+" in issues[0]
 
     def test_model_not_cached(self) -> None:
         """Missing ML models appear in issue list."""

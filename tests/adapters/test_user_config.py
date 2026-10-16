@@ -4,7 +4,7 @@ Tests user configuration TOML operations including load, save,
 error handling, directory creation, and default config factory.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -29,7 +29,7 @@ def sample_config() -> UserConfig:
         install=InstallConfig(
             source="git+https://github.com/jbb10/nest",
             installed_version="0.1.3",
-            installed_at=datetime(2026, 2, 12, 10, 30, 0, tzinfo=timezone.utc),
+            installed_at=datetime(2026, 2, 12, 10, 30, 0, tzinfo=UTC),
         )
     )
 
@@ -170,7 +170,7 @@ class TestSave:
             install=InstallConfig(
                 source=sample_config.install.source,
                 installed_version="0.2.0",
-                installed_at=datetime(2026, 3, 1, 12, 0, 0, tzinfo=timezone.utc),
+                installed_at=datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC),
             )
         )
         adapter.save(updated)
@@ -189,7 +189,7 @@ class TestSave:
             install=InstallConfig(
                 source="git+https://github.com/other/repo",
                 installed_version="1.0.0",
-                installed_at=datetime(2026, 6, 1, 0, 0, 0, tzinfo=timezone.utc),
+                installed_at=datetime(2026, 6, 1, 0, 0, 0, tzinfo=UTC),
             )
         )
         adapter.save(new_config)
@@ -241,9 +241,9 @@ class TestCreateDefaultConfig:
 
     def test_default_config_has_utc_timestamp(self) -> None:
         """AC #1: Default installed_at is a UTC datetime."""
-        before = datetime.now(tz=timezone.utc)
+        before = datetime.now(tz=UTC)
         config = create_default_config()
-        after = datetime.now(tz=timezone.utc)
+        after = datetime.now(tz=UTC)
 
         assert config.install.installed_at >= before
         assert config.install.installed_at <= after

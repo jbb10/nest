@@ -1,5 +1,6 @@
 """Unit tests for update CLI command."""
 
+from datetime import UTC
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -35,7 +36,7 @@ from nest.services.update_service import UpdateService
 
 def _make_config() -> UserConfig:
     """Create a minimal UserConfig for testing."""
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from nest.core.models import InstallConfig
 
@@ -43,7 +44,7 @@ def _make_config() -> UserConfig:
         install=InstallConfig(
             source="git+https://github.com/jbb10/nest",
             installed_version="1.0.0",
-            installed_at=datetime.now(tz=timezone.utc),
+            installed_at=datetime.now(tz=UTC),
         )
     )
 

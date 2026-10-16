@@ -1,6 +1,6 @@
 """Tests for StatusService."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from nest.adapters.file_discovery import FileDiscoveryAdapter
@@ -52,24 +52,24 @@ class TestStatusService:
 
         manifest = Manifest(
             nest_version="0.0.0",
-            last_sync=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            last_sync=datetime(2026, 1, 1, tzinfo=UTC),
             files={
                 "modified.pdf": FileEntry(
                     sha256="old-sha",
-                    processed_at=datetime.now(timezone.utc),
+                    processed_at=datetime.now(UTC),
                     output="modified.md",
                     status="success",
                 ),
                 "unchanged.pdf": FileEntry(
                     sha256=unchanged_sha,
-                    processed_at=datetime.now(timezone.utc),
+                    processed_at=datetime.now(UTC),
                     output="unchanged.md",
                     status="success",
                 ),
                 # Orphan: output exists but source missing
                 "orphan.pdf": FileEntry(
                     sha256="deadbeef",
-                    processed_at=datetime.now(timezone.utc),
+                    processed_at=datetime.now(UTC),
                     output="orphan.md",
                     status="success",
                 ),

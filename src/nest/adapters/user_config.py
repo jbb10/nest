@@ -6,24 +6,14 @@ that tracks installation source and version for self-update support.
 
 from __future__ import annotations
 
-import sys
-from datetime import datetime, timezone
+import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from nest import __version__
 from nest.core.exceptions import ConfigError
 from nest.core.models import InstallConfig, UserConfig
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib  # type: ignore[no-redef]
-    except ModuleNotFoundError as _err:  # pragma: no cover
-        raise ModuleNotFoundError(
-            "Python <3.11 requires 'tomli'. Install with: pip install tomli>=2.0.0"
-        ) from _err
 
 DEFAULT_INSTALL_SOURCE = "git+https://github.com/jbb10/nest"
 CONFIG_DIR = Path.home() / ".config" / "nest"
@@ -33,20 +23,11 @@ CONFIG_FILE = "config.toml"
 def _parse_toml(text: str) -> dict[str, Any]:
     """Parse a TOML string into a dictionary.
 
-    Wrapper around tomllib.loads to provide explicit typing for pyright
-    strict mode when using the tomli backport on Python <3.11.
-
-    Args:
-        text: TOML-formatted string.
-
-    Returns:
-        Parsed dictionary.
-
     Raises:
         ConfigError: If the TOML is malformed.
     """
     try:
-        result = cast(dict[str, Any], tomllib.loads(text))  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType]
+        result = tomllib.loads(text)
     except Exception as exc:
         raise ConfigError(
             "User config is corrupt. Delete ~/.config/nest/config.toml "
@@ -67,7 +48,7 @@ def create_default_config() -> UserConfig:
         install=InstallConfig(
             source=DEFAULT_INSTALL_SOURCE,
             installed_version=__version__,
-            installed_at=datetime.now(tz=timezone.utc),
+            installed_at=datetime.now(tz=UTC),
         )
     )
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from nest.adapters.protocols import FileSystemProtocol
@@ -75,7 +75,7 @@ class IndexService:
         Returns:
             Formatted Markdown content for the index.
         """
-        timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        timestamp = datetime.now(UTC).isoformat(timespec="seconds")
         # Sort files case-insensitively for better UX
         sorted_files = sorted(files, key=lambda f: f.path.casefold())
         count = len(sorted_files)

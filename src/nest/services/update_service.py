@@ -5,7 +5,7 @@ uv-based installation, and config persistence.
 """
 
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from nest.adapters.protocols import (
     GitClientProtocol,
@@ -138,7 +138,7 @@ class UpdateService:
                     "install": config.install.model_copy(
                         update={
                             "installed_version": version,
-                            "installed_at": datetime.now(tz=timezone.utc),
+                            "installed_at": datetime.now(tz=UTC),
                         }
                     )
                 }
