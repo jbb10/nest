@@ -5,7 +5,7 @@ Responsible for rendering a StatusReport to the terminal.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from rich.console import Console
 from rich.tree import Tree
@@ -27,9 +27,9 @@ def format_relative_time(dt: datetime | None) -> str:
         return "never"
 
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
 
-    delta = datetime.now(timezone.utc) - dt.astimezone(timezone.utc)
+    delta = datetime.now(UTC) - dt.astimezone(UTC)
     seconds = delta.total_seconds()
 
     if seconds < 60:

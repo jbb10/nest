@@ -5,7 +5,7 @@ cancellation, validation, subprocess failure, and edge cases.
 """
 
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -29,7 +29,7 @@ def _make_config(
         install=InstallConfig(
             source=source,
             installed_version=version,
-            installed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            installed_at=datetime(2026, 1, 1, tzinfo=UTC),
         )
     )
 
@@ -227,7 +227,7 @@ class TestExecuteUpdate:
 
         assert user_cfg.saved is not None
         assert user_cfg.saved.install.installed_version == "1.2.0"
-        assert user_cfg.saved.install.installed_at.tzinfo == timezone.utc
+        assert user_cfg.saved.install.installed_at.tzinfo == UTC
 
     def test_preserves_git_plus_prefix(self) -> None:
         config = _make_config(version="1.0.0")

@@ -6,7 +6,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -201,7 +201,7 @@ class DoctorService:
             Environment status for Python version check.
         """
         current = sys.version_info
-        required = (3, 10, 0)
+        required = (3, 11, 0)
 
         version_str = f"{current[0]}.{current[1]}.{current[2]}"
 
@@ -216,8 +216,8 @@ class DoctorService:
                 name="Python",
                 status="fail",
                 current_value=version_str,
-                message="requires 3.10+",
-                suggestion="Upgrade Python to 3.10 or higher",
+                message="requires 3.11+",
+                suggestion="Upgrade Python to 3.11 or higher",
             )
 
     def _check_uv_installation(self) -> EnvironmentStatus:
@@ -481,7 +481,7 @@ class DoctorService:
         try:
             manifest = Manifest(
                 nest_version=nest.__version__,
-                last_sync=datetime.now(timezone.utc),
+                last_sync=datetime.now(UTC),
                 files={},
             )
 
@@ -509,7 +509,7 @@ class DoctorService:
                 output_path = context_dir / output_rel_path
 
                 if self._filesystem.exists(output_path):
-                    processed_at = datetime.now(timezone.utc)
+                    processed_at = datetime.now(UTC)
 
                     entry = FileEntry(
                         sha256=sha256,

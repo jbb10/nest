@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -75,7 +75,7 @@ class TestStatusE2E:
         output_relative = "report.md"
         (context / output_relative).write_text("# report\n")
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         _write_manifest(
             project_dir,

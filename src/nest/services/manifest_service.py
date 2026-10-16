@@ -5,7 +5,7 @@ recording success/failure status for each file.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from nest import __version__
@@ -75,7 +75,7 @@ class ManifestService:
 
         entry = FileEntry(
             sha256=checksum,
-            processed_at=datetime.now(timezone.utc),
+            processed_at=datetime.now(UTC),
             output=output_relative,
             status="success",
         )
@@ -105,7 +105,7 @@ class ManifestService:
 
         entry = FileEntry(
             sha256=checksum,
-            processed_at=datetime.now(timezone.utc),
+            processed_at=datetime.now(UTC),
             output="",  # No output for failures
             status="failed",
             error=error,
@@ -136,7 +136,7 @@ class ManifestService:
 
         entry = FileEntry(
             sha256=checksum,
-            processed_at=datetime.now(timezone.utc),
+            processed_at=datetime.now(UTC),
             output="",
             status="skipped",
             error=reason,
@@ -168,7 +168,7 @@ class ManifestService:
             manifest.files.update(self._pending_entries)
 
         # Update metadata
-        manifest.last_sync = datetime.now(timezone.utc)
+        manifest.last_sync = datetime.now(UTC)
         manifest.nest_version = __version__
 
         self._manifest_adapter.save(self._project_root, manifest)

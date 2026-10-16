@@ -1,6 +1,6 @@
 """Tests for status display formatting."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from rich.console import Console
 
@@ -13,19 +13,19 @@ class TestFormatRelativeTime:
         assert format_relative_time(None) == "never"
 
     def test_just_now(self) -> None:
-        dt = datetime.now(timezone.utc) - timedelta(seconds=10)
+        dt = datetime.now(UTC) - timedelta(seconds=10)
         assert format_relative_time(dt) == "just now"
 
     def test_minutes(self) -> None:
-        dt = datetime.now(timezone.utc) - timedelta(minutes=2)
+        dt = datetime.now(UTC) - timedelta(minutes=2)
         assert format_relative_time(dt) == "2 minutes ago"
 
     def test_hours(self) -> None:
-        dt = datetime.now(timezone.utc) - timedelta(hours=1)
+        dt = datetime.now(UTC) - timedelta(hours=1)
         assert format_relative_time(dt) == "1 hour ago"
 
     def test_days(self) -> None:
-        dt = datetime.now(timezone.utc) - timedelta(days=3)
+        dt = datetime.now(UTC) - timedelta(days=3)
         assert format_relative_time(dt) == "3 days ago"
 
 

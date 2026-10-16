@@ -3,7 +3,7 @@
 Tests the full pipeline: process file → manifest updated → re-process → entry updated.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from nest.adapters.manifest import ManifestAdapter
@@ -173,12 +173,12 @@ class TestManifestIntegration:
             output_dir=processed,
         )
 
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
 
         # Act
         service.commit()
 
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         # Assert
         manifest = adapter.load(project_root)

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/jbb10/nest/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jbb10/nest/actions/workflows/ci.yml)
 [![Release](https://github.com/jbb10/nest/actions/workflows/release.yml/badge.svg)](https://github.com/jbb10/nest/actions/workflows/release.yml)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 
 **Turn your project documents into an AI-powered knowledge base for VS Code Copilot.**
 
@@ -36,7 +36,7 @@ All processing happens on your machine. No documents are sent to external servic
 
 ## Installation
 
-**Requires [Python 3.10+](https://www.python.org/) and [uv](https://docs.astral.sh/uv/getting-started/installation/).**
+**Requires [Python 3.11+](https://www.python.org/) and [uv](https://docs.astral.sh/uv/getting-started/installation/).**
 
 ```bash
 uv tool install git+https://github.com/jbb10/nest

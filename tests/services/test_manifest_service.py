@@ -3,7 +3,7 @@
 Tests manifest tracking and updates during sync operations.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from nest.core.models import FileEntry, Manifest
@@ -94,7 +94,7 @@ class TestManifestServiceRecordSuccess:
             raw_inbox=Path("/project/raw_inbox"),
             output_dir=Path("/project/processed_context"),
         )
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
 
         # Act
         entry = service.record_success(
@@ -102,7 +102,7 @@ class TestManifestServiceRecordSuccess:
             checksum="abc123",
             output_path=Path("/project/processed_context/doc.md"),
         )
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         # Assert
         assert before <= entry.processed_at <= after
@@ -275,11 +275,11 @@ class TestManifestServiceCommit:
             raw_inbox=Path("/project/raw_inbox"),
             output_dir=Path("/project/processed_context"),
         )
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
 
         # Act
         service.commit()
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         # Assert
         saved = mock_adapter.saved_manifest
@@ -332,7 +332,7 @@ class TestManifestServiceCommit:
         # Arrange
         existing_entry = FileEntry(
             sha256="existing123",
-            processed_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            processed_at=datetime(2026, 1, 1, tzinfo=UTC),
             output="existing.md",
             status="success",
         )
