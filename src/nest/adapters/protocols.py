@@ -272,11 +272,11 @@ class AgentWriterProtocol(Protocol):
 
 
 @runtime_checkable
-class ModelDownloaderProtocol(Protocol):
-    """Protocol for ML model download operations.
+class ModelCacheProtocol(Protocol):
+    """Protocol for the local ML model cache.
 
-    Implementations handle checking cache status and downloading
-    required models for document processing.
+    Implementations report cache state for diagnostics and download the
+    models required for document processing.
     """
 
     def are_models_cached(self) -> bool:
@@ -285,6 +285,14 @@ class ModelDownloaderProtocol(Protocol):
         Returns:
             True if all required models are present, False otherwise.
         """
+        ...
+
+    def get_cache_size(self) -> int:
+        """Return total cache size in bytes, 0 if the cache doesn't exist."""
+        ...
+
+    def get_cache_status(self) -> Literal["exists", "empty", "not_created"]:
+        """Return whether the cache directory has files, is empty, or is missing."""
         ...
 
     def download_if_needed(self, progress: bool = True) -> bool:
@@ -340,48 +348,6 @@ class FileDiscoveryProtocol(Protocol):
             ...     Path("raw_inbox"),
             ...     {".pdf", ".docx"}
             ... )
-        """
-        ...
-
-
-@runtime_checkable
-class ModelCheckerProtocol(Protocol):
-    """Protocol for ML model cache operations.
-
-    Implementations handle checking model cache status, calculating sizes,
-    and determining cache directory state for diagnostics.
-    """
-
-    def are_models_cached(self) -> bool:
-        """Check if models are cached.
-
-        Returns:
-            True if all required models are cached, False otherwise.
-        """
-        ...
-
-    def get_cache_path(self) -> Path:
-        """Get cache directory path.
-
-        Returns:
-            Path to the model cache directory.
-        """
-        ...
-
-    def get_cache_size(self) -> int:
-        """Get total cache size in bytes.
-
-        Returns:
-            Total size of cached models in bytes, 0 if cache doesn't exist.
-        """
-        ...
-
-    def get_cache_status(self) -> Literal["exists", "empty", "not_created"]:
-        """Get cache directory status.
-
-        Returns:
-            "exists" if cache has files, "empty" if directory exists but empty,
-            "not_created" if directory doesn't exist.
         """
         ...
 

@@ -34,8 +34,10 @@ def _suppress_third_party_loggers() -> None:
     do not reach the user.
     """
     logging.basicConfig(level=logging.WARNING, force=True)
-    for name in ("docling", "httpx", "openai", "PIL", "transformers", "urllib3"):
+    for name in ("httpx", "openai", "PIL", "transformers", "urllib3"):
         logging.getLogger(name).setLevel(logging.ERROR)
+    # Docling logs a full traceback for every unreadable document; nest reports those itself.
+    logging.getLogger("docling").setLevel(logging.CRITICAL)
 
 
 def main() -> None:

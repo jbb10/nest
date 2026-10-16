@@ -16,13 +16,14 @@ from nest.core.paths import (
     MASTER_INDEX_FILE,
     NEST_META_DIR,
 )
+from nest.core.project_layout import LEGACY_MANIFEST_FILENAME, detect_project
 
 logger = logging.getLogger(__name__)
 
 # Legacy file locations → new locations inside .nest/
 _MIGRATION_MAP: list[tuple[str, str]] = [
     # (old_path_relative_to_project, new_filename_inside_.nest)
-    (".nest_manifest.json", MANIFEST_FILENAME),
+    (LEGACY_MANIFEST_FILENAME, MANIFEST_FILENAME),
     (".nest_errors.log", ERROR_LOG_FILENAME),
     (f"{CONTEXT_DIR}/{MASTER_INDEX_FILE}", MASTER_INDEX_FILE),
     (f"{CONTEXT_DIR}/00_INDEX_HINTS.yaml", "00_INDEX_HINTS.yaml"),
@@ -50,7 +51,7 @@ class MetadataMigrationService:
         Returns:
             True if legacy layout detected, False otherwise.
         """
-        return (project_dir / ".nest_manifest.json").exists()
+        return detect_project(project_dir).legacy_manifest
 
     def migrate(self, project_dir: Path) -> MigrationResult:
         """Migrate metadata files from legacy layout to .nest/ directory.

@@ -250,7 +250,7 @@ class TestCheckEnvironment:
 
 
 class MockModelChecker:
-    """Mock implementation of ModelCheckerProtocol for testing."""
+    """Mock implementation of ModelCacheProtocol for testing."""
 
     def __init__(
         self,
@@ -273,6 +273,9 @@ class MockModelChecker:
 
     def get_cache_status(self) -> str:
         return self._cache_status
+
+    def download_if_needed(self, progress: bool = True) -> bool:
+        return not self._cached
 
 
 class TestModelValidation:

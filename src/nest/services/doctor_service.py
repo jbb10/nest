@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Literal
 import nest
 from nest.adapters.protocols import (
     GitClientProtocol,
-    ModelCheckerProtocol,
+    ModelCacheProtocol,
     ProjectCheckerProtocol,
     UserConfigProtocol,
 )
@@ -112,6 +112,56 @@ class ProjectReport:
             and self.status.folders_status == "intact"
         )
 
+    def issues(self) -> list[str]:
+        """Human-readable descriptions of every project problem."""
+        status = self.status
+        issues: list[str] = []
+        if status.manifest_status != "valid":
+            issues.append(_MANIFEST_ISSUES[status.manifest_status])
+        if not status.agent_file_present:
+            issues.append("Agent files missing")
+        if status.folders_status != "intact":
+            issues.append(_FOLDER_ISSUES[status.folders_status])
+        if not status.meta_folder_present:
+            issues.append(".nest/ metadata directory missing")
+        if status.legacy_layout_detected:
+            issues.append("Legacy layout detected \u2014 run `nest update` to migrate")
+        return issues
+
+
+_MANIFEST_ISSUES = {
+    "missing": "Manifest missing",
+    "invalid_json": "Manifest has invalid JSON",
+    "invalid_structure": "Manifest has invalid structure",
+    "version_mismatch": "Manifest version mismatch",
+}
+
+_FOLDER_ISSUES = {
+    "sources_missing": "_nest_sources/ folder missing",
+    "context_missing": "_nest_context/ folder missing",
+    "both_missing": "Project folders missing",
+}
+
+
+def list_issues(
+    env_report: EnvironmentReport,
+    model_report: ModelReport | None,
+    project_report: ProjectReport | None,
+) -> list[str]:
+    """Describe every failing check across all doctor reports."""
+    issues: list[str] = []
+    for check in (env_report.python, env_report.uv, env_report.nest):
+        if check.status == "fail":
+            msg = f"{check.name} check failed"
+            if check.message:
+                msg += f" ({check.message})"
+            issues.append(msg)
+    if model_report and not model_report.all_pass:
+        issues.append("ML models not cached")
+    if project_report:
+        issues.extend(project_report.issues())
+    return issues
+
 
 @dataclass
 class RemediationResult:
@@ -143,12 +193,25 @@ class RemediationReport:
         return any(r.attempted for r in self.results)
 
 
+_REBUILDABLE_MANIFEST = frozenset({"missing", "invalid_json", "invalid_structure"})
+
+
+@dataclass(frozen=True)
+class _Remedy:
+    """A repair for one detected issue."""
+
+    issue: str
+    prompt: str
+    needed: bool
+    apply: Callable[[], RemediationResult]
+
+
 class DoctorService:
     """Validates development environment and project state."""
 
     def __init__(
         self,
-        model_checker: ModelCheckerProtocol | None = None,
+        model_checker: ModelCacheProtocol | None = None,
         project_checker: ProjectCheckerProtocol | None = None,
         manifest_adapter: "ManifestProtocol | None" = None,
         filesystem: "FileSystemProtocol | None" = None,
@@ -635,18 +698,8 @@ class DoctorService:
                 message="Model checker not available",
             )
 
-        # Get the download method if it exists
-        download_method = getattr(self._model_checker, "download_if_needed", None)
-        if download_method is None:
-            return RemediationResult(
-                issue="missing_models",
-                attempted=False,
-                success=False,
-                message="Model checker does not support download",
-            )
-
         try:
-            downloaded = download_method(progress=True)
+            downloaded = self._model_checker.download_if_needed(progress=True)
             if downloaded:
                 message = "Models downloaded successfully"
             else:
@@ -666,6 +719,52 @@ class DoctorService:
                 message=f"Failed to download models: {e}",
             )
 
+    def _remedies(
+        self,
+        project_dir: Path,
+        model_report: ModelReport | None,
+        project_report: ProjectReport | None,
+    ) -> list[_Remedy]:
+        """Return the remedies needed for the reported issues, in repair order.
+
+        Order matters: models are foundational, folders must exist before the
+        manifest can be rebuilt, and agent files come last.
+        """
+        status = project_report.status if project_report else None
+        candidates = [
+            _Remedy(
+                "missing_models",
+                "Download missing ML models?",
+                model_report is not None and not model_report.all_pass,
+                self.download_models,
+            ),
+            _Remedy(
+                "missing_folders",
+                "Recreate missing project folders?",
+                status is not None and status.folders_status != "intact",
+                lambda: self.recreate_folders(project_dir),
+            ),
+            _Remedy(
+                "corrupt_manifest",
+                "Rebuild manifest?",
+                status is not None and status.manifest_status in _REBUILDABLE_MANIFEST,
+                lambda: self.rebuild_manifest(project_dir),
+            ),
+            _Remedy(
+                "missing_agent_file",
+                "Regenerate agent files?",
+                status is not None and not status.agent_file_present,
+                lambda: self.regenerate_agent_file(project_dir),
+            ),
+            _Remedy(
+                "legacy_layout",
+                "Migrate legacy metadata to .nest/ directory?",
+                status is not None and status.legacy_layout_detected,
+                lambda: self.migrate_legacy_layout(project_dir),
+            ),
+        ]
+        return [r for r in candidates if r.needed]
+
     def remediate_issues_auto(
         self,
         project_dir: Path,
@@ -673,51 +772,10 @@ class DoctorService:
         model_report: ModelReport | None,
         project_report: ProjectReport | None,
     ) -> RemediationReport:
-        """Remediate all detected issues automatically.
-
-        Args:
-            project_dir: Path to the project root directory.
-            env_report: Environment validation report.
-            model_report: ML model validation report (if available).
-            project_report: Project state validation report (if available).
-
-        Returns:
-            RemediationReport with all remediation results.
-        """
-        results: list[RemediationResult] = []
-
-        # Check ML models
-        if model_report and not model_report.all_pass:
-            result = self.download_models()
-            results.append(result)
-
-        # Check project issues if in a project
-        if project_report:
-            # Recreate folders
-            if project_report.status.folders_status != "intact":
-                result = self.recreate_folders(project_dir)
-                results.append(result)
-
-            # Rebuild manifest
-            if project_report.status.manifest_status in (
-                "missing",
-                "invalid_json",
-                "invalid_structure",
-            ):
-                result = self.rebuild_manifest(project_dir)
-                results.append(result)
-
-            # Regenerate agent file
-            if not project_report.status.agent_file_present:
-                result = self.regenerate_agent_file(project_dir)
-                results.append(result)
-
-            # Migrate legacy layout
-            if project_report.status.legacy_layout_detected:
-                result = self.migrate_legacy_layout(project_dir)
-                results.append(result)
-
-        return RemediationReport(results=results)
+        """Apply every needed remedy without prompting."""
+        return self.remediate_issues_interactive(
+            project_dir, env_report, model_report, project_report, confirm_callback=None
+        )
 
     def remediate_issues_interactive(
         self,
@@ -727,71 +785,17 @@ class DoctorService:
         project_report: ProjectReport | None,
         confirm_callback: Callable[[str], bool] | None = None,
     ) -> RemediationReport:
-        """Remediate issues sequentially with user confirmation.
+        """Apply needed remedies in repair order, asking ``confirm_callback`` before each.
 
-        Args:
-            project_dir: Path to the project root directory.
-            env_report: Environment validation report.
-            model_report: ML model validation report.
-            project_report: Project state validation report.
-            confirm_callback: Function that returns True if user confirms action.
-
-        Returns:
-            RemediationReport with results.
+        A remedy the user declines is reported as not attempted. Without a
+        callback every remedy is applied.
         """
         results: list[RemediationResult] = []
-
-        def _confirm(msg: str) -> bool:
-            if confirm_callback:
-                return confirm_callback(msg)
-            return True
-
-        # 1. ML models (Foundational)
-        if model_report and not model_report.all_pass:
-            if _confirm("Download missing ML models?"):
-                result = self.download_models()
-                results.append(result)
+        for remedy in self._remedies(project_dir, model_report, project_report):
+            if confirm_callback is None or confirm_callback(remedy.prompt):
+                results.append(remedy.apply())
             else:
-                results.append(RemediationResult("missing_models", False, False, "User declined"))
-
-        # 2. Folders (Structural)
-        if project_report and project_report.status.folders_status != "intact":
-            if _confirm("Recreate missing project folders?"):
-                result = self.recreate_folders(project_dir)
-                results.append(result)
-            else:
-                results.append(RemediationResult("missing_folders", False, False, "User declined"))
-
-        # 3. Manifest (State)
-        if project_report and project_report.status.manifest_status in (
-            "missing",
-            "invalid_json",
-            "invalid_structure",
-        ):
-            if _confirm("Rebuild manifest?"):
-                result = self.rebuild_manifest(project_dir)
-                results.append(result)
-            else:
-                results.append(RemediationResult("corrupt_manifest", False, False, "User declined"))
-
-        # 4. Agent file (Last)
-        if project_report and not project_report.status.agent_file_present:
-            if _confirm("Regenerate agent files?"):
-                result = self.regenerate_agent_file(project_dir)
-                results.append(result)
-            else:
-                results.append(
-                    RemediationResult("missing_agent_file", False, False, "User declined")
-                )
-
-        # 5. Legacy layout migration
-        if project_report and project_report.status.legacy_layout_detected:
-            if _confirm("Migrate legacy metadata to .nest/ directory?"):
-                result = self.migrate_legacy_layout(project_dir)
-                results.append(result)
-            else:
-                results.append(RemediationResult("legacy_layout", False, False, "User declined"))
-
+                results.append(RemediationResult(remedy.issue, False, False, "User declined"))
         return RemediationReport(results=results)
 
     def migrate_legacy_layout(self, project_dir: Path) -> RemediationResult:

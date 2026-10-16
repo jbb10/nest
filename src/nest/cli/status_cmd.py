@@ -12,6 +12,7 @@ from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.core.exceptions import NestError
+from nest.core.project_layout import detect_project
 from nest.services.status_service import StatusService
 from nest.ui.messages import error, get_console
 from nest.ui.status_display import display_status
@@ -47,9 +48,7 @@ def status_command(
     console = get_console()
     project_root = (target_dir or Path.cwd()).resolve()
 
-    # AC4: Outside project
-    manifest_adapter = ManifestAdapter()
-    if not manifest_adapter.exists(project_root):
+    if not detect_project(project_root).initialized:
         error("No Nest project found. Run `nest init` first.")
         raise typer.Exit(1)
 

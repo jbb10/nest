@@ -12,16 +12,12 @@ from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.git_client import GitClientAdapter
 from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.project_checker import ProjectChecker
-from nest.adapters.protocols import ModelCheckerProtocol
+from nest.adapters.protocols import ModelCacheProtocol
 from nest.adapters.user_config import UserConfigAdapter
 from nest.agents.vscode_writer import VSCodeAgentWriter
 from nest.core.exceptions import ModelError
-from nest.services.doctor_service import (
-    DoctorService,
-    EnvironmentReport,
-    ModelReport,
-    ProjectReport,
-)
+from nest.core.project_layout import detect_project
+from nest.services.doctor_service import DoctorService, list_issues
 from nest.ui.doctor_display import (
     display_doctor_report,
     display_issue_summary,
@@ -40,7 +36,7 @@ def create_doctor_service(project_checker: ProjectChecker) -> DoctorService:
     try:
         from nest.adapters.docling_downloader import DoclingModelDownloader
 
-        model_checker: ModelCheckerProtocol | None = DoclingModelDownloader()
+        model_checker: ModelCacheProtocol | None = DoclingModelDownloader()
         # Eagerly verify docling is importable
         model_checker.get_cache_path()
     except (ImportError, ModelError):
@@ -55,82 +51,6 @@ def create_doctor_service(project_checker: ProjectChecker) -> DoctorService:
         agent_writer=VSCodeAgentWriter(filesystem),
         git_client=GitClientAdapter(),
         user_config=UserConfigAdapter(),
-    )
-
-
-def _count_issues(
-    env_report: EnvironmentReport,
-    model_report: ModelReport | None,
-    project_report: ProjectReport | None,
-) -> list[str]:
-    """Count and describe all detected issues.
-
-    Args:
-        env_report: Environment validation report.
-        model_report: ML model validation report (if available).
-        project_report: Project state validation report (if available).
-
-    Returns:
-        List of issue description strings. Empty if all pass.
-    """
-    issues: list[str] = []
-
-    # Environment failures
-    for check in [env_report.python, env_report.uv, env_report.nest]:
-        if check.status == "fail":
-            msg = f"{check.name} check failed"
-            if check.message:
-                msg += f" ({check.message})"
-            issues.append(msg)
-
-    # ML model issues
-    if model_report and not model_report.all_pass:
-        issues.append("ML models not cached")
-
-    # Project issues
-    if project_report:
-        status = project_report.status
-        if status.manifest_status != "valid":
-            label_map = {
-                "missing": "Manifest missing",
-                "invalid_json": "Manifest has invalid JSON",
-                "invalid_structure": "Manifest has invalid structure",
-                "version_mismatch": "Manifest version mismatch",
-            }
-            issues.append(label_map.get(status.manifest_status, "Manifest issue"))
-        if not status.agent_file_present:
-            issues.append("Agent files missing")
-        if status.folders_status != "intact":
-            folder_map = {
-                "sources_missing": "_nest_sources/ folder missing",
-                "context_missing": "_nest_context/ folder missing",
-                "both_missing": "Project folders missing",
-            }
-            issues.append(folder_map.get(status.folders_status, "Folders issue"))
-        if not status.meta_folder_present:
-            issues.append(".nest/ metadata directory missing")
-        if status.legacy_layout_detected:
-            issues.append("Legacy layout detected \u2014 run `nest update` to migrate")
-
-    return issues
-
-
-def _is_nest_project(project_dir: Path, project_checker: ProjectChecker) -> bool:
-    """Check whether a directory looks like a Nest project.
-
-    Args:
-        project_dir: Directory to check.
-        project_checker: Project checker adapter.
-
-    Returns:
-        True if any Nest project markers exist, False otherwise.
-    """
-    return (
-        project_checker.manifest_exists(project_dir)
-        or project_checker.has_legacy_layout(project_dir)
-        or project_checker.agent_file_exists(project_dir)
-        or project_checker.source_folder_exists(project_dir)
-        or project_checker.context_folder_exists(project_dir)
     )
 
 
@@ -155,13 +75,13 @@ def doctor_command(
 
     # Check if we're in a Nest project
     project_dir = Path.cwd()
-    if _is_nest_project(project_dir, project_checker):
+    if detect_project(project_dir).is_nest_project:
         project_report = service.check_project(project_dir)
     else:
         project_report = None
 
     # Detect issues
-    issues = _count_issues(env_report, model_report, project_report)
+    issues = list_issues(env_report, model_report, project_report)
 
     display_doctor_report(env_report, console, model_report, project_report)
 

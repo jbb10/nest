@@ -9,7 +9,7 @@ from nest.adapters.protocols import (
     AgentWriterProtocol,
     FileSystemProtocol,
     ManifestProtocol,
-    ModelDownloaderProtocol,
+    ModelCacheProtocol,
 )
 from nest.core.exceptions import NestError
 from nest.core.paths import (
@@ -55,7 +55,7 @@ class InitService:
         filesystem: FileSystemProtocol,
         manifest: ManifestProtocol,
         agent_writer: AgentWriterProtocol,
-        model_downloader: ModelDownloaderProtocol,
+        model_downloader: ModelCacheProtocol,
     ) -> None:
         """Initialize the service with required adapters.
 
