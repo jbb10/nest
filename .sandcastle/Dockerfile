@@ -5,7 +5,19 @@ RUN apt-get update && apt-get install -y \
   git \
   curl \
   jq \
+  make \
+  libgl1 \
+  libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/*
+
+# uv manages Python and the project virtualenv, matching CI.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /usr/local/bin/
+
+# gitleaks backs `make scan-secrets`; same version as CI.
+ARG GITLEAKS_VERSION=8.30.1
+RUN arch="$(dpkg --print-architecture | sed 's/amd64/x64/')" \
+  && curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${arch}.tar.gz" \
+  | tar xz -C /usr/local/bin gitleaks
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -30,6 +42,10 @@ RUN npm install -g @github/copilot
 USER ${AGENT_UID}:${AGENT_GID}
 
 WORKDIR /home/agent
+
+# The uv cache is bind-mounted from the host, so hardlinks cannot cross into the worktree.
+ENV UV_LINK_MODE=copy
+RUN uv python install 3.13
 
 # In worktree sandbox mode, Sandcastle bind-mounts the git worktree at ${SANDBOX_REPO_DIR}
 # and overrides the working directory to ${SANDBOX_REPO_DIR} at container start.

@@ -28,7 +28,7 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 3. **Check correctness**:
    - Does the implementation match the intent? Are edge cases handled?
    - Are new/changed behaviours covered by tests?
-   - Are there unsafe casts, `any` types, or unchecked assumptions?
+   - Are there unsafe casts, `Any` types, `# type: ignore` or `# pyright: ignore` comments, or unchecked assumptions?
    - Does the change introduce injection vulnerabilities, credential leaks, or other security issues?
 
 4. **Maintain balance**: Avoid over-simplification that could:
@@ -47,8 +47,8 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 If you find improvements to make:
 
 1. Make the changes directly on this branch
-2. Run tests and type checking to ensure nothing is broken
-3. Commit describing the refinements
+2. Run `make lint format-check typecheck test` to ensure nothing is broken
+3. Commit describing the refinements, using a Conventional Commit subject (usually `refactor(<scope>): ...`)
 
 If the code is already clean and well-structured, do nothing.
 

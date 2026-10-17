@@ -4,7 +4,7 @@ Here are the open issues in the repo:
 
 <issues-json>
 
-!`gh issue list --state open --label Sandcastle --limit 100 --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`
+!`gh issue list --state open --label ready-for-agent --limit 100 --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`
 
 </issues-json>
 
@@ -16,6 +16,7 @@ Analyze the open issues and build a dependency graph. For each issue, determine 
 
 An issue B is **blocked by** issue A if:
 
+- B's body or agent brief has a `Blocked by: #A` line and #A is still open (an issue absent from the list above may be closed; check with `gh issue view A --json state`)
 - B requires code or infrastructure that A introduces
 - B and A modify overlapping files or modules, making concurrent work likely to produce merge conflicts
 - B's requirements depend on a decision or API shape that A will establish

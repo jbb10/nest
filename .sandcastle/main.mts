@@ -44,15 +44,20 @@ const planSchema = z.object({
 const MAX_ITERATIONS = 10;
 
 // Hooks run inside the sandbox before the agent starts each iteration.
-// npm install ensures the sandbox always has fresh dependencies.
+// uv sync builds the project virtualenv the Makefile targets run in.
 const hooks = {
-  sandbox: { onSandboxReady: [{ command: "npm install" }] },
+  sandbox: { onSandboxReady: [{ command: "uv sync --dev" }] },
 };
 
-// Copy node_modules from the host into the worktree before each sandbox
-// starts. Avoids a full npm install from scratch; the hook above handles
-// platform-specific binaries and any packages added since the last copy.
-const copyToWorktree = ["node_modules"];
+// Host caches shared with every sandbox: uv wheels, and the ~2 GB of Docling
+// models the E2E suite needs, so neither is downloaded per sandbox.
+const nestSandbox = () =>
+  docker({
+    mounts: [
+      { hostPath: "~/.cache/uv", sandboxPath: "/home/agent/.cache/uv" },
+      { hostPath: "~/.cache/docling", sandboxPath: "/home/agent/.cache/docling" },
+    ],
+  });
 
 // ---------------------------------------------------------------------------
 // Main loop
@@ -72,7 +77,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // -------------------------------------------------------------------------
   const plan = await sandcastle.run({
     hooks,
-    sandbox: docker(),
+    sandbox: nestSandbox(),
     name: "planner",
     // One iteration is enough: the planner just needs to read and reason,
     // not write code. (Structured output requires maxIterations: 1.)
@@ -115,9 +120,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     issues.map(async (issue) => {
       const sandbox = await sandcastle.createSandbox({
         branch: issue.branch,
-        sandbox: docker(),
+        sandbox: nestSandbox(),
         hooks,
-        copyToWorktree,
       });
 
       try {
@@ -209,7 +213,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   // -------------------------------------------------------------------------
   await sandcastle.run({
     hooks,
-    sandbox: docker(),
+    sandbox: nestSandbox(),
     name: "merger",
     maxIterations: 1,
     // Custom Copilot model for merging (see .sandcastle/.env).

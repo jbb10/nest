@@ -2,7 +2,7 @@
 
 Fix issue {{TASK_ID}}: {{ISSUE_TITLE}}
 
-Pull in the issue using `gh issue view <ID>`. If it has a parent PRD, pull that in too.
+Pull in the issue using `gh issue view <ID> --comments`. The `## Agent Brief` comment is the specification; the body and other comments are context. If it has a parent PRD, pull that in too.
 
 Only work on the issue specified.
 
@@ -35,19 +35,27 @@ If applicable, use RGR to complete the task.
 
 # FEEDBACK LOOPS
 
-Before committing, run `npm run typecheck` and `npm run test` to ensure the tests pass.
+The `Makefile` is the single source of truth for checks.
+
+Before each commit, run `make lint format-check typecheck test`. Fix formatting with `make format`.
+
+Before outputting COMPLETE, also run `make test-e2e E2E_TIMEOUT=180`. AI-gated E2E tests skip when `NEST_AI_API_KEY` is unset; that is expected.
+
+Never run `nest init` or `nest sync` in the repository root. Verify CLI behavior through the E2E tests, which use isolated temporary workspaces.
 
 # COMMIT
 
-Make a git commit. The commit message must:
+Follow `.sandcastle/CODING_STANDARDS.md`. Commit messages use Conventional Commits, because release-please derives versions from them:
 
-1. Start with `RALPH:` prefix
-2. Include task completed + PRD reference
-3. Key decisions made
-4. Files changed
-5. Blockers or notes for next iteration
+```
+<type>(<scope>): <imperative subject>
 
-Keep it concise.
+<what changed and key decisions>
+
+Refs #{{TASK_ID}}
+```
+
+Use `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, `build` or `perf`. Mark breaking changes with `!`.
 
 # THE ISSUE
 
