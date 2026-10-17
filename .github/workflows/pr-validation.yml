@@ -47,6 +47,25 @@ jobs:
             The PR title subject must start with a lowercase letter, e.g.
             "feat(sync): add parallel processing".
 
+  # ── Dependency review (advisory security gate) ───────────────────────────────
+  # Fails when a PR introduces a dependency with a known GitHub advisory.
+  # Compares the dependency snapshots of the base and head refs through the
+  # repository dependency graph (uv.lock), so nothing is installed. Advisory
+  # only: branch protection still requires just `CI success` and
+  # `Validate PR title`, so this check cannot block a merge on its own.
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      # fail-on-severity stays at its default (low): any known advisory in a
+      # newly added dependency fails the check.
+      - name: Review dependencies for known advisories
+        uses: actions/dependency-review-action@v5
+
   # ── Branch naming convention (advisory) ──────────────────────────────────────
   # Optional convention check. Automated branches (release-please, dependabot)
   # are exempt.
