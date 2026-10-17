@@ -185,6 +185,78 @@ class SyncResult(BaseModel):
     images_skipped: int = 0
 
 
+class ConvertFileOutcome(BaseModel):
+    """A per-file outcome recorded during a convert run.
+
+    Attributes:
+        path: Absolute path to the source file.
+        reason: Human-readable reason for the outcome.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    path: Path
+    reason: str
+
+
+class ConvertSkip(ConvertFileOutcome):
+    """A file skipped during a convert run."""
+
+
+class ConvertFailure(ConvertFileOutcome):
+    """A file that failed during a convert run."""
+
+
+class ConvertPlan(BaseModel):
+    """Planned work for one `nest convert` run.
+
+    Attributes:
+        root: Root of the conversion (the target directory, or the parent
+            of a single target file).
+        output_dir: Output root when mirroring into a separate tree; None
+            writes outputs next to the originals.
+        pending: Files to convert or copy.
+        skipped: Files already classified as skipped, with collision_reason set.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    root: Path
+    output_dir: Path | None = None
+    pending: list[DiscoveredFile] = Field(default_factory=lambda: [])
+    skipped: list[DiscoveredFile] = Field(default_factory=lambda: [])
+
+
+class ConvertResult(BaseModel):
+    """Result of a convert run.
+
+    Attributes:
+        root: Root of the conversion.
+        processed_count: Number of files converted or copied.
+        skipped_count: Number of files skipped.
+        failed_count: Number of files that failed.
+        skips: Skipped files with reasons.
+        failures: Failed files with reasons.
+        images_described: Number of images described by the vision model.
+        images_skipped: Number of images intentionally skipped (logos/signatures).
+        vision_prompt_tokens: Total prompt tokens used for image descriptions.
+        vision_completion_tokens: Total completion tokens used for image descriptions.
+    """
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    root: Path
+    processed_count: int = 0
+    skipped_count: int = 0
+    failed_count: int = 0
+    skips: list[ConvertSkip] = Field(default_factory=lambda: [])
+    failures: list[ConvertFailure] = Field(default_factory=lambda: [])
+    images_described: int = 0
+    images_skipped: int = 0
+    vision_prompt_tokens: int = 0
+    vision_completion_tokens: int = 0
+
+
 class AIEnrichmentResult(BaseModel):
     """Result of AI index enrichment.
 

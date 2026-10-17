@@ -5,6 +5,7 @@ import logging
 import typer
 
 from nest.cli.config_cmd import config_app
+from nest.cli.convert_cmd import convert_command
 from nest.cli.doctor_cmd import doctor_command
 from nest.cli.init_cmd import init_command
 from nest.cli.status_cmd import status_command
@@ -17,6 +18,7 @@ app = typer.Typer()
 # Register commands
 app.command(name="init")(init_command)
 app.command(name="sync")(sync_command)
+app.command(name="convert")(convert_command)
 app.command(name="status")(status_command)
 app.command(name="doctor")(doctor_command)
 app.command(name="update")(update_command)

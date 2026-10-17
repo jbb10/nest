@@ -1,10 +1,11 @@
-"""Error logging infrastructure for Nest.
+"""Logging infrastructure for Nest.
 
-Provides file-based error logging for sync operations.
-Logs are written to .nest/errors.log in ISO timestamp format.
-
-NEVER use this for user-facing messages - use messages.py Rich helpers.
-This module is for diagnostic/error log files only.
+- ``setup_error_logger`` / ``log_processing_error``: file-based error logging
+  for sync operations, written to .nest/errors.log in ISO timestamp format.
+  NEVER use these for user-facing messages - use messages.py Rich helpers.
+- ``RichConsoleHandler`` / ``install_rich_console_handler``: bridge ``nest.*``
+  log records to the Rich console.
+- ``enable_verbose_logging``: INFO-level logging for ``--verbose`` CLI runs.
 """
 
 from __future__ import annotations
@@ -61,6 +62,13 @@ def setup_error_logger(
     adapter = logging.LoggerAdapter(logger, {"service": service_name})
 
     return adapter
+
+
+def enable_verbose_logging() -> None:
+    """Raise the root and known chatty loggers to INFO for ``--verbose`` runs."""
+    logging.getLogger().setLevel(logging.INFO)
+    for name in ("docling", "httpx", "openai", "nest"):
+        logging.getLogger(name).setLevel(logging.INFO)
 
 
 def log_processing_error(
