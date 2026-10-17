@@ -1,0 +1,397 @@
+"""Tests for the convert service.
+
+Covers project-free document conversion: planning (validation, discovery,
+skip-existing classification) and execution (in-place conversion, output
+mirroring, passthrough handling, per-file failure recording).
+"""
+
+from pathlib import Path
+from typing import Literal
+
+import pytest
+
+from nest.adapters.file_discovery import FileDiscoveryAdapter
+from nest.adapters.filesystem import FileSystemAdapter
+from nest.adapters.passthrough_processor import PassthroughProcessor
+from nest.core.checksum import compute_sha256
+from nest.core.exceptions import NestError
+from nest.core.models import ProcessingResult
+from nest.services.convert_service import ConvertService
+from nest.services.output_service import OutputMirrorService
+
+
+class StubProcessor:
+    """Document processor that writes a marker line to each output path."""
+
+    def __init__(self, fail_names: set[str] | None = None) -> None:
+        self.fail_names = fail_names or set()
+        self.processed: list[Path] = []
+
+    def process(self, source: Path, output: Path) -> ProcessingResult:
+        if source.name in self.fail_names:
+            return ProcessingResult(
+                source_path=source,
+                status="failed",
+                error=f"stub failure for {source.name}",
+            )
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(f"converted: {source.name}\n", encoding="utf-8", newline="\n")
+        self.processed.append(source)
+        return ProcessingResult(source_path=source, status="success", output_path=output)
+
+
+class StubDownloader:
+    """Model cache that records download calls without downloading."""
+
+    def __init__(self) -> None:
+        self.download_calls = 0
+
+    def are_models_cached(self) -> bool:
+        return True
+
+    def download_if_needed(self, progress: bool = True) -> bool:
+        self.download_calls += 1
+        return False
+
+    def get_cache_path(self) -> Path:
+        return Path("/tmp/docling-models")
+
+    def get_cache_size(self) -> int:
+        return 0
+
+    def get_cache_status(self) -> Literal["exists", "empty", "not_created"]:
+        return "exists"
+
+
+def make_service(
+    fail_names: set[str] | None = None,
+) -> tuple[ConvertService, StubProcessor, StubDownloader]:
+    """Wire a ConvertService with real discovery/passthrough and stub conversion."""
+    processor = StubProcessor(fail_names)
+    downloader = StubDownloader()
+    service = ConvertService(
+        output=OutputMirrorService(
+            filesystem=FileSystemAdapter(),
+            processor=processor,
+            passthrough_processor=PassthroughProcessor(),
+        ),
+        file_discovery=FileDiscoveryAdapter(),
+        model_downloader=downloader,
+    )
+    return service, processor, downloader
+
+
+def write(path: Path, content: str = "content") -> Path:
+    """Create a file (and parents) with the given content."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8", newline="\n")
+    return path
+
+
+class TestConvertPlanValidation:
+    """Tests for target validation in plan()."""
+
+    def test_plan_raises_for_missing_path(self, tmp_path: Path) -> None:
+        """A path that does not exist raises NestError naming the path."""
+        service, _, _ = make_service()
+
+        with pytest.raises(NestError, match="not found"):
+            service.plan(tmp_path / "missing")
+
+    def test_plan_raises_for_unsupported_single_file(self, tmp_path: Path) -> None:
+        """A single file of an unsupported type raises NestError naming the type."""
+        service, _, _ = make_service()
+        write(tmp_path / "archive.zip")
+
+        with pytest.raises(NestError, match="[Uu]nsupported file type"):
+            service.plan(tmp_path / "archive.zip")
+
+    def test_plan_accepts_single_supported_file(self, tmp_path: Path) -> None:
+        """A single supported file is planned with its parent as root."""
+        service, _, _ = make_service()
+        pdf = write(tmp_path / "docs" / "q1.pdf")
+
+        plan = service.plan(pdf)
+
+        assert plan.root == pdf.parent
+        assert [f.path for f in plan.pending] == [pdf]
+        assert plan.skipped == []
+
+    def test_plan_accepts_explicitly_passed_hidden_file(self, tmp_path: Path) -> None:
+        """An explicitly passed hidden file converts; hidden rules apply to directories."""
+        service, _, _ = make_service()
+        pdf = write(tmp_path / ".secret.pdf")
+
+        plan = service.plan(pdf)
+
+        assert [f.path for f in plan.pending] == [pdf]
+
+
+class TestConvertPlanDiscovery:
+    """Tests for directory discovery in plan()."""
+
+    def test_plan_discovers_nested_supported_files(self, tmp_path: Path) -> None:
+        """A directory is processed recursively for all supported extensions."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "reports" / "q1.pdf")
+        write(docs / "reports" / "summary.docx")
+        write(docs / "decks" / "intro.pptx")
+
+        plan = service.plan(docs)
+
+        names = {f.path.name for f in plan.pending}
+        assert names == {"q1.pdf", "summary.docx", "intro.pptx"}
+        assert all(f.path.is_absolute() for f in plan.pending)
+
+    def test_plan_skips_hidden_directories_like_sync(self, tmp_path: Path) -> None:
+        """Hidden directories are skipped with the same rules as sync."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "visible.pdf")
+        write(docs / ".hidden" / "secret.pdf")
+
+        plan = service.plan(docs)
+
+        assert [f.path.name for f in plan.pending] == ["visible.pdf"]
+
+    def test_plan_skips_unsupported_files_in_directory(self, tmp_path: Path) -> None:
+        """Files with unsupported extensions are ignored during directory discovery."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "good.pdf")
+        write(docs / "image.png")
+
+        plan = service.plan(docs)
+
+        assert [f.path.name for f in plan.pending] == ["good.pdf"]
+
+    def test_plan_computes_checksums_for_pending_files(self, tmp_path: Path) -> None:
+        """Each planned file carries its SHA-256 checksum."""
+        service, _, _ = make_service()
+        pdf = write(tmp_path / "q1.pdf", "binary-ish content")
+
+        plan = service.plan(pdf)
+
+        assert plan.pending[0].checksum == compute_sha256(pdf)
+
+
+class TestConvertPlanSkipClassification:
+    """Tests for skip classification in plan()."""
+
+    def test_plan_skips_passthrough_files_without_output(self, tmp_path: Path) -> None:
+        """Without --output, passthrough text files are left in place and skipped."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "notes.txt")
+        write(docs / "report.pdf")
+
+        plan = service.plan(docs)
+
+        assert [f.path.name for f in plan.pending] == ["report.pdf"]
+        assert [f.path.name for f in plan.skipped] == ["notes.txt"]
+        assert "left in place" in (plan.skipped[0].collision_reason or "")
+
+    def test_plan_keeps_passthrough_files_with_output(self, tmp_path: Path) -> None:
+        """With --output, passthrough text files are pending for copying."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "notes.txt")
+
+        plan = service.plan(docs, output_dir=tmp_path / "out")
+
+        assert [f.path.name for f in plan.pending] == ["notes.txt"]
+
+    def test_plan_skips_existing_output(self, tmp_path: Path) -> None:
+        """A file whose target Markdown already exists is skipped with a reason."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "q1.pdf")
+        write(docs / "q1.md", "already converted")
+
+        plan = service.plan(docs)
+
+        assert plan.pending == []
+        reasons = {f.path.name: f.collision_reason or "" for f in plan.skipped}
+        assert "already exists" in reasons["q1.pdf"]
+        # q1.md is itself a passthrough source, left in place without --output
+        assert "left in place" in reasons["q1.md"]
+
+    def test_plan_force_overrides_existing_output(self, tmp_path: Path) -> None:
+        """--force re-plans files whose target Markdown already exists."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "q1.pdf")
+        write(docs / "q1.md", "already converted")
+
+        plan = service.plan(docs, force=True)
+
+        assert [f.path.name for f in plan.pending] == ["q1.pdf"]
+
+    def test_plan_checks_existing_output_in_output_dir(self, tmp_path: Path) -> None:
+        """With --output, existence is checked in the output tree, not next to the source."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        out = tmp_path / "out"
+        write(docs / "q1.pdf")
+        write(docs / "q1.md", "in-place markdown must not block --output")
+        write(out / "q1.md", "already converted")
+
+        plan = service.plan(docs, output_dir=out)
+
+        assert plan.pending == []
+        reasons = {f.path.name: f.collision_reason or "" for f in plan.skipped}
+        # Both the passthrough copy and the Docling conversion target out/q1.md
+        assert "already exists" in reasons["q1.md"]
+        assert "already exists" in reasons["q1.pdf"]
+
+
+class TestConvertExecute:
+    """Tests for execute()."""
+
+    def test_execute_writes_markdown_next_to_original(self, tmp_path: Path) -> None:
+        """Each output is written next to its original: reports/q1.pdf -> reports/q1.md."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "reports" / "q1.pdf")
+
+        result = service.execute(service.plan(docs))
+
+        assert (docs / "reports" / "q1.md").exists()
+        assert result.processed_count == 1
+        assert result.failed_count == 0
+
+    def test_execute_leaves_passthrough_untouched_without_output(self, tmp_path: Path) -> None:
+        """Without --output, passthrough files keep their content and mtime."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        notes = write(docs / "notes.txt", "original text")
+        before = notes.stat().st_mtime_ns
+        write(docs / "report.pdf")
+
+        result = service.execute(service.plan(docs))
+
+        assert notes.read_text() == "original text"
+        assert notes.stat().st_mtime_ns == before
+        assert result.skipped_count == 1
+        assert result.processed_count == 1
+
+    def test_execute_copies_passthrough_into_output_tree(self, tmp_path: Path) -> None:
+        """With --output, passthrough files are copied mirroring the tree."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        out = tmp_path / "out"
+        write(docs / "notes.txt", "original text")
+        write(docs / "reports" / "q1.pdf")
+
+        result = service.execute(service.plan(docs, output_dir=out))
+
+        assert (out / "notes.txt").read_text() == "original text"
+        assert (out / "reports" / "q1.md").exists()
+        assert not (docs / "reports" / "q1.md").exists()
+        assert result.processed_count == 2
+
+    def test_execute_records_failure_reason_and_continues(self, tmp_path: Path) -> None:
+        """A failed file does not stop the run; the summary carries the reason."""
+        service, _, _ = make_service(fail_names={"bad.pdf"})
+        docs = tmp_path / "docs"
+        write(docs / "good.pdf")
+        write(docs / "bad.pdf")
+
+        result = service.execute(service.plan(docs))
+
+        assert (docs / "good.md").exists()
+        assert not (docs / "bad.md").exists()
+        assert result.processed_count == 1
+        assert result.failed_count == 1
+        assert [f.path.name for f in result.failures] == ["bad.pdf"]
+        assert "stub failure for bad.pdf" in result.failures[0].reason
+
+    def test_execute_skips_docling_file_colliding_with_passthrough(self, tmp_path: Path) -> None:
+        """With --output, a passthrough file wins the output path over a Docling file."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        out = tmp_path / "out"
+        write(docs / "report.md", "passthrough wins")
+        write(docs / "report.pdf")
+
+        result = service.execute(service.plan(docs, output_dir=out))
+
+        assert (out / "report.md").read_text() == "passthrough wins"
+        assert not (out / "report.pdf").exists()
+        assert result.processed_count == 1
+        assert result.skipped_count == 1
+        collision = [s for s in result.skips if s.path.name == "report.pdf"]
+        assert len(collision) == 1
+        assert "conflicts" in collision[0].reason
+
+    def test_execute_creates_no_project_artifacts(self, tmp_path: Path) -> None:
+        """No manifest, .nest folder, index, or glossary is created anywhere."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "q1.pdf")
+
+        service.execute(service.plan(docs))
+
+        assert not (tmp_path / ".nest").exists()
+        assert list(tmp_path.rglob("manifest.json")) == []
+        assert list(tmp_path.rglob("00_MASTER_INDEX.md")) == []
+        assert list(tmp_path.rglob("glossary.md")) == []
+        assert list(tmp_path.rglob("errors.log")) == []
+
+    def test_execute_downloads_models_when_docling_files_pending(self, tmp_path: Path) -> None:
+        """The model cache is consulted before converting Docling-convertible files."""
+        service, _, downloader = make_service()
+        write(tmp_path / "q1.pdf")
+
+        service.execute(service.plan(tmp_path / "q1.pdf"))
+
+        assert downloader.download_calls == 1
+
+    def test_execute_skips_download_for_passthrough_only_run(self, tmp_path: Path) -> None:
+        """No model download when only passthrough files are copied."""
+        service, _, downloader = make_service()
+        write(tmp_path / "notes.txt")
+
+        service.execute(service.plan(tmp_path, output_dir=tmp_path / "out"))
+
+        assert downloader.download_calls == 0
+
+    def test_execute_advances_progress_once_per_attempted_file(self, tmp_path: Path) -> None:
+        """Every attempted file (converted, skipped, or failed) advances progress once."""
+        service, _, _ = make_service(fail_names={"bad.pdf"})
+        docs = tmp_path / "docs"
+        write(docs / "good.pdf")
+        write(docs / "bad.pdf")
+        write(docs / "notes.txt")
+
+        seen: list[str] = []
+        result = service.execute(service.plan(docs), progress_callback=seen.append)
+
+        assert sorted(seen) == ["bad.pdf", "good.pdf", "notes.txt"]
+        assert result.processed_count + result.skipped_count + result.failed_count == 3
+
+    def test_execute_reports_existing_output_as_skipped(self, tmp_path: Path) -> None:
+        """Re-running reports the existing output as skipped with its reason."""
+        service, _, _ = make_service()
+        pdf = write(tmp_path / "q1.pdf")
+
+        service.execute(service.plan(pdf))
+        result = service.execute(service.plan(pdf))
+
+        assert result.processed_count == 0
+        assert result.skipped_count == 1
+        assert result.failures == []
+        assert [s.path.name for s in result.skips] == ["q1.pdf"]
+        assert "already exists" in result.skips[0].reason
+
+    def test_execute_force_regenerates_existing_output(self, tmp_path: Path) -> None:
+        """--force re-converts files whose output already exists."""
+        service, _, _ = make_service()
+        pdf = write(tmp_path / "q1.pdf")
+
+        service.execute(service.plan(pdf))
+        result = service.execute(service.plan(pdf, force=True))
+
+        assert result.processed_count == 1
+        assert (tmp_path / "q1.md").exists()
