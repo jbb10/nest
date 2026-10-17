@@ -3,6 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
+from rich.console import Console
 from typer.testing import CliRunner
 
 from nest.cli.convert_cmd import _display_convert_summary
@@ -194,9 +195,7 @@ class TestConvertCommandRun:
 class TestDisplayConvertSummary:
     """Tests for the convert summary display."""
 
-    def _make_console(self) -> tuple["Mock", list[str]]:
-        from rich.console import Console
-
+    def _make_console(self) -> tuple[Mock, list[str]]:
         output_lines: list[str] = []
         console = Mock(spec=Console)
         console.print.side_effect = lambda *args, **kwargs: output_lines.append(

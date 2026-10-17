@@ -185,12 +185,12 @@ class SyncResult(BaseModel):
     images_skipped: int = 0
 
 
-class ConvertSkip(BaseModel):
-    """A file skipped during a convert run.
+class ConvertFileOutcome(BaseModel):
+    """A per-file outcome recorded during a convert run.
 
     Attributes:
-        path: Absolute path to the skipped source file.
-        reason: Human-readable reason the file was skipped.
+        path: Absolute path to the source file.
+        reason: Human-readable reason for the outcome.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -199,18 +199,12 @@ class ConvertSkip(BaseModel):
     reason: str
 
 
-class ConvertFailure(BaseModel):
-    """A file that failed during a convert run.
+class ConvertSkip(ConvertFileOutcome):
+    """A file skipped during a convert run."""
 
-    Attributes:
-        path: Absolute path to the failed source file.
-        reason: Human-readable reason the file failed.
-    """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    path: Path
-    reason: str
+class ConvertFailure(ConvertFileOutcome):
+    """A file that failed during a convert run."""
 
 
 class ConvertPlan(BaseModel):

@@ -5,6 +5,7 @@ path on disk, without requiring a Nest project.
 """
 
 import logging
+from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -13,11 +14,13 @@ import typer
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.llm_provider import resolve_ai_config
+from nest.adapters.noop_processor import NoOpProcessor
 from nest.adapters.passthrough_processor import PassthroughProcessor
 from nest.core.exceptions import ModelError, NestError
-from nest.core.models import ConvertResult, ProcessingResult
+from nest.core.models import ConvertFileOutcome, ConvertResult
 from nest.services.convert_service import ConvertService
 from nest.services.output_service import OutputMirrorService
+from nest.ui.logger import enable_verbose_logging
 from nest.ui.messages import error, get_console, success
 from nest.ui.progress import SyncProgress
 
@@ -28,18 +31,6 @@ if TYPE_CHECKING:
     from nest.adapters.protocols import ModelCacheProtocol
 
 logger = logging.getLogger(__name__)
-
-
-class NoOpProcessor:
-    """Fallback processor when docling is missing."""
-
-    def process(self, source: Path, output: Path) -> ProcessingResult:
-        """Fail all processing."""
-        return ProcessingResult(
-            source_path=source,
-            status="failed",
-            error="Docling is not installed",
-        )
 
 
 def create_convert_service(
@@ -158,11 +149,7 @@ def convert_command(
     console = get_console()
 
     if verbose:
-        import logging as _logging
-
-        _logging.getLogger().setLevel(_logging.INFO)
-        for name in ("docling", "httpx", "openai", "nest"):
-            _logging.getLogger(name).setLevel(_logging.INFO)
+        enable_verbose_logging()
 
     target = path.resolve()
     output_dir = output.resolve() if output else None
@@ -176,7 +163,7 @@ def convert_command(
         ai_status_note = ""
         if no_ai:
             ai_status_note = "disabled (--no-ai)"
-        elif not (ai_config.api_key_var if ai_config else ""):
+        elif ai_config is None:
             ai_status_note = "not configured (run 'nest config ai' or set NEST_AI_API_KEY)"
 
         total = len(plan.pending) + len(plan.skipped)
@@ -216,21 +203,8 @@ def _display_convert_summary(
     console.print(f"  Skipped:   {result.skipped_count}")
     console.print(f"  Failed:    {result.failed_count}")
 
-    if result.skips:
-        console.print()
-        console.print("  Skipped files:")
-        for skip in result.skips:
-            console.print(
-                f"    [dim]{_relative_display(skip.path, result.root)}: {skip.reason}[/dim]"
-            )
-
-    if result.failures:
-        console.print()
-        console.print("  Failed files:")
-        for failure in result.failures:
-            console.print(
-                f"    [dim]{_relative_display(failure.path, result.root)}: {failure.reason}[/dim]"
-            )
+    _print_reason_list(console, "Skipped files", result.skips, result.root)
+    _print_reason_list(console, "Failed files", result.failures, result.root)
 
     if ai_status_note:
         console.print()
@@ -248,6 +222,21 @@ def _display_convert_summary(
             f"(prompt: {result.vision_prompt_tokens:,}, "
             f"completion: {result.vision_completion_tokens:,})"
         )
+
+
+def _print_reason_list(
+    console: "Console",
+    title: str,
+    outcomes: Sequence[ConvertFileOutcome],
+    root: Path,
+) -> None:
+    """Print a titled list of per-file outcomes with reasons, when non-empty."""
+    if not outcomes:
+        return
+    console.print()
+    console.print(f"  {title}:")
+    for outcome in outcomes:
+        console.print(f"    [dim]{_relative_display(outcome.path, root)}: {outcome.reason}[/dim]")
 
 
 def _relative_display(path: Path, root: Path) -> str:

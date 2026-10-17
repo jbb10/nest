@@ -14,9 +14,10 @@ from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.llm_provider import resolve_ai_config
 from nest.adapters.manifest import ManifestAdapter
+from nest.adapters.noop_processor import NoOpProcessor
 from nest.adapters.passthrough_processor import PassthroughProcessor
 from nest.core.exceptions import NestError, ProcessingError
-from nest.core.models import DryRunResult, ProcessingResult, SyncResult
+from nest.core.models import DryRunResult, SyncResult
 from nest.core.paths import (
     AI_SEEN_MARKER,
     CONTEXT_DIR,
@@ -32,7 +33,7 @@ from nest.services.metadata_service import MetadataExtractorService
 from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
 from nest.services.sync_service import SyncService
-from nest.ui.logger import setup_error_logger
+from nest.ui.logger import enable_verbose_logging, setup_error_logger
 from nest.ui.messages import error, get_console, success
 from nest.ui.progress import SyncProgress
 
@@ -40,18 +41,6 @@ if TYPE_CHECKING:
     from rich.console import Console
 
     from nest.adapters.llm_provider import AIConfig
-
-
-class NoOpProcessor:
-    """Fallback processor when docling is missing."""
-
-    def process(self, source: Path, output: Path) -> ProcessingResult:
-        """Fail all processing."""
-        return ProcessingResult(
-            source_path=source,
-            status="failed",
-            error="Docling is not installed",
-        )
 
 
 def create_sync_service(
@@ -267,11 +256,7 @@ def sync_command(
     console = get_console()
 
     if verbose:
-        import logging as _logging
-
-        _logging.getLogger().setLevel(_logging.INFO)
-        for name in ("docling", "httpx", "openai", "nest"):
-            _logging.getLogger(name).setLevel(_logging.INFO)
+        enable_verbose_logging()
 
     project_root = (target_dir or Path.cwd()).resolve()
 
