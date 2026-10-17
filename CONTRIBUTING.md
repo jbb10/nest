@@ -105,7 +105,9 @@ Two workflows guard every pull request (see [.github/workflows/](.github/workflo
   quality job.
 
 - **PR Validation** (`pr-validation.yml`) - validates the Conventional Commit
-  format of the PR title (required) and the branch-name convention (advisory).
+  format of the PR title (required), plus advisory checks that newly added
+  dependencies have no known advisories and that branch names follow the
+  convention.
 
 ### Branch protection for `main`
 
