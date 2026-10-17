@@ -23,6 +23,7 @@
 
 import * as sandcastle from "@ai-hero/sandcastle";
 import { docker } from "@ai-hero/sandcastle/sandboxes/docker";
+import { execFileSync } from "node:child_process";
 import { z } from "zod";
 
 // The planner emits its plan as JSON inside <plan> tags; Output.object extracts
@@ -46,8 +47,13 @@ const MAX_ITERATIONS = 10;
 // Hooks run inside the sandbox before the agent starts each iteration.
 // uv sync builds the project virtualenv the Makefile targets run in.
 const hooks = {
-  sandbox: { onSandboxReady: [{ command: "uv sync --dev" }] },
+  // A cold Linux uv cache downloads Docling and torch, which far exceeds the 60s default.
+  sandbox: { onSandboxReady: [{ command: "uv sync --dev", timeoutMs: 15 * 60_000 }] },
 };
+
+// `make test-e2e` runs ~10 minutes in a sandbox with no output, longer when
+// sandboxes run in parallel; the 600s default kills agents mid-suite.
+const idleTimeoutSeconds = 45 * 60;
 
 // Host caches shared with every sandbox: uv wheels, and the ~2 GB of Docling
 // models the E2E suite needs, so neither is downloaded per sandbox.
@@ -83,7 +89,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     // not write code. (Structured output requires maxIterations: 1.)
     maxIterations: 1,
     // Custom Copilot model for planning (see .sandcastle/.env).
-    agent: sandcastle.copilot("DeepSeek-V4-Flash"),
+    agent: sandcastle.copilot("FW-Kimi-K3"),
     promptFile: "./.sandcastle/plan-prompt.md",
     // Extract and validate the <plan> JSON into a typed object. Throws
     // StructuredOutputError if the tag is missing, the JSON is malformed, or
@@ -129,8 +135,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
         const implement = await sandbox.run({
           name: "implementer",
           maxIterations: 100,
+          idleTimeoutSeconds,
           // Custom Copilot model for coding (see .sandcastle/.env).
-          agent: sandcastle.copilot("FW-GLM-5.2"),
+          agent: sandcastle.copilot("FW-GLM-5.3"),
           promptFile: "./.sandcastle/implement-prompt.md",
           promptArgs: {
             TASK_ID: issue.id,
@@ -144,6 +151,7 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           const review = await sandbox.run({
             name: "reviewer",
             maxIterations: 1,
+            idleTimeoutSeconds,
             // Custom Copilot model for review (see .sandcastle/.env).
             agent: sandcastle.copilot("FW-Kimi-K3"),
             promptFile: "./.sandcastle/review-prompt.md",
@@ -216,8 +224,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     sandbox: nestSandbox(),
     name: "merger",
     maxIterations: 1,
+    idleTimeoutSeconds,
     // Custom Copilot model for merging (see .sandcastle/.env).
-    agent: sandcastle.copilot("DeepSeek-V4-Flash"),
+    agent: sandcastle.copilot("FW-Kimi-K3"),
     promptFile: "./.sandcastle/merge-prompt.md",
     promptArgs: {
       // A markdown list of branch names, one per line.
@@ -228,6 +237,9 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
   });
 
   console.log("\nBranches merged.");
+
+  // The merger closes the issues, so the merged code must reach the remote too.
+  execFileSync("git", ["push"], { stdio: "inherit" });
 }
 
 console.log("\nAll done.");
