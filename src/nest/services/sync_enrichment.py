@@ -24,10 +24,7 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-PROJECT_CONTEXT_CANDIDATES = (
-    Path("_bmad-output") / "project-context.md",
-    Path("docs") / "project-context.md",
-)
+PROJECT_CONTEXT_CANDIDATES = (Path("docs") / "project-context.md",)
 
 
 class EnrichmentPhase:
