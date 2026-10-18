@@ -16,7 +16,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from docling.datamodel.document import ConversionResult
-from docling_core.types.doc.document import DescriptionMetaField, PictureItem, PictureMeta
+from docling_core.types.doc.common.meta import DescriptionMetaField
+from docling_core.types.doc.items.picture.meta import PictureMeta
+from docling_core.types.doc.items.picture.picture import PictureItem
 
 from nest.core.models import LLMCompletionResult, PictureDescriptionResult
 

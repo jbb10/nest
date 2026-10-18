@@ -8,9 +8,18 @@ import pytest
 from nest.adapters.docling_downloader import DoclingModelDownloader
 from nest.core.exceptions import ModelError
 
-# Shared patch target for the lazy settings helper
+# Shared patch targets for the lazy import helpers
 _SETTINGS_TARGET = "nest.adapters.docling_downloader._get_docling_settings"
 _DOWNLOAD_TARGET = "nest.adapters.docling_downloader._get_download_models"
+_ENGINE_DOWNLOADS_TARGET = "nest.adapters.docling_downloader._get_engine_model_downloads"
+_HF_HUB_CACHE_TARGET = "nest.adapters.docling_downloader._get_hf_hub_cache_dir"
+
+# Hub cache folder names for the models docling's inference engines load
+_ENGINE_REPOS = (
+    "docling-project--docling-layout-heron",
+    "docling-project--DocumentFigureClassifier-v2.5",
+    "docling-project--docling-models",
+)
 
 
 def _mock_settings(tmp_path: Path) -> MagicMock:
@@ -20,16 +29,38 @@ def _mock_settings(tmp_path: Path) -> MagicMock:
     return mock
 
 
+def _mock_engine_downloads() -> dict[str, MagicMock]:
+    """Engine model downloads with one mock per hub cache folder."""
+    return {repo: MagicMock(name=repo) for repo in _ENGINE_REPOS}
+
+
+def _seed_docling_cache(tmp_path: Path) -> None:
+    """Create a warm docling cache: required folders plus completion marker."""
+    cache_dir = tmp_path / "models" / "docling-project--docling-models"
+    cache_dir.mkdir(parents=True)
+    (tmp_path / "models" / DoclingModelDownloader.MARKER_FILENAME).touch()
+
+
+def _seed_hub_cache(hub_path: Path, repos: tuple[str, ...] = _ENGINE_REPOS) -> None:
+    """Create hub cache folders for the given repos."""
+    for repo in repos:
+        (hub_path / f"models--{repo}").mkdir(parents=True)
+
+
 class TestDoclingModelDownloader:
     """Tests for DoclingModelDownloader adapter."""
 
     def test_are_models_cached_when_folders_exist(self, tmp_path: Path) -> None:
         """Test cache detection returns True when folders and marker exist."""
         downloader = DoclingModelDownloader()
-        cache_dir = tmp_path / "models" / "docling-project--docling-models"
-        cache_dir.mkdir(parents=True)
-        (tmp_path / "models" / DoclingModelDownloader.MARKER_FILENAME).touch()
-        with patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)):
+        hub_path = tmp_path / "hub"
+        _seed_docling_cache(tmp_path)
+        _seed_hub_cache(hub_path)
+        with (
+            patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
+            patch(_HF_HUB_CACHE_TARGET, return_value=hub_path),
+            patch(_ENGINE_DOWNLOADS_TARGET, return_value=_mock_engine_downloads()),
+        ):
             result = downloader.are_models_cached()
         assert result is True
 
@@ -59,12 +90,14 @@ class TestDoclingModelDownloader:
     def test_download_if_needed_when_already_cached(self, tmp_path: Path) -> None:
         """Test download skipped when models already cached."""
         downloader = DoclingModelDownloader()
-        cache_dir = tmp_path / "models" / "docling-project--docling-models"
-        cache_dir.mkdir(parents=True)
-        (tmp_path / "models" / DoclingModelDownloader.MARKER_FILENAME).touch()
+        hub_path = tmp_path / "hub"
+        _seed_docling_cache(tmp_path)
+        _seed_hub_cache(hub_path)
         mock_download = MagicMock()
         with (
             patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
+            patch(_HF_HUB_CACHE_TARGET, return_value=hub_path),
+            patch(_ENGINE_DOWNLOADS_TARGET, return_value=_mock_engine_downloads()),
             patch(_DOWNLOAD_TARGET, return_value=mock_download),
         ):
             result = downloader.download_if_needed(progress=True)
@@ -78,6 +111,7 @@ class TestDoclingModelDownloader:
         with (
             patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
             patch(_DOWNLOAD_TARGET, return_value=mock_download),
+            patch(_ENGINE_DOWNLOADS_TARGET, return_value=_mock_engine_downloads()),
         ):
             result = downloader.download_if_needed(progress=True)
         assert result is True
@@ -106,6 +140,7 @@ class TestDoclingModelDownloader:
         with (
             patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
             patch(_DOWNLOAD_TARGET, return_value=mock_download),
+            patch(_ENGINE_DOWNLOADS_TARGET, return_value=_mock_engine_downloads()),
         ):
             result = downloader.download_if_needed(progress=True)
         assert result is True
@@ -144,6 +179,7 @@ class TestDoclingModelDownloader:
         with (
             patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
             patch(_DOWNLOAD_TARGET, return_value=mock_download),
+            patch(_ENGINE_DOWNLOADS_TARGET, return_value=_mock_engine_downloads()),
         ):
             downloader.download_if_needed(progress=True)
         assert mock_sleep.call_args_list[0][0][0] == 1  # 2^0
@@ -162,7 +198,86 @@ class TestDoclingModelDownloader:
             with pytest.raises(ModelError) as exc_info:
                 downloader.download_if_needed(progress=True)
         assert "Insufficient disk space" in str(exc_info.value)
-        assert "2500MB required" in str(exc_info.value)
+        assert "3000MB required" in str(exc_info.value)
+
+
+class TestEngineModelHubCache:
+    """Tests for the HuggingFace hub cache warming (docling >= 2.118).
+
+    docling's inference engines load the layout, picture-classifier and
+    TableFormer models from the HuggingFace hub cache, so the downloader
+    must warm that cache too, not only ~/.cache/docling.
+    """
+
+    def test_are_models_cached_true_when_engine_hub_folders_exist(self, tmp_path: Path) -> None:
+        """Cached requires the engine model folders in the hub cache."""
+        downloader = DoclingModelDownloader()
+        hub_path = tmp_path / "hub"
+        _seed_docling_cache(tmp_path)
+        _seed_hub_cache(hub_path)
+        with (
+            patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
+            patch(_HF_HUB_CACHE_TARGET, return_value=hub_path),
+            patch(_ENGINE_DOWNLOADS_TARGET, return_value=_mock_engine_downloads()),
+        ):
+            result = downloader.are_models_cached()
+        assert result is True
+
+    def test_are_models_cached_false_when_engine_hub_folder_missing(self, tmp_path: Path) -> None:
+        """A warm docling cache alone is no longer enough."""
+        downloader = DoclingModelDownloader()
+        hub_path = tmp_path / "hub"
+        _seed_docling_cache(tmp_path)
+        _seed_hub_cache(hub_path, repos=_ENGINE_REPOS[:2])
+        with (
+            patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
+            patch(_HF_HUB_CACHE_TARGET, return_value=hub_path),
+            patch(_ENGINE_DOWNLOADS_TARGET, return_value=_mock_engine_downloads()),
+        ):
+            result = downloader.are_models_cached()
+        assert result is False
+
+    def test_download_if_needed_warms_engine_model_hub_cache(self, tmp_path: Path) -> None:
+        """Downloading warms the hub cache for every engine-loaded model."""
+        downloader = DoclingModelDownloader()
+        mock_download = MagicMock()
+        engine_downloads = _mock_engine_downloads()
+        with (
+            patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
+            patch(_DOWNLOAD_TARGET, return_value=mock_download),
+            patch(_ENGINE_DOWNLOADS_TARGET, return_value=engine_downloads),
+        ):
+            result = downloader.download_if_needed(progress=True)
+        assert result is True
+        for engine_download in engine_downloads.values():
+            engine_download.assert_called_once_with(True)
+
+    @patch("nest.adapters.docling_downloader.time.sleep")
+    def test_download_retries_when_hub_cache_warm_fails(
+        self, mock_sleep: MagicMock, tmp_path: Path
+    ) -> None:
+        """Hub cache warm failures retry like the docling cache download."""
+        downloader = DoclingModelDownloader()
+        mock_download = MagicMock()
+        flaky = MagicMock(
+            side_effect=[
+                ConnectionError("Network error"),
+                ConnectionError("Network error"),
+                None,
+            ]
+        )
+        engine_downloads = _mock_engine_downloads()
+        engine_downloads[_ENGINE_REPOS[1]] = flaky
+        with (
+            patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
+            patch(_DOWNLOAD_TARGET, return_value=mock_download),
+            patch(_ENGINE_DOWNLOADS_TARGET, return_value=engine_downloads),
+        ):
+            result = downloader.download_if_needed(progress=True)
+        assert result is True
+        assert flaky.call_count == 3
+        assert mock_download.call_count == 3
+        assert mock_sleep.call_count == 2
 
 
 class TestGetCacheSize:

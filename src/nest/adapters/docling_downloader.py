@@ -5,6 +5,7 @@ Wraps Docling's download_models() utility for ML model management.
 
 import shutil
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
@@ -33,12 +34,88 @@ def _get_download_models():
     return download_models
 
 
+def _get_engine_model_downloads() -> dict[str, Callable[[bool], None]]:
+    """Lazy import of the inference-engine model downloads.
+
+    Since docling 2.118 the layout, picture-classifier and TableFormer
+    models are loaded through docling's inference-engine system, which
+    resolves them from the HuggingFace hub cache when no artifacts_path
+    is set - the default under nest. Returns one entry per model: the
+    repo's folder name in the hub cache mapped to a function that
+    downloads the model there.
+    """
+    try:
+        from docling.datamodel.picture_classification_options import (
+            DocumentPictureClassifierOptions,
+        )
+        from docling.datamodel.pipeline_options import (
+            LayoutObjectDetectionOptions,
+        )
+        from docling.models.stages.picture_classifier.document_picture_classifier import (
+            DocumentPictureClassifier,
+        )
+        from docling.models.stages.table_structure.table_structure_model import (
+            TableStructureModel,
+        )
+        from docling.models.utils.hf_model_download import download_hf_model
+    except ImportError as exc:
+        raise ModelError(
+            "Docling is not installed. Install it with: uv pip install docling"
+        ) from exc
+
+    layout_spec = LayoutObjectDetectionOptions().model_spec
+    classifier_options = DocumentPictureClassifierOptions.from_preset(
+        "document_figure_classifier_v2"
+    )
+
+    def _download_layout(progress: bool) -> None:
+        download_hf_model(
+            repo_id=layout_spec.repo_id,
+            revision=layout_spec.revision,
+            local_dir=None,  # None downloads into the HuggingFace hub cache
+            progress=progress,
+        )
+
+    def _download_classifier(progress: bool) -> None:
+        DocumentPictureClassifier.download_models(
+            repo_id=classifier_options.repo_id,
+            revision=classifier_options.revision,
+            local_dir=None,
+            progress=progress,
+        )
+
+    def _download_tableformer(progress: bool) -> None:
+        TableStructureModel.download_models(local_dir=None, progress=progress)
+
+    # De-facto public: docling's own model downloader reads this member, but
+    # pyright strict flags the protected access from outside the class.
+    tableformer_folder: str = TableStructureModel._model_repo_folder  # pyright: ignore[reportPrivateUsage]
+
+    return {
+        layout_spec.repo_id.replace("/", "--"): _download_layout,
+        classifier_options.repo_id.replace("/", "--"): _download_classifier,
+        tableformer_folder: _download_tableformer,
+    }
+
+
+def _get_hf_hub_cache_dir() -> Path:
+    """Lazy import of the HuggingFace hub cache location."""
+    try:
+        from huggingface_hub.constants import HF_HUB_CACHE
+    except ImportError as exc:
+        raise ModelError(
+            "Docling is not installed. Install it with: uv pip install docling"
+        ) from exc
+    return Path(HF_HUB_CACHE)
+
+
 class DoclingModelDownloader:
     """Adapter for downloading and caching Docling ML models.
 
     Uses Docling's built-in model downloader with exponential backoff
     retry logic (3 attempts) for network failures. Downloads ~2GB of
-    models to ~/.cache/docling/models/.
+    models to ~/.cache/docling/models/ and warms the HuggingFace hub
+    cache that docling's inference engines read at runtime.
     """
 
     DEFAULT_MODELS = {
@@ -54,8 +131,9 @@ class DoclingModelDownloader:
     REQUIRED_CACHE_FOLDERS = [
         "docling-project--docling-models",
     ]
-    # Approximate total size of all models in MB
-    REQUIRED_DISK_SPACE_MB = 2500
+    # Approximate total size of all models in MB, across both the docling
+    # cache and the HuggingFace hub cache warmed for the inference engines
+    REQUIRED_DISK_SPACE_MB = 3000
     # Marker file written only after a successful full download.
     # Guards against truncated/partial cache restores that pass a
     # folder-existence check but are missing model data.
@@ -66,11 +144,13 @@ class DoclingModelDownloader:
 
         Uses a marker file written only after a successful full download,
         so truncated or partial cache restores are detected and trigger a
-        fresh download.
+        fresh download. Since docling 2.118 the inference engines also load
+        the layout, picture-classifier and TableFormer models from the
+        HuggingFace hub cache, so a warm docling cache alone is not enough.
 
         Returns:
-            True if all required model folders exist and the completion
-            marker is present, False otherwise.
+            True if all required model folders exist in both caches and the
+            completion marker is present, False otherwise.
         """
         cache_dir = self.get_cache_path()
         marker = cache_dir / self.MARKER_FILENAME
@@ -82,7 +162,11 @@ class DoclingModelDownloader:
             if not (cache_dir / folder).exists():
                 return False
 
-        return True
+        hub_cache = _get_hf_hub_cache_dir()
+        return all(
+            (hub_cache / f"models--{repo_folder}").exists()
+            for repo_folder in _get_engine_model_downloads()
+        )
 
     def download_if_needed(self, progress: bool = True) -> bool:
         """Download models if not already cached.
@@ -153,6 +237,10 @@ class DoclingModelDownloader:
                     with_picture_classifier=self.DEFAULT_MODELS["picture_classifier"],
                     with_rapidocr=self.DEFAULT_MODELS["rapidocr"],
                 )
+                # Warm the HuggingFace hub cache that docling's inference
+                # engines read at runtime (see _get_engine_model_downloads).
+                for engine_download in _get_engine_model_downloads().values():
+                    engine_download(progress)
                 # Write marker file to confirm full download completed.
                 marker = self.get_cache_path() / self.MARKER_FILENAME
                 marker.parent.mkdir(parents=True, exist_ok=True)
@@ -180,6 +268,8 @@ class DoclingModelDownloader:
             marker = cache_dir / self.MARKER_FILENAME
             marker.unlink(missing_ok=True)
             shutil.rmtree(cache_dir, ignore_errors=True)
+        # The HuggingFace hub cache is left as-is: it is shared with other
+        # HuggingFace tooling, and snapshot_download resumes partial repos.
 
     def get_cache_size(self) -> int:
         """Get total size of cached models in bytes.
