@@ -234,7 +234,7 @@ Pull before syncing to avoid conflicts when multiple people add documents.
 
 ## Contributing
 
-This project uses the [BMad Method](https://github.com/bmadcode/BMAD-METHOD) for planning and development. All contributions must follow the BMad workflow — epics, stories, and sprint status are tracked in `_bmad-output/`, and work is driven through the SM and Dev agents.
+Contributions follow the trunk-based workflow described in [CONTRIBUTING.md](CONTRIBUTING.md). Planning and development run through the agent workflows described in [AGENTS.md](AGENTS.md).
 
 ```bash
 # Clone and install

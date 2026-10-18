@@ -24,10 +24,7 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-PROJECT_CONTEXT_CANDIDATES = (
-    Path("_bmad-output") / "project-context.md",
-    Path("docs") / "project-context.md",
-)
+PROJECT_CONTEXT_FILE = Path("docs") / "project-context.md"
 
 
 class EnrichmentPhase:
@@ -102,8 +99,10 @@ class EnrichmentPhase:
 
     def _load_project_context(self) -> str | None:
         """Return the first non-empty project context file, if any."""
-        candidates = [self._project_root / c for c in PROJECT_CONTEXT_CANDIDATES]
-        candidates.append(self._context_dir / "project-context.md")
+        candidates = [
+            self._project_root / PROJECT_CONTEXT_FILE,
+            self._context_dir / "project-context.md",
+        ]
         for path in candidates:
             try:
                 if path.exists():

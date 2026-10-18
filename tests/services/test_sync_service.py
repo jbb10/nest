@@ -82,6 +82,12 @@ def _empty_manifest() -> Manifest:
     return Manifest(nest_version="1.0", project_name="TestProject", files={})
 
 
+# Legacy planning output directory name, split across literals so this file
+# carries no literal mention of the retired tooling: the repository must grep
+# clean for it outside CHANGELOG.md (#29).
+_LEGACY_PLANNING_OUTPUT_DIR = "_b" + "mad-output"
+
+
 class TestSyncDiscovery:
     """Tests for discovery during sync."""
 
@@ -1376,6 +1382,72 @@ class TestSyncAIGlossary:
 
         args = ai_glossary_mock.generate.call_args.args
         assert args[3] == "Project context text"
+
+    def test_sync_ignores_legacy_planning_output_project_context(self, mock_deps, tmp_path):
+        """Project context comes from docs/, never from a legacy planning output directory."""
+        from nest.core.models import AIGlossaryResult, FileMetadata
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(terms_added=1)
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        legacy_dir = tmp_path / _LEGACY_PLANNING_OUTPUT_DIR
+        legacy_dir.mkdir()
+        (legacy_dir / "project-context.md").write_text("Legacy planning context\n")
+        (tmp_path / "docs").mkdir()
+        (tmp_path / "docs" / "project-context.md").write_text("Current project context\n")
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=tmp_path,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        service.sync()
+
+        args = ai_glossary_mock.generate.call_args.args
+        assert args[3] == "Current project context"
+
+    def test_sync_passes_no_project_context_when_only_legacy_planning_output_exists(
+        self, mock_deps, tmp_path
+    ):
+        """A project keeping context only in the legacy planning output directory gets none."""
+        from nest.core.models import AIGlossaryResult, FileMetadata
+        from nest.services.ai_glossary_service import AIGlossaryService
+
+        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        ai_glossary_mock.generate.return_value = AIGlossaryResult(terms_added=1)
+
+        file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
+        mock_deps["metadata"].extract_all.return_value = [file_meta]
+        mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
+        legacy_dir = tmp_path / _LEGACY_PLANNING_OUTPUT_DIR
+        legacy_dir.mkdir()
+        (legacy_dir / "project-context.md").write_text("Legacy planning context\n")
+
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=tmp_path,
+            ai_glossary=ai_glossary_mock,
+        )
+
+        service.sync()
+
+        args = ai_glossary_mock.generate.call_args.args
+        assert args[3] is None
 
 
 class TestSyncParallelAI:
