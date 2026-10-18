@@ -55,6 +55,15 @@ const hooks = {
 // sandboxes run in parallel; the 600s default kills agents mid-suite.
 const idleTimeoutSeconds = 45 * 60;
 
+// Counts all branch commits missing from the host branch, including ones from
+// earlier interrupted runs that a single sandbox.run() result does not report.
+const commitsAhead = (branch: string) =>
+  Number(
+    execFileSync("git", ["rev-list", "--count", `HEAD..${branch}`], {
+      encoding: "utf8",
+    }).trim(),
+  );
+
 // Host caches shared with every sandbox: uv wheels, and the ~2 GB of Docling
 // models the E2E suite needs, so neither is downloaded per sandbox.
 const nestSandbox = () =>
@@ -146,8 +155,8 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
           },
         });
 
-        // Only review if the implementer produced commits
-        if (implement.commits.length > 0) {
+        // Only review if the branch has work that main lacks
+        if (commitsAhead(issue.branch) > 0) {
           const review = await sandbox.run({
             name: "reviewer",
             maxIterations: 1,
@@ -184,14 +193,13 @@ for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
     }
   }
 
-  // Only pass branches that actually produced commits to the merge phase.
-  // An agent that ran successfully but made no commits has nothing to merge.
+  // Only pass branches with commits not yet on main to the merge phase.
   const completedIssues = settled
     .map((outcome, i) => ({ outcome, issue: issues[i]! }))
     .filter(
       (entry) =>
         entry.outcome.status === "fulfilled" &&
-        entry.outcome.value.commits.length > 0,
+        commitsAhead(entry.issue.branch) > 0,
     )
     .map((entry) => entry.issue);
 
