@@ -2,6 +2,39 @@
 
 All notable changes to Nest.
 
+## [2.1.0](https://github.com/jbb10/nest/compare/v2.0.0...v2.1.0) (2026-10-18)
+
+
+### Features
+
+* **convert:** add nest convert for project-free document conversion ([315af9b](https://github.com/jbb10/nest/commit/315af9b8351f60def2423e0a1976d8b4ef51077c)), closes [#20](https://github.com/jbb10/nest/issues/20)
+
+
+### Bug Fixes
+
+* **deps:** update docling to 2.140.0 ([bfbfe0f](https://github.com/jbb10/nest/commit/bfbfe0f8f6db99f6bbfa3ae1fef4125fd5fd1254)), closes [#4](https://github.com/jbb10/nest/issues/4)
+* **sandcastle:** embed a diff summary in the review prompt ([def2e84](https://github.com/jbb10/nest/commit/def2e8458e133ed494375c07884a73894ac7ccf2))
+* **sandcastle:** merge branches with commits from earlier runs ([2b9dcf2](https://github.com/jbb10/nest/commit/2b9dcf2c27ecd69f8b548a9643531af7a1396164))
+
+
+### Refactoring
+
+* **adapters:** polish docling downloader hub cache warming ([c6d0198](https://github.com/jbb10/nest/commit/c6d0198bc5c9b2df47d6d14dbf1c8ecbd1c0d655))
+* **ci:** align job banner and document dependency review ([696b25c](https://github.com/jbb10/nest/commit/696b25ca8b02b7ba3e73916422f6aca4611a54a3))
+* **convert:** deduplicate shared CLI helpers and convert models ([1f511d5](https://github.com/jbb10/nest/commit/1f511d5762b5b3a485f9f7d91d63a71a6fb39637))
+* **sync:** simplify project context candidate lookup ([d7717ae](https://github.com/jbb10/nest/commit/d7717ae569d3928bd316b57ea47726de360d3969))
+
+
+### Documentation
+
+* add security policy for private vulnerability reporting ([ed774ff](https://github.com/jbb10/nest/commit/ed774ff68a09911fec99d37b3e85afd1c541bdb2)), closes [#6](https://github.com/jbb10/nest/issues/6)
+
+
+### CI/CD
+
+* add dependency review gate to PR validation ([a15cb63](https://github.com/jbb10/nest/commit/a15cb6322e222f86cca8debcd47cd8efa30afe25)), closes [#6](https://github.com/jbb10/nest/issues/6)
+* **deps:** bump GitHub Actions to latest majors ([d0fe4ce](https://github.com/jbb10/nest/commit/d0fe4ce5de2daff28c63c1b1956bb108390233c6)), closes [#4](https://github.com/jbb10/nest/issues/4)
+
 ## [2.0.0](https://github.com/jbb10/nest/compare/v1.3.3...v2.0.0) (2026-10-16)
 
 
