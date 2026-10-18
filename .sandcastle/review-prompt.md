@@ -4,9 +4,11 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 
 # CONTEXT
 
-## Branch diff
+## Changed files
 
-!`git diff {{TARGET_BRANCH}}...{{BRANCH}}`
+!`git diff --stat=120 {{TARGET_BRANCH}}...{{BRANCH}}`
+
+The full diff is too large to embed: the Copilot prompt limit is 120 KB. Read it per file with `git diff {{TARGET_BRANCH}}...{{BRANCH}} -- <path>`. Deleted files and lockfiles need no line-by-line review.
 
 ## Commits on this branch
 
@@ -14,7 +16,7 @@ Review the code changes on branch `{{BRANCH}}` and improve code clarity, consist
 
 # REVIEW PROCESS
 
-1. **Understand the change**: Read the diff and commits above to understand the intent.
+1. **Understand the change**: Read the commits and changed files above, then the diff of each changed source, test and config file, to understand the intent.
 
 2. **Analyze for improvements**: Look for opportunities to:
    - Reduce unnecessary complexity and nesting
