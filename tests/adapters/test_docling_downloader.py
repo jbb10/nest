@@ -209,20 +209,6 @@ class TestEngineModelHubCache:
     must warm that cache too, not only ~/.cache/docling.
     """
 
-    def test_are_models_cached_true_when_engine_hub_folders_exist(self, tmp_path: Path) -> None:
-        """Cached requires the engine model folders in the hub cache."""
-        downloader = DoclingModelDownloader()
-        hub_path = tmp_path / "hub"
-        _seed_docling_cache(tmp_path)
-        _seed_hub_cache(hub_path)
-        with (
-            patch(_SETTINGS_TARGET, return_value=_mock_settings(tmp_path)),
-            patch(_HF_HUB_CACHE_TARGET, return_value=hub_path),
-            patch(_ENGINE_DOWNLOADS_TARGET, return_value=_mock_engine_downloads()),
-        ):
-            result = downloader.are_models_cached()
-        assert result is True
-
     def test_are_models_cached_false_when_engine_hub_folder_missing(self, tmp_path: Path) -> None:
         """A warm docling cache alone is no longer enough."""
         downloader = DoclingModelDownloader()

@@ -41,8 +41,8 @@ def _get_engine_model_downloads() -> dict[str, Callable[[bool], None]]:
     models are loaded through docling's inference-engine system, which
     resolves them from the HuggingFace hub cache when no artifacts_path
     is set - the default under nest. Returns one entry per model: the
-    repo's folder name in the hub cache mapped to a function that
-    downloads the model there.
+    repo id with "/" replaced by "--" (its folder suffix in the hub
+    cache) mapped to a function that downloads the model there.
     """
     try:
         from docling.datamodel.picture_classification_options import (
@@ -198,7 +198,7 @@ class DoclingModelDownloader:
         """Check if sufficient disk space is available for model download.
 
         Returns:
-            True if sufficient space (2.5GB+) available, False otherwise.
+            True if sufficient space (3GB+) available, False otherwise.
         """
         cache_dir = _get_docling_settings().cache_dir
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -223,6 +223,7 @@ class DoclingModelDownloader:
             )
 
         _download = _get_download_models()
+        engine_downloads = _get_engine_model_downloads()
         last_exception: Exception | None = None
 
         for attempt in range(self.MAX_RETRIES):
@@ -239,7 +240,7 @@ class DoclingModelDownloader:
                 )
                 # Warm the HuggingFace hub cache that docling's inference
                 # engines read at runtime (see _get_engine_model_downloads).
-                for engine_download in _get_engine_model_downloads().values():
+                for engine_download in engine_downloads.values():
                     engine_download(progress)
                 # Write marker file to confirm full download completed.
                 marker = self.get_cache_path() / self.MARKER_FILENAME
