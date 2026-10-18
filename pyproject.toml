@@ -49,6 +49,10 @@ exclude = ["tests"]
 target-version = "py311"
 line-length = 100
 src = ["src", "tests"]
+# Ruff only lints and formats Python files. Since ruff 0.16 the formatter
+# also reformats Python code blocks inside Markdown files by default;
+# those blocks are documentation, out of the formatter's scope here.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "C4", "PT"]
@@ -59,10 +63,10 @@ known-first-party = ["nest"]
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
-    "ruff>=0.1.0",
-    "pyright>=1.1.0",
-    "reportlab>=4.4.9",
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+    "pyright>=1.1.414",
+    "reportlab>=5.0.1",
     "pytest-timeout>=2.4.0",
     "python-docx>=1.1.0",
     "python-pptx>=1.0.0",
