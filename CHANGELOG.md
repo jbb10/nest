@@ -2,6 +2,13 @@
 
 All notable changes to Nest.
 
+## [2.2.0](https://github.com/jbb10/nest/compare/v2.1.0...v2.2.0) (2026-10-21)
+
+
+### Features
+
+* **cli:** shared command output and image-description failure policy ([#36](https://github.com/jbb10/nest/issues/36)) ([d3ff137](https://github.com/jbb10/nest/commit/d3ff1371a6ce31596abad9b3a551a624de2abfe5))
+
 ## [2.1.0](https://github.com/jbb10/nest/compare/v2.0.0...v2.1.0) (2026-10-18)
 
 
