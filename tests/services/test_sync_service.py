@@ -1021,6 +1021,23 @@ class TestSyncCollisionDetection:
         # The .pdf should have been skipped (manifest.record_skipped called)
         mock_deps["manifest"].record_skipped.assert_called_once()
 
+    def test_image_follows_the_same_collision_rules_as_documents(self, mock_deps):
+        """An image file loses to a passthrough file and the later image wins between images."""
+        from nest.services.sync_conversion import resolve_collisions
+
+        sources = Path("/app/_nest_sources")
+        arch_png = DiscoveredFile(path=sources / "arch.png", checksum="a", status="new")
+        arch_md = DiscoveredFile(path=sources / "arch.md", checksum="b", status="new")
+        flow_png = DiscoveredFile(path=sources / "flow.png", checksum="c", status="new")
+        flow_jpg = DiscoveredFile(path=sources / "flow.jpg", checksum="d", status="new")
+
+        kept, skipped = resolve_collisions([arch_png, arch_md, flow_png, flow_jpg], sources)
+
+        assert [f.path.name for f in kept] == ["arch.md", "flow.jpg"]
+        assert [f.path.name for f in skipped] == ["arch.png", "flow.png"]
+        assert "arch.md" in (arch_png.collision_reason or "")
+        assert "flow.jpg" in (flow_png.collision_reason or "")
+
     def test_no_collision_when_output_paths_differ(self, mock_deps):
         """No collision when files produce different output paths."""
         mock_deps["project_root"] = Path("/app")

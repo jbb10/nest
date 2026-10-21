@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from nest.adapters.classification_processor import create_classification_processor
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.llm_provider import resolve_ai_config
@@ -72,24 +73,13 @@ def create_convert_service(
         ai_config = ai_config or resolve_ai_config()
         vision_provider = create_vision_provider(ai_config) if ai_config else None
         if vision_provider is not None:
-            from nest.adapters.docling_processor import DoclingProcessor as ClassificationProcessor
-
-            vision_processor = ClassificationProcessor(enable_classification=True)
+            vision_processor = create_classification_processor()
 
             from nest.services.picture_description_service import PictureDescriptionService
 
             picture_description = PictureDescriptionService(vision_provider=vision_provider)
 
-    # Without vision, standalone images still need classification to tell
-    # whether they require an AI description (and therefore fail).
-    image_processor = None
-    if vision_processor is None:
-        try:
-            from nest.adapters.docling_processor import DoclingProcessor as ClassificationProcessor
-
-            image_processor = ClassificationProcessor(enable_classification=True)
-        except ImportError:
-            image_processor = None
+    image_processor = create_classification_processor() if vision_processor is None else None
 
     return ConvertService(
         output=OutputMirrorService(

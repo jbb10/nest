@@ -10,7 +10,7 @@ from rich.console import Console
 from rich.text import Text
 
 from nest.core.models import ConvertFileOutcome, ConvertResult
-from nest.ui.messages import print_needs_ai_block
+from nest.ui.messages import AI_DISABLED_NOTE, display_path, print_needs_ai_block
 
 
 def display_convert_summary(
@@ -54,12 +54,12 @@ def display_convert_summary(
     print_needs_ai_block(
         console,
         [
-            _relative_display(failure.path, result.root)
+            display_path(failure.path, result.root)
             for failure in result.failures
             if failure.kind == "needs_ai"
         ],
-        ai_status_note,
-        "nest convert",
+        ai_disabled=ai_status_note == AI_DISABLED_NOTE,
+        command="nest convert",
     )
     if ai_status_note:
         console.print(f"\n  AI: {ai_status_note}")
@@ -85,8 +85,4 @@ def _print_reason_list(
         return
     console.print(f"\n  {title}:")
     for outcome in outcomes:
-        console.print(Text(f"    {_relative_display(outcome.path, root)}: {outcome.reason}"))
-
-
-def _relative_display(source: Path, root: Path) -> str:
-    return str(source.relative_to(root)) if source.is_relative_to(root) else source.name
+        console.print(Text(f"    {display_path(outcome.path, root)}: {outcome.reason}"))

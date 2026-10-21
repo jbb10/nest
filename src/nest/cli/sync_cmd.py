@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
 
+from nest.adapters.classification_processor import create_classification_processor
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.llm_provider import resolve_ai_config
@@ -38,6 +39,7 @@ from nest.ui.logger import setup_error_logger
 from nest.ui.messages import (
     AI_DISABLED_NOTE,
     AI_NOT_CONFIGURED_NOTE,
+    display_path,
     error,
     get_console,
     print_needs_ai_block,
@@ -47,7 +49,6 @@ from nest.ui.messages import (
 if TYPE_CHECKING:
     from rich.console import Console
 
-    from nest.adapters.docling_processor import DoclingProcessor
     from nest.adapters.llm_provider import AIConfig
 
 
@@ -133,19 +134,15 @@ def create_sync_service(
 
         vision_provider = create_vision_provider(ai_config) if ai_config else None
         if vision_provider is not None:
-            from nest.adapters.docling_processor import DoclingProcessor as ClassificationProcessor
-
-            vision_docling_processor = ClassificationProcessor(enable_classification=True)
+            vision_docling_processor = create_classification_processor()
 
             from nest.services.picture_description_service import PictureDescriptionService
 
             picture_description_service = PictureDescriptionService(vision_provider=vision_provider)
 
-    # Without vision, standalone images still need classification to tell
-    # whether they require an AI description (and therefore fail).
-    image_docling_processor = None
-    if vision_docling_processor is None:
-        image_docling_processor = _create_image_processor()
+    image_docling_processor = (
+        create_classification_processor() if vision_docling_processor is None else None
+    )
 
     # Wire up services with their dependencies
     return SyncService(
@@ -185,15 +182,6 @@ def create_sync_service(
         vision_docling_processor=vision_docling_processor,
         image_docling_processor=image_docling_processor,
     )
-
-
-def _create_image_processor() -> "DoclingProcessor | None":
-    """Build a classification-enabled Docling processor, or None without Docling."""
-    try:
-        from nest.adapters.docling_processor import DoclingProcessor
-    except ImportError:
-        return None
-    return DoclingProcessor(enable_classification=True)
 
 
 def _validate_on_error(value: str) -> Literal["skip", "fail"]:
@@ -380,13 +368,6 @@ def sync_command(
         raise typer.Exit(1) from None
 
 
-def _display_path(source: str, project_root: Path | None) -> str:
-    source_path = Path(source)
-    if project_root and source_path.is_relative_to(project_root):
-        return str(source_path.relative_to(project_root))
-    return source_path.name
-
-
 def _display_dry_run_result(result: DryRunResult, console: "Console") -> None:
     """Display dry-run preview output.
 
@@ -452,12 +433,12 @@ def _display_sync_summary(
     else:
         console.print(f"  Failed:    {result.failed_count}")
     for source, reason in result.failure_reasons.items():
-        console.print(f"    {_display_path(source, project_root)}: {reason}", markup=False)
+        console.print(f"    {display_path(Path(source), project_root)}: {reason}", markup=False)
     print_needs_ai_block(
         console,
-        [_display_path(source, project_root) for source in result.needs_ai_files],
-        ai_status_note,
-        "nest sync",
+        [display_path(Path(source), project_root) for source in result.needs_ai_files],
+        ai_disabled=ai_status_note == AI_DISABLED_NOTE,
+        command="nest sync",
     )
 
     # Show orphan info

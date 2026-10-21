@@ -19,6 +19,8 @@ from nest.core.exceptions import ProcessingError
 from nest.core.models import (
     AIEnrichmentResult,
     AIGlossaryResult,
+    ConvertFailure,
+    ConvertSkip,
     DiscoveredFile,
     FailureKind,
     OrphanCleanupResult,
@@ -47,13 +49,12 @@ class SyncLedger:
     vision: list[PictureDescriptionResult] = field(default_factory=lambda: [])
     enrichment: AIEnrichmentResult | None = None
     glossary: AIGlossaryResult | None = None
-    skip_reasons: list[tuple[Path, str]] = field(default_factory=lambda: [])
-    failure_reasons: list[tuple[Path, str]] = field(default_factory=lambda: [])
-    failure_kinds: dict[Path, FailureKind] = field(default_factory=lambda: {})
+    skips: list[ConvertSkip] = field(default_factory=lambda: [])
+    failures: list[ConvertFailure] = field(default_factory=lambda: [])
 
     def needs_ai_files(self) -> list[Path]:
         """Documents that failed only because an AI image description was unavailable."""
-        return [path for path, kind in self.failure_kinds.items() if kind == "needs_ai"]
+        return [failure.path for failure in self.failures if failure.kind == "needs_ai"]
 
     def to_result(
         self,
@@ -84,7 +85,7 @@ class SyncLedger:
             images_mermaid=sum(v.images_mermaid for v in self.vision),
             images_skipped=sum(v.images_skipped for v in self.vision),
             images_failed=sum(v.images_failed for v in self.vision),
-            failure_reasons={str(path): reason for path, reason in self.failure_reasons},
+            failure_reasons={str(failure.path): failure.reason for failure in self.failures},
             needs_ai_files=[str(path) for path in self.needs_ai_files()],
         )
 
@@ -123,7 +124,7 @@ class OutcomeRecorder:
         if self._manifest is not None:
             self._manifest.record_skipped(file.path, file.checksum, reason)
         self._ledger.skipped += 1
-        self._ledger.skip_reasons.append((file.path, reason))
+        self._ledger.skips.append(ConvertSkip(path=file.path, reason=reason))
         self._advance(file)
 
     def failed(
@@ -143,8 +144,7 @@ class OutcomeRecorder:
         if self._manifest is not None:
             self._manifest.record_failure(file.path, file.checksum, error)
         self._ledger.failed += 1
-        self._ledger.failure_reasons.append((file.path, error))
-        self._ledger.failure_kinds[file.path] = kind
+        self._ledger.failures.append(ConvertFailure(path=file.path, reason=error, kind=kind))
         if self._error_logger:
             log_processing_error(self._error_logger, file.path, error)
         self._advance(file)

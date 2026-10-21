@@ -17,10 +17,8 @@ from nest.core.checksum import compute_sha256
 from nest.core.exceptions import NestError
 from nest.core.models import (
     Activity,
-    ConvertFailure,
     ConvertPlan,
     ConvertResult,
-    ConvertSkip,
     DiscoveredFile,
 )
 from nest.core.paths import (
@@ -183,13 +181,8 @@ class ConvertService:
             processed_count=ledger.processed,
             skipped_count=ledger.skipped,
             failed_count=ledger.failed,
-            skips=[ConvertSkip(path=path, reason=reason) for path, reason in ledger.skip_reasons],
-            failures=[
-                ConvertFailure(
-                    path=path, reason=reason, kind=ledger.failure_kinds.get(path, "error")
-                )
-                for path, reason in ledger.failure_reasons
-            ],
+            skips=list(ledger.skips),
+            failures=list(ledger.failures),
             images_described=sum(v.images_described for v in ledger.vision),
             images_skipped=sum(v.images_skipped for v in ledger.vision),
             images_failed=sum(v.images_failed for v in ledger.vision),
