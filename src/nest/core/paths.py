@@ -51,11 +51,31 @@ CONTEXT_TEXT_EXTENSIONS = [
     ".xml",
 ]
 
-# All file extensions recognized in _nest_sources/ (Docling-convertible + passthrough text)
-ALL_SOURCE_EXTENSIONS = sorted(set(SUPPORTED_EXTENSIONS + CONTEXT_TEXT_EXTENSIONS))
+# Standalone raster image files, converted by Docling as one-page scanned documents.
+# SVG is excluded because Docling does not rasterise it.
+IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"]
 
-# Pre-computed set for O(1) passthrough extension lookups
+# All file extensions recognized in _nest_sources/
+# (Docling-convertible documents + images + passthrough text)
+ALL_SOURCE_EXTENSIONS = sorted(
+    set(SUPPORTED_EXTENSIONS + IMAGE_EXTENSIONS + CONTEXT_TEXT_EXTENSIONS)
+)
+
+# Pre-computed sets for O(1) extension lookups
 _PASSTHROUGH_EXTENSIONS = frozenset(ext.lower() for ext in CONTEXT_TEXT_EXTENSIONS)
+_IMAGE_EXTENSIONS = frozenset(ext.lower() for ext in IMAGE_EXTENSIONS)
+
+
+def is_image_extension(suffix: str) -> bool:
+    """Check if file extension denotes a standalone image source document.
+
+    Args:
+        suffix: File extension including leading dot (e.g., ".png").
+
+    Returns:
+        True if the extension is a raster image format converted by Docling.
+    """
+    return suffix.lower() in _IMAGE_EXTENSIONS
 
 
 def is_passthrough_extension(suffix: str) -> bool:

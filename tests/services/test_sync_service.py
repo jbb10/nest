@@ -1021,6 +1021,23 @@ class TestSyncCollisionDetection:
         # The .pdf should have been skipped (manifest.record_skipped called)
         mock_deps["manifest"].record_skipped.assert_called_once()
 
+    def test_image_follows_the_same_collision_rules_as_documents(self, mock_deps):
+        """An image file loses to a passthrough file and the later image wins between images."""
+        from nest.services.sync_conversion import resolve_collisions
+
+        sources = Path("/app/_nest_sources")
+        arch_png = DiscoveredFile(path=sources / "arch.png", checksum="a", status="new")
+        arch_md = DiscoveredFile(path=sources / "arch.md", checksum="b", status="new")
+        flow_png = DiscoveredFile(path=sources / "flow.png", checksum="c", status="new")
+        flow_jpg = DiscoveredFile(path=sources / "flow.jpg", checksum="d", status="new")
+
+        kept, skipped = resolve_collisions([arch_png, arch_md, flow_png, flow_jpg], sources)
+
+        assert [f.path.name for f in kept] == ["arch.md", "flow.jpg"]
+        assert [f.path.name for f in skipped] == ["arch.png", "flow.png"]
+        assert "arch.md" in (arch_png.collision_reason or "")
+        assert "flow.jpg" in (flow_png.collision_reason or "")
+
     def test_no_collision_when_output_paths_differ(self, mock_deps):
         """No collision when files produce different output paths."""
         mock_deps["project_root"] = Path("/app")
@@ -2087,6 +2104,58 @@ class TestSyncVisionPipeline:
         mock_deps["output"].process_file.assert_called_once()
         assert result.images_described == 0
         assert result.vision_prompt_tokens == 0
+
+    def test_image_needing_ai_without_vision_is_a_failed_document(self, mock_deps, tmp_path):
+        """A standalone image holding a describable picture fails and is retried next sync."""
+        from unittest.mock import MagicMock
+
+        from docling_core.types.doc.items.picture.picture import PictureItem
+
+        from nest.adapters.docling_processor import DoclingProcessor
+
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        (project_root / "_nest_context").mkdir(parents=True)
+        source_file = raw_inbox / "flow.png"
+        source_file.touch()
+
+        picture = MagicMock()
+        picture.__class__ = PictureItem
+        picture.meta.classification = None
+        conversion = MagicMock()
+        conversion.document.iterate_items.return_value = [(picture, 1)]
+        image_processor = Mock(spec=DoclingProcessor)
+        image_processor.convert.return_value = conversion
+
+        mock_deps["project_root"] = project_root
+        changes = DiscoveryResult(
+            new_files=[DiscoveredFile(path=source_file, checksum="abc", status="new")],
+            modified_files=[],
+            unchanged_files=[],
+        )
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=None,
+            vision_docling_processor=None,
+            image_docling_processor=image_processor,
+        )
+
+        result = service.sync(changes=changes)
+
+        assert result.failed_count == 1
+        assert result.processed_count == 0
+        assert result.needs_ai_files == [str(source_file)]
+        assert result.failure_reasons == {str(source_file): "requires AI image description"}
+        mock_deps["manifest"].record_failure.assert_called_once()
+        mock_deps["output"].process_file.assert_not_called()
+        mock_deps["output"].compute_docling_output_path.assert_not_called()
 
     def test_passthrough_files_unaffected_by_vision(self, mock_deps, tmp_path):
         """Passthrough files always go through output.process_file() even when vision active."""

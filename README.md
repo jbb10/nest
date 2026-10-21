@@ -214,8 +214,15 @@ nest config ai --remove   # Remove AI configuration
 | Microsoft Excel | `.xlsx` |
 | Microsoft PowerPoint | `.pptx` |
 | HTML | `.html` |
+| Images | `.png`, `.jpg`, `.jpeg`, `.tif`, `.tiff`, `.bmp`, `.webp`, `.gif` |
 
 You can also place Markdown, text, CSV, JSON, YAML, and other text files into `_nest_sources/` — they'll be copied through to `_nest_context/` as-is and picked up by the master index automatically.
+
+Standalone image files are converted as one-page scanned documents: text is OCR'd, tables are extracted, and figures are classified.
+Flowcharts and block diagrams become Mermaid diagrams, other figures are described in prose, and logos and signatures are left out.
+Because a figure is usually the whole point of an image file, an image that holds a figure needing an AI description is a failed document when AI is unavailable (`--no-ai` or not configured).
+The run summary lists these files with instructions to enable AI, and the next `nest sync` retries them.
+SVG is not supported.
 
 ---
 

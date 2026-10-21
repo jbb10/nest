@@ -143,17 +143,18 @@ class TestNegativePathsWithDocling:
         """Test that unsupported file types are ignored without error.
 
         AC6: Unsupported file type → ignored, no error
-        Note: Post-2.12, text files (.txt, .md, .yaml, etc.) ARE supported
-        via passthrough copy. Only truly unsupported types (.png, .zip) are ignored.
+        Note: Text files (.txt, .md, .yaml, etc.) are passthrough-copied and
+        raster images are converted, so only truly unsupported types such as
+        .zip are ignored.
         """
         # Arrange - init project
         result = run_cli(["init"], cwd=fresh_temp_dir)
         assert result.exit_code == 0
 
-        # Add a .png file (unsupported binary format)
+        # Add a .zip file (unsupported binary format)
         raw_inbox = fresh_temp_dir / "_nest_sources"
-        png_file = raw_inbox / "diagram.png"
-        png_file.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        zip_file = raw_inbox / "archive.zip"
+        zip_file.write_bytes(b"PK\x03\x04" + b"\x00" * 100)
 
         # Act
         result = run_cli(["sync"], cwd=fresh_temp_dir)
@@ -161,7 +162,7 @@ class TestNegativePathsWithDocling:
         # Assert
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}: {result.stderr}"
 
-        # .png should NOT be in output
+        # .zip should NOT be in output
         processed = fresh_temp_dir / "_nest_context"
-        assert not (processed / "diagram.png").exists(), ".png file should be ignored"
-        assert not (processed / "diagram.md").exists(), ".png file should be ignored"
+        assert not (processed / "archive.zip").exists(), ".zip file should be ignored"
+        assert not (processed / "archive.md").exists(), ".zip file should be ignored"

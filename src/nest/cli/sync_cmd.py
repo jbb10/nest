@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Annotated, Literal
 
 import typer
 
+from nest.adapters.classification_processor import create_classification_processor
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.llm_provider import resolve_ai_config
@@ -35,7 +36,15 @@ from nest.services.output_service import OutputMirrorService
 from nest.services.sync_service import SyncService
 from nest.ui.command import current_output
 from nest.ui.logger import setup_error_logger
-from nest.ui.messages import error, get_console, success
+from nest.ui.messages import (
+    AI_DISABLED_NOTE,
+    AI_NOT_CONFIGURED_NOTE,
+    display_path,
+    error,
+    get_console,
+    print_needs_ai_block,
+    success,
+)
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -125,13 +134,15 @@ def create_sync_service(
 
         vision_provider = create_vision_provider(ai_config) if ai_config else None
         if vision_provider is not None:
-            from nest.adapters.docling_processor import DoclingProcessor as ClassificationProcessor
-
-            vision_docling_processor = ClassificationProcessor(enable_classification=True)
+            vision_docling_processor = create_classification_processor()
 
             from nest.services.picture_description_service import PictureDescriptionService
 
             picture_description_service = PictureDescriptionService(vision_provider=vision_provider)
+
+    image_docling_processor = (
+        create_classification_processor() if vision_docling_processor is None else None
+    )
 
     # Wire up services with their dependencies
     return SyncService(
@@ -169,6 +180,7 @@ def create_sync_service(
         ai_glossary=ai_glossary,
         picture_description_service=picture_description_service,
         vision_docling_processor=vision_docling_processor,
+        image_docling_processor=image_docling_processor,
     )
 
 
@@ -306,9 +318,9 @@ def sync_command(
 
         ai_status_note = ""
         if no_ai:
-            ai_status_note = "disabled (--no-ai)"
+            ai_status_note = AI_DISABLED_NOTE
         elif not ai_detected_key:
-            ai_status_note = "not configured (run 'nest config ai' or set NEST_AI_API_KEY)"
+            ai_status_note = AI_NOT_CONFIGURED_NOTE
 
         # AI progress callback for console display
         def ai_progress_callback(message: str) -> None:
@@ -421,13 +433,13 @@ def _display_sync_summary(
     else:
         console.print(f"  Failed:    {result.failed_count}")
     for source, reason in result.failure_reasons.items():
-        source_path = Path(source)
-        label = (
-            str(source_path.relative_to(project_root))
-            if project_root and source_path.is_relative_to(project_root)
-            else source_path.name
-        )
-        console.print(f"    {label}: {reason}", markup=False)
+        console.print(f"    {display_path(Path(source), project_root)}: {reason}", markup=False)
+    print_needs_ai_block(
+        console,
+        [display_path(Path(source), project_root) for source in result.needs_ai_files],
+        ai_disabled=ai_status_note == AI_DISABLED_NOTE,
+        command="nest sync",
+    )
 
     # Show orphan info
     if result.orphans_removed > 0:

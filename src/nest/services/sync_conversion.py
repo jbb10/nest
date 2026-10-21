@@ -1,8 +1,10 @@
 """Conversion phase of the sync pipeline.
 
 Turns every pending source file into exactly one recorded outcome. Owns
-collision resolution between passthrough and Docling outputs and the
-two-pass vision pipeline (convert bounded batches, describe images in parallel).
+collision resolution between passthrough and Docling outputs, the two-pass
+vision pipeline (convert bounded batches, describe images in parallel), and
+the rule that a standalone image file needing an AI description is a failed
+document when no vision provider is available.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from docling_core.types.doc.base import ImageRefMode
 
 from nest.core.exceptions import ProcessingError
 from nest.core.models import Activity, DiscoveredFile
-from nest.core.paths import is_passthrough_extension
+from nest.core.paths import is_image_extension, is_passthrough_extension
 
 if TYPE_CHECKING:
     from nest.adapters.docling_processor import DoclingProcessor
@@ -28,6 +30,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _VISION_BATCH_SIZE = 4
+
+NEEDS_AI_REASON = "requires AI image description"
 
 
 class ConversionPhase:
@@ -40,12 +44,26 @@ class ConversionPhase:
         context_dir: Path,
         picture_description: PictureDescriptionService | None = None,
         vision_processor: DoclingProcessor | None = None,
+        image_processor: DoclingProcessor | None = None,
     ) -> None:
+        """
+        Args:
+            output: Writes passthrough copies and plain Docling conversions.
+            sources_dir: Root of the source documents.
+            context_dir: Root of the prepared documents.
+            picture_description: Vision pass; None when AI is unavailable.
+            vision_processor: Classification-enabled Docling processor used
+                with ``picture_description``.
+            image_processor: Classification-enabled Docling processor used for
+                standalone image files when vision is unavailable, so the
+                phase can tell whether an image needs an AI description.
+        """
         self._output = output
         self._sources_dir = sources_dir
         self._context_dir = context_dir
         self._picture_description = picture_description
         self._vision_processor = vision_processor
+        self._image_processor = image_processor
         self._activity: Callable[[Activity], None] | None = None
 
     @property
@@ -88,6 +106,8 @@ class ConversionPhase:
                     if len(deferred) >= _VISION_BATCH_SIZE:
                         self._describe_images(deferred, recorder, ledger)
                         deferred.clear()
+            elif self._image_processor is not None and is_image_extension(file.path.suffix):
+                self._convert_image_without_vision(file, recorder)
             else:
                 self._convert(file, recorder)
 
@@ -106,6 +126,48 @@ class ConversionPhase:
             recorder.failed(file, str(e), cause=e)
             return
         recorder.record(file, result)
+
+    def _convert_image_without_vision(
+        self, file: DiscoveredFile, recorder: OutcomeRecorder
+    ) -> None:
+        """Convert a standalone image when no vision provider is available.
+
+        The image is a failed document when its conversion holds a picture
+        the vision pass would describe; otherwise the plain export is written.
+        """
+        # Imported lazily: the description service pulls in Docling, which
+        # lightweight commands must not load.
+        from nest.services.picture_description_service import requires_description
+
+        assert self._image_processor is not None
+        try:
+            conversion = self._image_processor.convert(file.path)
+        except ProcessingError:
+            raise
+        except Exception as e:
+            recorder.failed(file, f"Docling convert failed: {e}", cause=e)
+            return
+        if requires_description(conversion):
+            recorder.failed(file, NEEDS_AI_REASON, kind="needs_ai")
+            return
+        output_path = self._output.compute_docling_output_path(
+            file.path, self._sources_dir, self._context_dir
+        )
+        try:
+            self._write_markdown(file, conversion, output_path)
+        except Exception as e:
+            recorder.failed(file, str(e), cause=e)
+            return
+        recorder.processed(file, output_path)
+
+    def _write_markdown(self, file: DiscoveredFile, conversion: Any, output_path: Path) -> None:
+        if self._activity is not None:
+            self._activity(Activity(stage="writing", files=[file.path]))
+        markdown = conversion.document.export_to_markdown(
+            image_mode=ImageRefMode.PLACEHOLDER,
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(markdown, encoding="utf-8", newline="\n")
 
     def _convert_for_vision(
         self, file: DiscoveredFile, recorder: OutcomeRecorder
@@ -146,13 +208,7 @@ class ConversionPhase:
                             f"{description.images_failed} required image {noun} failed",
                             source_path=file.path,
                         )
-                    if self._activity is not None:
-                        self._activity(Activity(stage="writing", files=[file.path]))
-                    markdown = conversion.document.export_to_markdown(
-                        image_mode=ImageRefMode.PLACEHOLDER,
-                    )
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    output_path.write_text(markdown, encoding="utf-8", newline="\n")
+                    self._write_markdown(file, conversion, output_path)
                 except Exception as e:
                     recorder.failed(file, f"Vision describe failed: {e}", cause=e)
                     continue

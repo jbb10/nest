@@ -15,6 +15,10 @@ FileStatus = Literal["new", "modified", "unchanged"]
 # Type alias for processing status
 ProcessingStatus = Literal["success", "skipped", "failed"]
 
+# Why a document failed. "needs_ai" marks a standalone image that holds a
+# picture requiring an AI description while no vision provider is available.
+FailureKind = Literal["error", "needs_ai"]
+
 
 class ProcessingResult(BaseModel):
     """Result of a document processing operation.
@@ -185,6 +189,7 @@ class SyncResult(BaseModel):
     images_skipped: int = 0
     images_failed: int = 0
     failure_reasons: dict[str, str] = Field(default_factory=lambda: {})
+    needs_ai_files: list[str] = Field(default_factory=lambda: [])
 
 
 class ConvertFileOutcome(BaseModel):
@@ -207,6 +212,8 @@ class ConvertSkip(ConvertFileOutcome):
 
 class ConvertFailure(ConvertFileOutcome):
     """A file that failed during a convert run."""
+
+    kind: FailureKind = "error"
 
 
 class Activity(BaseModel):

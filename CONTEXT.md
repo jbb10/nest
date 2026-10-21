@@ -12,8 +12,13 @@ _Avoid_: Input artifact
 A readable representation of a source document with the extraction and descriptions requested for that run.
 _Avoid_: Successful file merely because an output exists
 
+**Image file**:
+A standalone raster image supplied as a source document and converted as a one-page scanned document.
+_Avoid_: Embedded image, attachment
+
 **Required image description**:
 A description requested for an image when AI image descriptions are enabled and the image is not intentionally excluded.
+For an image file, a description is also required when the image holds a figure that would be described, even if AI is unavailable.
 _Avoid_: Optional enrichment
 
 **Failed document**:

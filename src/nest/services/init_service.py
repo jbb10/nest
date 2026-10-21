@@ -18,6 +18,7 @@ from nest.core.paths import (
     AGENT_DIR,
     CONTEXT_DIR,
     CONTEXT_TEXT_EXTENSIONS,
+    IMAGE_EXTENSIONS,
     NEST_META_DIR,
     SOURCES_DIR,
     SUPPORTED_EXTENSIONS,
@@ -171,7 +172,7 @@ class InitService:
         # Build the Nest block
         block_lines: list[str] = [_GITATTRIBUTES_MARKER]
         block_lines.append("# Binary source documents — never touch line endings")
-        for ext in SUPPORTED_EXTENSIONS:
+        for ext in SUPPORTED_EXTENSIONS + IMAGE_EXTENSIONS:
             block_lines.append(f"{SOURCES_DIR}/**/*{ext} binary")
 
         block_lines.append("")

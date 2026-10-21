@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
+from nest.adapters.classification_processor import create_classification_processor
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.llm_provider import resolve_ai_config
@@ -20,7 +21,7 @@ from nest.services.convert_service import ConvertService
 from nest.services.output_service import OutputMirrorService
 from nest.ui.command import current_output
 from nest.ui.conversion import display_convert_summary
-from nest.ui.messages import error, get_console
+from nest.ui.messages import AI_DISABLED_NOTE, AI_NOT_CONFIGURED_NOTE, error, get_console
 
 if TYPE_CHECKING:
     from nest.adapters.llm_provider import AIConfig
@@ -72,13 +73,13 @@ def create_convert_service(
         ai_config = ai_config or resolve_ai_config()
         vision_provider = create_vision_provider(ai_config) if ai_config else None
         if vision_provider is not None:
-            from nest.adapters.docling_processor import DoclingProcessor as ClassificationProcessor
-
-            vision_processor = ClassificationProcessor(enable_classification=True)
+            vision_processor = create_classification_processor()
 
             from nest.services.picture_description_service import PictureDescriptionService
 
             picture_description = PictureDescriptionService(vision_provider=vision_provider)
+
+    image_processor = create_classification_processor() if vision_processor is None else None
 
     return ConvertService(
         output=OutputMirrorService(
@@ -90,6 +91,7 @@ def create_convert_service(
         model_downloader=downloader,
         picture_description=picture_description,
         vision_processor=vision_processor,
+        image_processor=image_processor,
     )
 
 
@@ -156,9 +158,9 @@ def convert_command(
         ui.root = plan.root
         ai_status_note = ""
         if no_ai:
-            ai_status_note = "disabled (--no-ai)"
+            ai_status_note = AI_DISABLED_NOTE
         elif ai_config is None:
-            ai_status_note = "not configured (run 'nest config ai' or set NEST_AI_API_KEY)"
+            ai_status_note = AI_NOT_CONFIGURED_NOTE
 
         ui.start(len(plan.pending) + len(plan.skipped))
         result = service.execute(plan, progress_callback=ui.advance, activity_callback=ui.activity)
