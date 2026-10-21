@@ -14,6 +14,7 @@ from nest.services.picture_description_service import (
     MAX_CONCURRENT_DESCRIPTIONS,
     MERMAID_PROMPT,
     PictureDescriptionService,
+    requires_description,
 )
 
 # ---------------------------------------------------------------------------
@@ -457,3 +458,33 @@ class TestExceptionGuard:
 
         assert result.images_described == 1
         assert result.images_failed == 1
+
+
+# ---------------------------------------------------------------------------
+# Required-description detection (no vision provider needed)
+# ---------------------------------------------------------------------------
+
+
+class TestRequiresDescription:
+    """A conversion requires AI when it holds a picture that would be described."""
+
+    def test_true_for_describable_picture(self) -> None:
+        conv = make_conversion_result([make_picture_item(label="bar_chart", confidence=0.9)])
+        assert requires_description(conv) is True
+
+    def test_true_for_unclassified_picture(self) -> None:
+        conv = make_conversion_result([make_picture_item(label=None)])
+        assert requires_description(conv) is True
+
+    def test_false_when_only_logos_or_signatures(self) -> None:
+        conv = make_conversion_result(
+            [
+                make_picture_item(label="logo", confidence=0.9),
+                make_picture_item(label="signature", confidence=0.8),
+            ]
+        )
+        assert requires_description(conv) is False
+
+    def test_false_when_no_pictures(self) -> None:
+        conv = make_conversion_result([])
+        assert requires_description(conv) is False

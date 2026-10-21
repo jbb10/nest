@@ -13,7 +13,7 @@ import io
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from docling.datamodel.document import ConversionResult
 from docling_core.types.doc.common.meta import DescriptionMetaField
@@ -81,12 +81,10 @@ class PictureDescriptionService:
         pending: list[tuple[PictureItem, str, bool]] = []
 
         for element in picture_items:
-            label, confidence = self._classify(element)
-            if label is not None and confidence >= CONFIDENCE_THRESHOLD and label in SKIP_LABELS:
+            route = route_picture(element)
+            if route == "skip":
                 skip_list.append(element)
-            elif (
-                label is not None and confidence >= CONFIDENCE_THRESHOLD and label in MERMAID_LABELS
-            ):
+            elif route == "mermaid":
                 pending.append((element, MERMAID_PROMPT, True))
             else:
                 pending.append((element, DESCRIPTION_PROMPT, False))
@@ -151,27 +149,6 @@ class PictureDescriptionService:
             completion_tokens=completion_tokens,
         )
 
-    def _classify(self, element: PictureItem) -> tuple[str | None, float]:
-        """Extract the top-confidence classification label from a PictureItem.
-
-        Args:
-            element: The PictureItem to classify.
-
-        Returns:
-            Tuple of (best_label, best_confidence), or (None, 0.0) if no
-            classification is available.
-        """
-        if not element.meta or not element.meta.classification:
-            return None, 0.0
-        best_label: str | None = None
-        best_confidence: float = 0.0
-        for pred in element.meta.classification.predictions:
-            pred_confidence = pred.confidence if pred.confidence is not None else 0.0
-            if pred_confidence > best_confidence:
-                best_label = pred.class_name
-                best_confidence = pred_confidence
-        return best_label, best_confidence
-
     def _describe_one(
         self,
         element: PictureItem,
@@ -199,3 +176,52 @@ class PictureDescriptionService:
 
         result = self._vision_provider.complete_with_image(prompt, image_b64, "image/png")
         return result if result is not None and result.text.strip() else None
+
+
+PictureRoute = Literal["skip", "mermaid", "describe"]
+
+
+def route_picture(element: PictureItem) -> PictureRoute:
+    """Decide how a classified picture is handled by the vision pass.
+
+    Logos and signatures are skipped. Flowcharts and block diagrams become
+    Mermaid. Every other picture, including unclassified ones, is described.
+    """
+    label, confidence = _classify(element)
+    if label is not None and confidence >= CONFIDENCE_THRESHOLD:
+        if label in SKIP_LABELS:
+            return "skip"
+        if label in MERMAID_LABELS:
+            return "mermaid"
+    return "describe"
+
+
+def requires_description(conversion_result: ConversionResult) -> bool:
+    """Return True when the document holds at least one picture the vision pass would describe.
+
+    Used to decide whether a document is a failed document when no vision
+    provider is available.
+    """
+    for element, _level in conversion_result.document.iterate_items():
+        if isinstance(element, PictureItem) and route_picture(element) != "skip":
+            return True
+    return False
+
+
+def _classify(element: PictureItem) -> tuple[str | None, float]:
+    """Extract the top-confidence classification label from a PictureItem.
+
+    Returns:
+        Tuple of (best_label, best_confidence), or (None, 0.0) if no
+        classification is available.
+    """
+    if not element.meta or not element.meta.classification:
+        return None, 0.0
+    best_label: str | None = None
+    best_confidence: float = 0.0
+    for pred in element.meta.classification.predictions:
+        pred_confidence = pred.confidence if pred.confidence is not None else 0.0
+        if pred_confidence > best_confidence:
+            best_label = pred.class_name
+            best_confidence = pred_confidence
+    return best_label, best_confidence
