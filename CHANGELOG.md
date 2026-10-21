@@ -2,6 +2,13 @@
 
 All notable changes to Nest.
 
+## [2.3.0](https://github.com/jbb10/nest/compare/v2.2.0...v2.3.0) (2026-10-21)
+
+
+### Features
+
+* **sync:** support standalone image files as source documents ([#39](https://github.com/jbb10/nest/issues/39)) ([7dff318](https://github.com/jbb10/nest/commit/7dff318558286ebe9748dd72af13ab9db8be1577))
+
 ## [2.2.0](https://github.com/jbb10/nest/compare/v2.1.0...v2.2.0) (2026-10-21)
 
 
