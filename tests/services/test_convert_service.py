@@ -161,11 +161,21 @@ class TestConvertPlanDiscovery:
         service, _, _ = make_service()
         docs = tmp_path / "docs"
         write(docs / "good.pdf")
-        write(docs / "image.png")
+        write(docs / "archive.zip")
 
         plan = service.plan(docs)
 
         assert [f.path.name for f in plan.pending] == ["good.pdf"]
+
+    def test_plan_includes_standalone_image_files(self, tmp_path: Path) -> None:
+        """Image files are source documents and are planned for conversion."""
+        service, _, _ = make_service()
+        docs = tmp_path / "docs"
+        write(docs / "diagram.png")
+
+        plan = service.plan(docs)
+
+        assert [f.path.name for f in plan.pending] == ["diagram.png"]
 
     def test_plan_computes_checksums_for_pending_files(self, tmp_path: Path) -> None:
         """Each planned file carries its SHA-256 checksum."""

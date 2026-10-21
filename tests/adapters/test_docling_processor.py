@@ -350,6 +350,7 @@ class TestDoclingProcessorPipelineOptions:
         with (
             patch("nest.adapters.docling_processor.PdfPipelineOptions") as mock_opts,
             patch("nest.adapters.docling_processor.PdfFormatOption"),
+            patch("nest.adapters.docling_processor.ImageFormatOption"),
             patch("nest.adapters.docling_processor.TableStructureOptions"),
             patch("nest.adapters.docling_processor.DocumentConverter"),
         ):
@@ -371,6 +372,7 @@ class TestDoclingProcessorPipelineOptions:
         with (
             patch("nest.adapters.docling_processor.PdfPipelineOptions") as mock_opts,
             patch("nest.adapters.docling_processor.PdfFormatOption"),
+            patch("nest.adapters.docling_processor.ImageFormatOption"),
             patch("nest.adapters.docling_processor.TableStructureOptions"),
             patch("nest.adapters.docling_processor.DocumentConverter"),
         ):
@@ -385,6 +387,57 @@ class TestDoclingProcessorPipelineOptions:
             assert kwargs.get("generate_picture_images") is True
             assert kwargs.get("images_scale") == 2.0
             assert kwargs.get("do_table_structure") is True
+
+
+class TestDoclingProcessorImageFormat:
+    """Standalone image files are converted as one-page scanned documents."""
+
+    def test_image_format_is_allowed(self) -> None:
+        from docling.datamodel.base_models import InputFormat
+
+        from nest.adapters.docling_processor import DoclingProcessor
+
+        assert InputFormat.IMAGE in DoclingProcessor.SUPPORTED_FORMATS
+
+    def test_image_format_shares_the_pdf_pipeline_options(self) -> None:
+        """Images get the same table and classification settings as PDFs."""
+        from unittest.mock import patch
+
+        from docling.datamodel.base_models import InputFormat
+
+        with (
+            patch("nest.adapters.docling_processor.PdfPipelineOptions") as mock_opts,
+            patch("nest.adapters.docling_processor.PdfFormatOption") as mock_pdf_option,
+            patch("nest.adapters.docling_processor.ImageFormatOption") as mock_image_option,
+            patch("nest.adapters.docling_processor.TableStructureOptions"),
+            patch("nest.adapters.docling_processor.DocumentConverter") as mock_converter,
+        ):
+            from nest.adapters.docling_processor import DoclingProcessor
+
+            DoclingProcessor(enable_classification=True)
+
+            pipeline_options = mock_opts.return_value
+            mock_pdf_option.assert_called_once_with(pipeline_options=pipeline_options)
+            mock_image_option.assert_called_once_with(pipeline_options=pipeline_options)
+            _, kwargs = mock_converter.call_args
+            assert kwargs["format_options"][InputFormat.IMAGE] is mock_image_option.return_value
+
+    def test_png_converts_to_markdown(self, tmp_path: Path) -> None:
+        """A standalone PNG is a valid source and conversion succeeds."""
+        from PIL import Image, ImageDraw
+
+        from nest.adapters.docling_processor import DoclingProcessor
+
+        image = Image.new("RGB", (400, 120), "white")
+        ImageDraw.Draw(image).text((20, 40), "Hello from a screenshot", fill="black")
+        source = tmp_path / "screenshot.png"
+        image.save(source)
+        output = tmp_path / "out" / "screenshot.md"
+
+        result = DoclingProcessor().process(source, output)
+
+        assert result.status == "success", result.error
+        assert output.exists()
 
 
 class TestDoclingProcessorConvertMethod:

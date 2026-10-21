@@ -12,7 +12,7 @@ from docling.datamodel.pipeline_options import (
     TableFormerMode,
     TableStructureOptions,
 )
-from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.document_converter import DocumentConverter, ImageFormatOption, PdfFormatOption
 from docling_core.types.doc.base import ImageRefMode
 
 from nest.core.models import ProcessingResult
@@ -21,8 +21,10 @@ from nest.core.models import ProcessingResult
 class DoclingProcessor:
     """Document processor using IBM Docling for conversion.
 
-    Converts PDF, DOCX, PPTX, XLSX, and HTML files to Markdown.
-    Uses TableFormer for accurate table structure extraction.
+    Converts PDF, DOCX, PPTX, XLSX, HTML, and standalone image files to
+    Markdown. Uses TableFormer for accurate table structure extraction.
+    Image files run through the same page pipeline as PDFs: layout analysis,
+    OCR, table structure, and picture classification.
 
     IMPORTANT: Output is optimized for LLM consumption - no base64-encoded
     images or binary artifacts are included in the Markdown output.
@@ -34,6 +36,7 @@ class DoclingProcessor:
         InputFormat.PPTX,
         InputFormat.XLSX,
         InputFormat.HTML,
+        InputFormat.IMAGE,
     ]
 
     def __init__(self, enable_classification: bool = False) -> None:
@@ -77,6 +80,7 @@ class DoclingProcessor:
             allowed_formats=self.SUPPORTED_FORMATS,
             format_options={
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options),
+                InputFormat.IMAGE: ImageFormatOption(pipeline_options=pipeline_options),
             },
         )
 

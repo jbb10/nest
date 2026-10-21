@@ -8,7 +8,9 @@ from pathlib import Path
 from nest.core.paths import (
     ALL_SOURCE_EXTENSIONS,
     CONTEXT_TEXT_EXTENSIONS,
+    IMAGE_EXTENSIONS,
     SUPPORTED_EXTENSIONS,
+    is_image_extension,
     is_passthrough_extension,
     mirror_path,
     passthrough_mirror_path,
@@ -44,6 +46,34 @@ class TestContextTextExtensions:
         """All extensions should start with a dot."""
         for ext in CONTEXT_TEXT_EXTENSIONS:
             assert ext.startswith("."), f"Extension {ext!r} missing leading dot"
+
+
+class TestImageExtensions:
+    """Standalone image files are source documents."""
+
+    def test_accepts_every_raster_format_docling_supports(self) -> None:
+        expected = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".gif"}
+        assert set(IMAGE_EXTENSIONS) == expected
+
+    def test_svg_is_not_an_image_source(self) -> None:
+        assert ".svg" not in IMAGE_EXTENSIONS
+        assert not is_image_extension(".svg")
+
+    def test_is_image_extension_is_case_insensitive(self) -> None:
+        assert is_image_extension(".PNG")
+        assert is_image_extension(".Jpeg")
+
+    def test_documents_and_text_files_are_not_images(self) -> None:
+        assert not is_image_extension(".pdf")
+        assert not is_image_extension(".md")
+
+    def test_images_are_discoverable_source_files(self) -> None:
+        for ext in IMAGE_EXTENSIONS:
+            assert ext in ALL_SOURCE_EXTENSIONS
+
+    def test_images_are_not_passthrough(self) -> None:
+        for ext in IMAGE_EXTENSIONS:
+            assert not is_passthrough_extension(ext)
 
 
 class TestMirrorPath:
@@ -240,7 +270,7 @@ class TestAllSourceExtensions:
 
     def test_union_count(self) -> None:
         """ALL_SOURCE_EXTENSIONS has the expected number of entries."""
-        expected = sorted(set(SUPPORTED_EXTENSIONS + CONTEXT_TEXT_EXTENSIONS))
+        expected = sorted(set(SUPPORTED_EXTENSIONS + IMAGE_EXTENSIONS + CONTEXT_TEXT_EXTENSIONS))
         assert ALL_SOURCE_EXTENSIONS == expected
 
 
@@ -265,7 +295,7 @@ class TestIsPassthroughExtension:
 
     def test_returns_false_for_unknown_extension(self) -> None:
         """Unknown extensions are not passthrough."""
-        assert is_passthrough_extension(".png") is False
+        assert is_passthrough_extension(".zip") is False
         assert is_passthrough_extension(".zip") is False
 
 
