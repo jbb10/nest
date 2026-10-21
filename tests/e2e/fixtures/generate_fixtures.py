@@ -9,6 +9,7 @@ Run: uv run python tests/e2e/fixtures/generate_fixtures.py
 """
 
 from pathlib import Path
+from typing import Any
 
 # DOCX generation
 from docx import Document
@@ -191,6 +192,50 @@ def create_corrupt_pdf(output_path: Path, source_pdf: Path) -> None:
     print(f"Created: {output_path} ({output_path.stat().st_size} bytes)")
 
 
+def _draw_bar_chart(canvas_size: tuple[int, int] = (400, 280), offset: int = 0) -> Any:
+    """Draw a colourful bar chart (400×280 px) onto a white canvas using PIL.
+
+    ``offset`` shifts the chart inside a larger canvas so the layout model sees
+    it as a figure on a page rather than content touching every edge.
+    """
+    from PIL import Image, ImageDraw
+
+    img = Image.new("RGB", canvas_size, color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    o = offset
+
+    # Outer border
+    draw.rectangle([o, o, o + 399, o + 279], outline=(50, 50, 50), width=2)
+
+    # Title banner
+    draw.rectangle([o, o, o + 399, o + 36], fill=(70, 130, 180))
+    draw.text((o + 120, o + 10), "Quarterly Sales 2025", fill=(255, 255, 255))
+
+    # Grid lines and Y-axis labels
+    base_y = o + 245
+    for val, y_off in [(200, 200), (150, 150), (100, 100), (50, 50)]:
+        y_pos = base_y - y_off
+        draw.line([o + 45, y_pos, o + 390, y_pos], fill=(210, 210, 210), width=1)
+        draw.text((o + 5, y_pos - 7), str(val), fill=(90, 90, 90))
+
+    # Bars: (label, bar_height, colour)
+    bars = [
+        ("Q1", 120, (70, 130, 180)),
+        ("Q2", 165, (255, 165, 0)),
+        ("Q3", 205, (60, 179, 113)),
+        ("Q4", 180, (220, 20, 60)),
+    ]
+    bar_width = 55
+    for i, (label, bh, colour) in enumerate(bars):
+        x = o + 55 + i * 82
+        draw.rectangle([x, base_y - bh, x + bar_width, base_y], fill=colour)
+        draw.text((x + 15, base_y + 5), label, fill=(50, 50, 50))
+
+    # X-axis baseline
+    draw.line([o + 45, base_y, o + 390, base_y], fill=(50, 50, 50), width=2)
+    return img
+
+
 def create_image_pdf(output_path: Path) -> None:
     """Create a PDF with embedded raster images for vision pipeline E2E tests.
 
@@ -202,48 +247,14 @@ def create_image_pdf(output_path: Path) -> None:
     """
     from io import BytesIO
 
-    from PIL import Image, ImageDraw
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen import canvas as rl_canvas
 
     def _make_bar_chart_image() -> BytesIO:
-        """Create a colourful bar chart image (400×280 px) using PIL."""
-        img = Image.new("RGB", (400, 280), color=(255, 255, 255))
-        draw = ImageDraw.Draw(img)
-
-        # Outer border
-        draw.rectangle([0, 0, 399, 279], outline=(50, 50, 50), width=2)
-
-        # Title banner
-        draw.rectangle([0, 0, 399, 36], fill=(70, 130, 180))
-        draw.text((120, 10), "Quarterly Sales 2025", fill=(255, 255, 255))
-
-        # Grid lines and Y-axis labels
-        base_y = 245
-        for val, y_off in [(200, 200), (150, 150), (100, 100), (50, 50)]:
-            y_pos = base_y - y_off
-            draw.line([45, y_pos, 390, y_pos], fill=(210, 210, 210), width=1)
-            draw.text((5, y_pos - 7), str(val), fill=(90, 90, 90))
-
-        # Bars: (label, bar_height, colour)
-        bars = [
-            ("Q1", 120, (70, 130, 180)),
-            ("Q2", 165, (255, 165, 0)),
-            ("Q3", 205, (60, 179, 113)),
-            ("Q4", 180, (220, 20, 60)),
-        ]
-        bar_width = 55
-        for i, (label, bh, colour) in enumerate(bars):
-            x = 55 + i * 82
-            draw.rectangle([x, base_y - bh, x + bar_width, base_y], fill=colour)
-            draw.text((x + 15, base_y + 5), label, fill=(50, 50, 50))
-
-        # X-axis baseline
-        draw.line([45, base_y, 390, base_y], fill=(50, 50, 50), width=2)
-
+        """Serialise the shared bar chart as PNG bytes."""
         buf = BytesIO()
-        img.save(buf, format="PNG")
+        _draw_bar_chart().save(buf, format="PNG")
         buf.seek(0)
         return buf
 
@@ -279,6 +290,42 @@ def create_image_pdf(output_path: Path) -> None:
     print(f"Created: {output_path} ({output_path.stat().st_size} bytes)")
 
 
+def create_chart_png(output_path: Path) -> None:
+    """Create a standalone bar-chart PNG for image-file E2E tests.
+
+    The chart sits inside a 60 px white margin so Docling's layout model
+    detects one picture (classified as a bar chart) and no body text.
+    """
+    _draw_bar_chart(canvas_size=(520, 400), offset=60).save(output_path)
+    print(f"Created: {output_path} ({output_path.stat().st_size} bytes)")
+
+
+def create_notes_png(output_path: Path) -> None:
+    """Create a screenshot-of-text PNG that Docling converts via OCR only.
+
+    Contains no figure, so it never requires an AI image description.
+    """
+    from PIL import Image, ImageDraw, ImageFont
+
+    img = Image.new("RGB", (800, 400), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 20)
+    except OSError:
+        font = ImageFont.load_default(size=20)
+    lines = [
+        "Meeting notes",
+        "",
+        "- Decided to ship images support",
+        "- Flowcharts become Mermaid",
+        "- Review next week",
+    ]
+    for i, line in enumerate(lines):
+        draw.text((40, 40 + i * 50), line, fill=(0, 0, 0), font=font)
+    img.save(output_path)
+    print(f"Created: {output_path} ({output_path.stat().st_size} bytes)")
+
+
 def main() -> None:
     """Generate all test fixtures."""
     fixtures_dir = Path(__file__).parent
@@ -295,6 +342,10 @@ def main() -> None:
 
     # Create PDF with embedded images for vision pipeline tests (Story 7.5)
     create_image_pdf(fixtures_dir / "image_doc.pdf")
+
+    # Standalone image files
+    create_chart_png(fixtures_dir / "chart.png")
+    create_notes_png(fixtures_dir / "notes.png")
 
     print("\n✅ All fixtures generated successfully!")
 
