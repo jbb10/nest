@@ -84,7 +84,7 @@ After delegating to a subagent, **verify the result is complete** before proceed
 ## Technical Context
 
 - All files in `_nest_context/` are either Markdown conversions of original documents (PDFs, Excel, PowerPoint, etc.), passthrough copies of text files from `_nest_sources/`, or user-curated content
-- Users can place all files in `_nest_sources/`: text files (`.md`, `.txt`, `.yaml`, etc.) are copied as-is, while documents (`.pdf`, `.docx`, etc.) are converted to Markdown
+- Users can place all files in `_nest_sources/`: text files (`.md`, `.txt`, `.yaml`, etc.) are copied as-is, while documents (`.pdf`, `.docx`, etc.) and standalone images (`.png`, `.jpg`, etc.) are converted to Markdown
 - Tables from source documents are converted to Markdown table format
 - File paths are relative to `_nest_context/`
 - The index (`.nest/00_MASTER_INDEX.md`) and glossary (`.nest/glossary.md`) are regenerated after each `nest sync` command

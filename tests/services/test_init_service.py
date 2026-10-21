@@ -336,6 +336,8 @@ class TestSetupGitattributes:
         content = (tmp_path / ".gitattributes").read_text(encoding="utf-8")
         assert "_nest_sources/**/*.pdf binary" in content
         assert "_nest_sources/**/*.docx binary" in content
+        assert "_nest_sources/**/*.png binary" in content
+        assert "_nest_sources/**/*.webp binary" in content
         assert "_nest_sources/**/*.md text eol=lf" in content
         assert "_nest_context/**/*.md text eol=lf" in content
         assert ".nest/**/*.json text eol=lf" in content

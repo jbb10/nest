@@ -100,7 +100,7 @@ def init_command(
         console.print("  2. Run [cyan]nest sync[/cyan] to process them")
         console.print("  3. Open VS Code Copilot Chat and select 'Nest' from the agent dropdown")
         console.print()
-        console.print("[dim]Supported formats: PDF, DOCX, PPTX, XLSX, HTML[/dim]")
+        console.print("[dim]Supported formats: PDF, DOCX, PPTX, XLSX, HTML, images[/dim]")
 
     except ModelError as e:
         # What → Why → Action format for model errors
