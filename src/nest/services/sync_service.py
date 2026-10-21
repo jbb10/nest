@@ -5,7 +5,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from nest.core.models import DiscoveryResult, DryRunResult, FileMetadata, SyncResult
+from nest.core.models import (
+    Activity,
+    DiscoveryResult,
+    DryRunResult,
+    FileMetadata,
+    SyncResult,
+)
 from nest.core.paths import (
     CONTEXT_DIR,
     GLOSSARY_FILE,
@@ -100,6 +106,7 @@ class SyncService:
         progress_callback: ProgressCallback | None = None,
         ai_progress_callback: Callable[[str], None] | None = None,
         changes: DiscoveryResult | None = None,
+        activity_callback: Callable[[Activity], None] | None = None,
     ) -> SyncResult | DryRunResult:
         """Execute the sync pipeline.
 
@@ -113,6 +120,7 @@ class SyncService:
             ai_progress_callback: Called with ``"start"`` when AI work begins and
                 with a summary string when it completes.
             changes: Pre-computed discovery result; discovered when omitted.
+            activity_callback: Reports document and finalization stages before blocking work.
 
         Raises:
             ProcessingError: In ``on_error="fail"`` mode, on the first failed file.
@@ -133,12 +141,23 @@ class SyncService:
         recorder = OutcomeRecorder(
             self._manifest, ledger, on_error, self._error_logger, progress_callback
         )
-        self._conversion.run(changes.new_files + changes.modified_files, recorder, ledger)
+        self._conversion.run(
+            changes.new_files + changes.modified_files,
+            recorder,
+            ledger,
+            activity_callback=activity_callback,
+        )
 
         # Commit before orphan cleanup so the detector sees newly produced outputs.
+        if activity_callback is not None:
+            activity_callback(Activity(stage="committing"))
         self._manifest.commit()
+        if activity_callback is not None:
+            activity_callback(Activity(stage="cleanup"))
         orphans = self._orphan.cleanup(no_clean=no_clean)
 
+        if activity_callback is not None:
+            activity_callback(Activity(stage="metadata"))
         hints_path = self._meta_dir / INDEX_HINTS_FILE
         hints = self._metadata.load_previous_hints(hints_path)
         old_index = self._index.read_index_content()
@@ -156,6 +175,8 @@ class SyncService:
             ai_progress_callback,
         )
 
+        if activity_callback is not None:
+            activity_callback(Activity(stage="indexing"))
         index_content = self._index.generate_content(metadata, descriptions, hints)
         self._index.write_index(index_content)
         logger.info("Master index updated.")

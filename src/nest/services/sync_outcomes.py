@@ -77,6 +77,8 @@ class SyncLedger:
             images_described=sum(v.images_described for v in self.vision),
             images_mermaid=sum(v.images_mermaid for v in self.vision),
             images_skipped=sum(v.images_skipped for v in self.vision),
+            images_failed=sum(v.images_failed for v in self.vision),
+            failure_reasons={str(path): reason for path, reason in self.failure_reasons},
         )
 
 
@@ -119,7 +121,12 @@ class OutcomeRecorder:
 
     def failed(self, file: DiscoveredFile, error: str, cause: BaseException | None = None) -> None:
         if cause is not None:
-            logger.error("Unexpected error processing %s", file.path, exc_info=cause)
+            logger.error(
+                "Unexpected error processing %s",
+                file.path,
+                exc_info=cause,
+                extra={"source_path": str(file.path)},
+            )
         if self._manifest is not None:
             self._manifest.record_failure(file.path, file.checksum, error)
         self._ledger.failed += 1

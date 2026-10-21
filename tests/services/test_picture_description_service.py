@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 from unittest.mock import MagicMock
 
+import pytest
 from docling_core.types.doc import PictureItem
 
 from nest.core.models import LLMCompletionResult, PictureDescriptionResult
@@ -291,6 +292,17 @@ class TestFiftyImageCap:
 
 
 class TestLLMFailureIsolation:
+    @pytest.mark.parametrize("description", ["", "   "])
+    def test_empty_description_counts_as_failed(self, description: str) -> None:
+        item = make_picture_item(label="natural_image", confidence=0.9)
+        conversion = make_conversion_result([item])
+        service = PictureDescriptionService(
+            vision_provider=MockVisionProvider([_result(description)])
+        )
+        result = service.describe(conversion)
+        assert result.images_failed == 1
+        assert result.images_described == 0
+
     def test_llm_returns_none_counts_as_failed(self) -> None:
         """AC6: complete_with_image returns None → images_failed, no description set."""
         item = make_picture_item(label="natural_image", confidence=0.9)

@@ -8,6 +8,7 @@ index, glossary, or any other project artifact.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,7 @@ from nest.adapters.protocols import FileDiscoveryProtocol, ModelCacheProtocol
 from nest.core.checksum import compute_sha256
 from nest.core.exceptions import NestError
 from nest.core.models import (
+    Activity,
     ConvertFailure,
     ConvertPlan,
     ConvertResult,
@@ -127,6 +129,7 @@ class ConvertService:
         self,
         plan: ConvertPlan,
         progress_callback: ProgressCallback | None = None,
+        activity_callback: Callable[[Activity], None] | None = None,
     ) -> ConvertResult:
         """Run a plan, recording exactly one outcome per attempted file.
 
@@ -136,6 +139,7 @@ class ConvertService:
         Args:
             plan: Plan produced by ``plan``.
             progress_callback: Called once per attempted file with its name.
+            activity_callback: Reports the current stage before blocking work begins.
 
         Returns:
             ConvertResult with counts, skip/failure reasons, and vision totals.
@@ -153,6 +157,10 @@ class ConvertService:
 
         needs_models = any(not is_passthrough_extension(f.path.suffix) for f in plan.pending)
         if needs_models and self._model_downloader is not None:
+            if activity_callback is not None:
+                activity_callback(Activity(stage="preparing"))
+                if not self._model_downloader.are_models_cached():
+                    activity_callback(Activity(stage="downloading"))
             self._model_downloader.download_if_needed(progress=True)
 
         if plan.pending:
@@ -163,7 +171,7 @@ class ConvertService:
                 picture_description=self._picture_description,
                 vision_processor=self._vision_processor,
             )
-            phase.run(plan.pending, recorder, ledger)
+            phase.run(plan.pending, recorder, ledger, activity_callback=activity_callback)
 
         return ConvertResult(
             root=plan.root,
@@ -176,6 +184,7 @@ class ConvertService:
             ],
             images_described=sum(v.images_described for v in ledger.vision),
             images_skipped=sum(v.images_skipped for v in ledger.vision),
+            images_failed=sum(v.images_failed for v in ledger.vision),
             vision_prompt_tokens=sum(v.prompt_tokens for v in ledger.vision),
             vision_completion_tokens=sum(v.completion_tokens for v in ledger.vision),
         )

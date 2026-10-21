@@ -183,6 +183,8 @@ class SyncResult(BaseModel):
     images_described: int = 0
     images_mermaid: int = 0
     images_skipped: int = 0
+    images_failed: int = 0
+    failure_reasons: dict[str, str] = Field(default_factory=lambda: {})
 
 
 class ConvertFileOutcome(BaseModel):
@@ -205,6 +207,27 @@ class ConvertSkip(ConvertFileOutcome):
 
 class ConvertFailure(ConvertFileOutcome):
     """A file that failed during a convert run."""
+
+
+class Activity(BaseModel):
+    """Current preparation work, independent of terminal formatting or completion counts."""
+
+    stage: Literal[
+        "preparing",
+        "downloading",
+        "converting",
+        "describing",
+        "writing",
+        "committing",
+        "cleanup",
+        "metadata",
+        "indexing",
+        "scaffolding",
+        "agents",
+    ]
+    files: list[Path] = Field(default_factory=lambda: [])
+    current: int = 0
+    total: int = 0
 
 
 class ConvertPlan(BaseModel):
@@ -253,6 +276,7 @@ class ConvertResult(BaseModel):
     failures: list[ConvertFailure] = Field(default_factory=lambda: [])
     images_described: int = 0
     images_skipped: int = 0
+    images_failed: int = 0
     vision_prompt_tokens: int = 0
     vision_completion_tokens: int = 0
 

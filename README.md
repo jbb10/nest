@@ -78,6 +78,21 @@ nest sync
 
 ## Commands
 
+### Output and Failures
+
+All commands share a quiet default output policy.
+Interactive terminals show live activity and elapsed time during blocking operations; redirected output contains plain-text stage updates without terminal control codes.
+Document counts measure document outcomes, not completion of later enrichment or index updates.
+Prompts and reports are displayed without a competing progress animation.
+Every command accepts `--verbose` or `-v` for detailed diagnostics.
+
+Repeated diagnostic warnings are grouped by affected document, and potential extraction problems remain visible in a review summary.
+Failed required AI image descriptions make the document and command fail, including empty responses and images that cannot be extracted for description.
+Both `sync` and `convert` return a nonzero exit code when any document fails.
+By default, other documents continue processing; `sync --on-error fail` aborts at the first failure.
+Failed documents remain eligible for retry, and an image-description failure does not replace an existing successful output with an incomplete one.
+`--no-ai` disables remote AI work, not local OCR or table extraction.
+
 ### `nest init`
 
 Scaffolds a new Nest project in the current directory:
@@ -112,6 +127,7 @@ Without AI configuration, sync still completes, but index descriptions may be bl
 | `--dry-run` | off | Preview what would be processed without making changes |
 | `--force` | off | Re-process all files, ignoring checksums |
 | `--no-ai` | off | Skip AI enrichment even when AI credentials are configured |
+| `--verbose`, `-v` | off | Show detailed diagnostics |
 
 ```bash
 nest sync                    # Normal incremental sync
@@ -122,21 +138,27 @@ nest sync --on-error fail    # Stop on first error
 
 ### `nest convert`
 
-Converts documents to Markdown anywhere on disk — no Nest project required.
-Give it a single file or a directory; outputs are written next to the originals
-(`reports/q1.pdf` → `reports/q1.md`), or into `--output` mirroring the tree.
-Uses the same discovery and conversion rules as `nest sync`: recursive
-discovery, hidden folders skipped, text files passed through, and AI used
-only for picture descriptions. No manifest, index, or `.nest/` folder is
-created. Existing outputs are skipped; `--force` overwrites them. Failed
-files don't stop the run — the summary lists them and the exit code is
-non-zero if any file failed.
+Converts documents to Markdown anywhere on disk without requiring a Nest project.
+The input can be a single file or a directory; outputs are written next to the originals (`reports/q1.pdf` to `reports/q1.md`), or into `--output` mirroring the tree.
+The command uses the same discovery and conversion rules as `nest sync`: recursive discovery, hidden folders skipped, text files passed through, and AI used only for picture descriptions.
+No manifest, index, or `.nest/` folder is created.
+Existing outputs are skipped; `--force` overwrites them.
+Failed files do not stop the run; the summary lists them and the exit code is non-zero if any file failed.
+
+The terminal display separates completed-file counts, the current stage, and a wrapping filename.
+Model preparation and downloads appear as activity stages rather than dependency logs.
+Image descriptions finish in bounded batches, allowing outputs to be written before the entire directory is converted.
+Routine skips are grouped by reason in the summary.
+Potential extraction problems, including dropped table content, appear under `Review recommended`, grouped by document.
+`--verbose` includes library diagnostics and individual skip reasons.
+`--no-ai` disables remote image descriptions, not local OCR or table extraction.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--output`, `-o` | off | Write outputs into a directory, mirroring the tree (copies text files too) |
 | `--force` | off | Overwrite existing output files |
 | `--no-ai` | off | Skip AI image descriptions even when AI credentials are configured |
+| `--verbose`, `-v` | off | Show library diagnostics and per-file skip reasons |
 
 ```bash
 nest convert reports/q1.pdf              # One file, output next to it

@@ -3,9 +3,145 @@
 Tests for ui/logger.py module - error logging setup and helpers.
 """
 
+import logging
+import warnings
+from io import StringIO
 from pathlib import Path
 
 import pytest
+from rich.console import Console
+
+from nest.ui.logger import ConsoleDiagnostics
+
+
+class TestConsoleDiagnostics:
+    """Dependency diagnostics follow the same scoped policy in every output channel."""
+
+    @pytest.mark.parametrize("verbose", [False, True])
+    def test_secrets_are_redacted_in_diagnostics(
+        self, monkeypatch: pytest.MonkeyPatch, verbose: bool
+    ) -> None:
+        secret = "sample-secret-for-diagnostic-test"
+        monkeypatch.setenv("NEST_AI_API_KEY", secret)
+        output = StringIO()
+        with ConsoleDiagnostics(Console(file=output, width=160), verbose=verbose) as diagnostics:
+            logging.getLogger("httpx").warning(
+                "Request failed with %s and Bearer another-token", secret
+            )
+            diagnostics.print_summary(Path.cwd())
+        assert secret not in output.getvalue()
+        assert "another-token" not in output.getvalue()
+        assert "[redacted]" in output.getvalue()
+
+    def test_library_progress_settings_are_restored(self) -> None:
+        from huggingface_hub.utils.tqdm import (
+            are_progress_bars_disabled,
+            disable_progress_bars,
+            enable_progress_bars,
+        )
+        from rapidocr.utils import download_file
+        from transformers.utils import logging as transformers_logging
+
+        original_factory = download_file.__dict__["tqdm"]
+        original_transformers = transformers_logging.is_progress_bar_enabled()
+        original_hub = are_progress_bars_disabled()
+        try:
+            transformers_logging.disable_progress_bar()
+            enable_progress_bars()
+            with ConsoleDiagnostics(Console(file=StringIO())):
+                assert are_progress_bars_disabled()
+                with download_file.__dict__["tqdm"](total=1) as progress:
+                    assert progress.disable
+
+            assert not transformers_logging.is_progress_bar_enabled()
+            assert not are_progress_bars_disabled()
+            assert download_file.__dict__["tqdm"] is original_factory
+        finally:
+            if original_transformers:
+                transformers_logging.enable_progress_bar()
+            else:
+                transformers_logging.disable_progress_bar()
+            if original_hub:
+                disable_progress_bars()
+            else:
+                enable_progress_bars()
+
+    def test_unrecognized_errors_remain_visible(self) -> None:
+        output = StringIO()
+        with ConsoleDiagnostics(Console(file=output, width=160)) as diagnostics:
+            logging.getLogger("RapidOCR").error("Unable to decode page image")
+            diagnostics.print_summary(Path.cwd())
+        assert "Unable to decode page image" in output.getvalue()
+
+    def test_quiet_output_keeps_document_quality_warnings(self, tmp_path: Path) -> None:
+        output = StringIO()
+        console = Console(file=output, width=160)
+        with ConsoleDiagnostics(console) as diagnostics:
+            diagnostics.source = tmp_path / "budget[1].pdf"
+            logging.getLogger("RapidOCR").info("Using engine_name: torch")
+            logging.getLogger("RapidOCR").warning("The text detection result is empty")
+            warnings.warn(
+                "Using padding='same' with even kernel lengths and odd dilation",
+                UserWarning,
+                stacklevel=2,
+            )
+            for _ in range(2):
+                logging.getLogger("MatchingPostProcessor").warning(
+                    "47 of 966 pdf cells matched neither a row nor a column band and were dropped"
+                )
+            warnings.warn("Unexpected extraction warning", UserWarning, stacklevel=2)
+            diagnostics.print_summary(tmp_path)
+
+        rendered = output.getvalue()
+        assert "engine_name" not in rendered
+        assert "text detection" not in rendered
+        assert "padding=" not in rendered
+        assert "budget[1].pdf" in rendered
+        assert rendered.count("Table extraction dropped some content") == 1
+        assert "Unexpected extraction warning" in rendered
+
+    def test_verbose_output_includes_logs_and_python_warnings(self) -> None:
+        output = StringIO()
+        with ConsoleDiagnostics(Console(file=output, width=160), verbose=True):
+            logging.getLogger("RapidOCR").info("Using engine_name: torch")
+            logging.getLogger("nest.services.sync_conversion").info("Processing 4 files")
+            logging.getLogger("RapidOCR").warning("The text detection result is empty")
+            warnings.warn(
+                "Using padding='same' with even kernel lengths and odd dilation",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        rendered = output.getvalue()
+        assert "INFO [RapidOCR] Using engine_name: torch" in rendered
+        assert "Processing 4 files" in rendered
+        assert "The text detection result is empty" in rendered
+        assert "UserWarning:" in rendered
+
+    def test_configuration_is_restored_after_failure(self) -> None:
+        root = logging.getLogger()
+        rapidocr = logging.getLogger("RapidOCR")
+        root_state = (root.level, root.handlers[:], root.propagate)
+        rapidocr_state = (rapidocr.level, rapidocr.handlers[:], rapidocr.propagate)
+        original_showwarning = warnings.showwarning
+
+        with pytest.raises(RuntimeError, match="conversion failed"):
+            with ConsoleDiagnostics(Console(file=StringIO())):
+                raise RuntimeError("conversion failed")
+
+        assert (root.level, root.handlers, root.propagate) == root_state
+        assert (rapidocr.level, rapidocr.handlers, rapidocr.propagate) == rapidocr_state
+        assert warnings.showwarning is original_showwarning
+
+    def test_downloads_have_a_user_facing_activity_without_urls(self) -> None:
+        output = StringIO()
+        activities: list[str | None] = []
+        with ConsoleDiagnostics(Console(file=output), download_activity=activities.append):
+            logging.getLogger("RapidOCR").info("Initiating download: https://example.test/model")
+            logging.getLogger("RapidOCR").info("Successfully saved to: /tmp/model")
+
+        assert activities == ["Downloading OCR models", None]
+        assert output.getvalue() == ""
 
 
 class TestSetupErrorLogger:
@@ -135,118 +271,13 @@ class TestLogProcessingError:
         assert "file2.xlsx" in lines[1]
 
 
-class TestRichConsoleHandler:
-    """Tests for RichConsoleHandler and install_rich_console_handler."""
+def test_file_only_error_logger_does_not_duplicate_console_output(tmp_path: Path) -> None:
+    from nest.ui.logger import setup_error_logger
 
-    def _reset_nest_logger(self) -> None:
-        import logging
-
-        nest_logger = logging.getLogger("nest")
-        nest_logger.handlers.clear()
-        nest_logger.setLevel(logging.NOTSET)
-
-    def test_warning_routed_to_ui_warning(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A WARNING from nest.* should be forwarded to ui.messages.warning."""
-        import logging
-
-        from nest.ui import messages
-        from nest.ui.logger import install_rich_console_handler
-
-        self._reset_nest_logger()
-
-        captured: list[str] = []
-        monkeypatch.setattr(messages, "warning", lambda msg: captured.append(msg))
-
-        install_rich_console_handler()
-
-        logging.getLogger("nest.adapters.file_discovery").warning(
-            "Skipping broken symlink: %s", "/tmp/foo"
-        )
-
-        assert captured == ["Skipping broken symlink: /tmp/foo"]
-        self._reset_nest_logger()
-
-    def test_error_routed_to_ui_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """An ERROR from nest.* should be forwarded to ui.messages.error."""
-        import logging
-
-        from nest.ui import messages
-        from nest.ui.logger import install_rich_console_handler
-
-        self._reset_nest_logger()
-
-        captured: list[str] = []
-        monkeypatch.setattr(messages, "error", lambda msg: captured.append(msg))
-
-        install_rich_console_handler()
-
-        logging.getLogger("nest.services.sync_service").error("boom")
-
-        assert captured == ["boom"]
-        self._reset_nest_logger()
-
-    def test_third_party_records_are_ignored(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Records from non-nest namespaces must not reach the UI."""
-        import logging
-
-        from nest.ui import messages
-        from nest.ui.logger import install_rich_console_handler
-
-        self._reset_nest_logger()
-
-        warned: list[str] = []
-        monkeypatch.setattr(messages, "warning", lambda msg: warned.append(msg))
-
-        install_rich_console_handler()
-
-        # Attach the same handler instance to a third-party logger to prove
-        # the namespace filter (not just propagation) blocks the record.
-        from nest.ui.logger import RichConsoleHandler
-
-        for h in logging.getLogger("nest").handlers:
-            if isinstance(h, RichConsoleHandler):
-                logging.getLogger("docling").addHandler(h)
-                logging.getLogger("docling").warning("noisy")
-                logging.getLogger("docling").removeHandler(h)
-                break
-
-        assert warned == []
-        self._reset_nest_logger()
-
-    def test_error_log_namespace_is_excluded(
-        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-    ) -> None:
-        """Records from nest.error_log.* (file-only sync errors) must be skipped."""
-        from nest.ui import messages
-        from nest.ui.logger import install_rich_console_handler, setup_error_logger
-
-        self._reset_nest_logger()
-
-        captured: list[str] = []
-        monkeypatch.setattr(messages, "error", lambda msg: captured.append(msg))
-
-        install_rich_console_handler()
-
-        log_file = tmp_path / "errors.log"
-        err_logger = setup_error_logger(log_file, service_name="sync")
-        err_logger.error("file.pdf: failure")
-
-        assert captured == []
-        self._reset_nest_logger()
-
-    def test_install_is_idempotent(self) -> None:
-        """Calling install twice must not add duplicate handlers."""
-        import logging
-
-        from nest.ui.logger import RichConsoleHandler, install_rich_console_handler
-
-        self._reset_nest_logger()
-
-        install_rich_console_handler()
-        install_rich_console_handler()
-
-        handlers = [
-            h for h in logging.getLogger("nest").handlers if isinstance(h, RichConsoleHandler)
-        ]
-        assert len(handlers) == 1
-        self._reset_nest_logger()
+    stream = StringIO()
+    log_file = tmp_path / "errors.log"
+    with ConsoleDiagnostics(Console(file=stream)) as diagnostics:
+        setup_error_logger(log_file, service_name="sync").error("file.pdf: failure")
+        diagnostics.print_summary(tmp_path)
+    assert stream.getvalue() == ""
+    assert "file.pdf: failure" in log_file.read_text()

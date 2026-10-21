@@ -1,15 +1,22 @@
 """Tests for the convert command CLI."""
 
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 from rich.console import Console
 from typer.testing import CliRunner
 
-from nest.cli.convert_cmd import _display_convert_summary
 from nest.cli.main import app
 from nest.core.exceptions import NestError
-from nest.core.models import ConvertFailure, ConvertResult, ConvertSkip, DiscoveredFile
+from nest.core.models import (
+    Activity,
+    ConvertFailure,
+    ConvertResult,
+    ConvertSkip,
+    DiscoveredFile,
+)
+from nest.ui.conversion import display_convert_summary as _display_convert_summary
 
 runner = CliRunner()
 
@@ -107,6 +114,34 @@ class TestConvertCommandRun:
     """Tests for the convert command happy path and exit codes."""
 
     @patch("nest.cli.convert_cmd.create_convert_service")
+    def test_convert_attributes_quality_warnings_to_each_document(
+        self, mock_create_service: MagicMock, tmp_path: Path
+    ) -> None:
+        service = mock_create_service.return_value
+        service.plan.return_value = _make_plan(tmp_path, pending=2)
+
+        def execute(plan, progress_callback, activity_callback):
+            for index, source in enumerate(plan.pending, start=1):
+                activity_callback(
+                    Activity(stage="converting", files=[source.path], current=index, total=2)
+                )
+                logging.getLogger("MatchingPostProcessor").warning(
+                    "1 of 514 pdf cells matched neither a row nor a column band and were dropped"
+                )
+                progress_callback(source.path.name)
+            return _make_result(root=tmp_path, processed_count=2, skipped_count=0, skips=[])
+
+        service.execute.side_effect = execute
+        result = runner.invoke(app, ["convert", str(tmp_path), "--no-ai"])
+
+        assert result.exit_code == 0, result.output
+        summary = result.output.split("Review recommended:")[1]
+        assert "file0.pdf" in summary
+        assert "file1.pdf" in summary
+        assert summary.count("Table extraction dropped some content") == 2
+        assert "MatchingPostProcessor" not in result.output
+
+    @patch("nest.cli.convert_cmd.create_convert_service")
     def test_convert_success_shows_summary(
         self, mock_create_service: MagicMock, tmp_path: Path
     ) -> None:
@@ -195,6 +230,24 @@ class TestConvertCommandRun:
 class TestDisplayConvertSummary:
     """Tests for the convert summary display."""
 
+    def test_summary_groups_routine_skips_without_listing_paths(self) -> None:
+        console, lines = self._make_console()
+        result = _make_result(
+            skipped_count=2,
+            skips=[
+                ConvertSkip(path=Path("/tmp/docs/report.pdf"), reason="Output already exists"),
+                ConvertSkip(path=Path("/tmp/docs/notes.txt"), reason="Text file; left in place"),
+            ],
+        )
+
+        _display_convert_summary(result, console)
+
+        output = "\n".join(lines)
+        assert "Outputs already present: 1" in output
+        assert "Text files left in place: 1" in output
+        assert "report.pdf" not in output
+        assert "notes.txt" not in output
+
     def _make_console(self) -> tuple[Mock, list[str]]:
         output_lines: list[str] = []
         console = Mock(spec=Console)
@@ -225,7 +278,7 @@ class TestDisplayConvertSummary:
         console, lines = self._make_console()
         result = _make_result()
 
-        _display_convert_summary(result, console)
+        _display_convert_summary(result, console, verbose=True)
 
         full_output = "\n".join(lines)
         assert "Skipped files:" in full_output
@@ -279,7 +332,7 @@ class TestDisplayConvertSummary:
             ]
         )
 
-        _display_convert_summary(result, console)
+        _display_convert_summary(result, console, verbose=True)
 
         full_output = "\n".join(lines)
         assert "sub/notes.txt" in full_output

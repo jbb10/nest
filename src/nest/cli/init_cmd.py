@@ -15,6 +15,7 @@ from nest.agents.vscode_writer import VSCodeAgentWriter
 from nest.core.exceptions import ModelError, NestError
 from nest.core.paths import SOURCES_DIR
 from nest.services.init_service import InitService
+from nest.ui.command import current_output
 from nest.ui.messages import error, get_console, success
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,9 @@ def init_command(
 
     try:
         service = create_init_service()
-        service.execute(resolved_dir)
+        ui = current_output()
+        ui.root = resolved_dir
+        service.execute(resolved_dir, activity_callback=ui.activity)
 
         success("Nest project initialized!")
         console.print()

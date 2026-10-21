@@ -5,6 +5,7 @@ from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from rich.console import Console
 
 from nest.adapters.project_checker import ProjectChecker
@@ -367,8 +368,10 @@ class TestDoctorCommand:
                     mock_service.check_project.return_value = None
 
                     from nest.cli.doctor_cmd import doctor_command
+                    from nest.ui.command import CommandUI
 
-                    doctor_command()
+                    with CommandUI("doctor", Console()):
+                        doctor_command()
 
                     mock_service.check_environment.assert_called_once()
                     mock_service.check_ml_models.assert_called_once()
@@ -379,8 +382,11 @@ class TestDoctorCommand:
                         None,
                     )
 
-    def test_doctor_shows_outside_project_message(self, tmp_path: Path) -> None:
+    def test_doctor_shows_outside_project_message(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """Doctor should show message when run outside project."""
+        monkeypatch.chdir(tmp_path)
         mock_report = EnvironmentReport(
             python=EnvironmentStatus("Python", "pass", "3.11.4"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
@@ -395,8 +401,10 @@ class TestDoctorCommand:
                         mock_service.check_environment.return_value = mock_report
 
                         from nest.cli.doctor_cmd import doctor_command
+                        from nest.ui.command import CommandUI
 
-                        doctor_command()
+                        with CommandUI("doctor", Console()):
+                            doctor_command()
 
                         # Verify console.print was called with outside project message
                         console = mock_console.return_value

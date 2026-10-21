@@ -2,12 +2,13 @@
 
 Turns every pending source file into exactly one recorded outcome. Owns
 collision resolution between passthrough and Docling outputs and the
-two-pass vision pipeline (convert sequentially, describe images in parallel).
+two-pass vision pipeline (convert bounded batches, describe images in parallel).
 """
 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -15,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 from docling_core.types.doc.base import ImageRefMode
 
 from nest.core.exceptions import ProcessingError
-from nest.core.models import DiscoveredFile
+from nest.core.models import Activity, DiscoveredFile
 from nest.core.paths import is_passthrough_extension
 
 if TYPE_CHECKING:
@@ -25,6 +26,8 @@ if TYPE_CHECKING:
     from nest.services.sync_outcomes import OutcomeRecorder, SyncLedger
 
 logger = logging.getLogger(__name__)
+
+_VISION_BATCH_SIZE = 4
 
 
 class ConversionPhase:
@@ -43,6 +46,7 @@ class ConversionPhase:
         self._context_dir = context_dir
         self._picture_description = picture_description
         self._vision_processor = vision_processor
+        self._activity: Callable[[Activity], None] | None = None
 
     @property
     def vision_enabled(self) -> bool:
@@ -53,12 +57,14 @@ class ConversionPhase:
         files: list[DiscoveredFile],
         recorder: OutcomeRecorder,
         ledger: SyncLedger,
+        activity_callback: Callable[[Activity], None] | None = None,
     ) -> None:
         """Convert ``files``, recording one outcome per file.
 
         Raises:
             ProcessingError: Propagated from ``recorder`` in fail mode.
         """
+        self._activity = activity_callback
         files, collisions = resolve_collisions(files, self._sources_dir)
         for skipped in collisions:
             recorder.skipped(
@@ -70,11 +76,18 @@ class ConversionPhase:
             logger.info("Processing %d files...", len(files))
 
         deferred: list[tuple[DiscoveredFile, Any, Path]] = []
-        for file in files:
+        for index, file in enumerate(files, start=1):
+            if self._activity is not None:
+                self._activity(
+                    Activity(stage="converting", files=[file.path], current=index, total=len(files))
+                )
             if self._uses_vision(file):
                 converted = self._convert_for_vision(file, recorder)
                 if converted is not None:
                     deferred.append(converted)
+                    if len(deferred) >= _VISION_BATCH_SIZE:
+                        self._describe_images(deferred, recorder, ledger)
+                        deferred.clear()
             else:
                 self._convert(file, recorder)
 
@@ -115,6 +128,8 @@ class ConversionPhase:
         ledger: SyncLedger,
     ) -> None:
         assert self._picture_description is not None
+        if self._activity is not None:
+            self._activity(Activity(stage="describing", files=[item[0].path for item in deferred]))
         with ThreadPoolExecutor() as executor:
             futures: dict[Future[Any], tuple[DiscoveredFile, Any, Path]] = {
                 executor.submit(self._picture_description.describe, item[1]): item
@@ -124,6 +139,15 @@ class ConversionPhase:
                 file, conversion, output_path = futures[future]
                 try:
                     description = future.result()
+                    ledger.vision.append(description)
+                    if description.images_failed:
+                        noun = "description" if description.images_failed == 1 else "descriptions"
+                        raise ProcessingError(
+                            f"{description.images_failed} required image {noun} failed",
+                            source_path=file.path,
+                        )
+                    if self._activity is not None:
+                        self._activity(Activity(stage="writing", files=[file.path]))
                     markdown = conversion.document.export_to_markdown(
                         image_mode=ImageRefMode.PLACEHOLDER,
                     )
@@ -132,7 +156,6 @@ class ConversionPhase:
                 except Exception as e:
                     recorder.failed(file, f"Vision describe failed: {e}", cause=e)
                     continue
-                ledger.vision.append(description)
                 recorder.processed(file, output_path)
 
 

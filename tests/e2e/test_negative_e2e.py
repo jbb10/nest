@@ -87,11 +87,8 @@ class TestNegativePathsE2E:
 class TestNegativePathsWithDocling:
     """E2E tests that require Docling for processing."""
 
-    def test_sync_skips_corrupt_file(self, fresh_temp_dir: Path):
-        """Test that corrupt file is skipped while others process.
-
-        AC6: Corrupt PDF with default flags → skipped, others processed, exit 0
-        """
+    def test_sync_continues_after_corrupt_file_but_exits_nonzero(self, fresh_temp_dir: Path):
+        """A failed document does not stop other documents but makes the command fail."""
         fixtures_dir = Path(__file__).parent / "fixtures"
 
         # Arrange - init project
@@ -107,9 +104,11 @@ class TestNegativePathsWithDocling:
         result = run_cli(["sync"], cwd=fresh_temp_dir)
 
         # Assert
-        assert result.exit_code == 0, (
-            f"Expected exit 0 with skip, got {result.exit_code}: {result.stderr}"
+        assert result.exit_code == 1, (
+            f"Expected exit 1 with a failed document, got {result.exit_code}: {result.stderr}"
         )
+        assert "Failed:    1" in result.stdout
+        assert "Sync finished with failures" in result.stdout
 
         # Valid doc should be processed
         processed = fresh_temp_dir / "_nest_context"
