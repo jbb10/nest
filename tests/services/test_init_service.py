@@ -12,6 +12,7 @@ from conftest import (
     MockModelDownloader,
 )
 from nest.core.exceptions import NestError
+from nest.core.models import Activity
 from nest.core.paths import AGENT_DIR, CONTEXT_TEXT_EXTENSIONS, SUPPORTED_EXTENSIONS
 from nest.services.init_service import InitService
 
@@ -190,11 +191,7 @@ def test_init_service_skips_download_when_models_cached(
 
 @patch("nest.services.init_service.InitService._setup_gitattributes")
 @patch("nest.services.init_service.InitService._setup_gitignore")
-@patch("nest.services.init_service.status_start")
-@patch("nest.services.init_service.status_done")
 def test_init_service_progress_output_sequence_cached(
-    mock_status_done: MagicMock,
-    mock_status_start: MagicMock,
     mock_gitignore: MagicMock,
     mock_gitattributes: MagicMock,
     mock_filesystem: MockFileSystem,
@@ -210,32 +207,14 @@ def test_init_service_progress_output_sequence_cached(
         model_downloader=mock_model_downloader_cached,
     )
 
-    service.execute(Path("/project"))
-
-    # Verify progress calls were made in order (AC2)
-    assert mock_status_start.call_count == 3
-    assert mock_status_done.call_count == 3
-
-    # Verify the status messages match AC2 requirements
-    start_calls = [call[0][0] for call in mock_status_start.call_args_list]
-    assert "Creating project structure" in start_calls
-    assert "Generating agent files" in start_calls
-    assert "Checking ML models" in start_calls
-
-    # Verify cached path shows "cached" suffix
-    done_calls = [call[0] for call in mock_status_done.call_args_list]
-    assert ("cached",) in done_calls
+    activities: list[Activity] = []
+    service.execute(Path("/project"), activity_callback=activities.append)
+    assert [activity.stage for activity in activities] == ["scaffolding", "agents", "preparing"]
 
 
 @patch("nest.services.init_service.InitService._setup_gitattributes")
 @patch("nest.services.init_service.InitService._setup_gitignore")
-@patch("nest.services.init_service.info")
-@patch("nest.services.init_service.status_start")
-@patch("nest.services.init_service.status_done")
 def test_init_service_progress_output_sequence_download(
-    mock_status_done: MagicMock,
-    mock_status_start: MagicMock,
-    mock_info: MagicMock,
     mock_gitignore: MagicMock,
     mock_gitattributes: MagicMock,
     mock_filesystem: MockFileSystem,
@@ -251,16 +230,14 @@ def test_init_service_progress_output_sequence_download(
         model_downloader=mock_model_downloader,
     )
 
-    service.execute(Path("/project"))
-
-    # Verify download path shows "downloading" suffix
-    done_calls = [call[0] for call in mock_status_done.call_args_list]
-    assert ("downloading",) in done_calls
-
-    # Verify info message about cache path is shown
-    assert mock_info.call_count == 1
-    info_msg = mock_info.call_args[0][0]
-    assert "cached at" in info_msg.lower()
+    activities: list[Activity] = []
+    service.execute(Path("/project"), activity_callback=activities.append)
+    assert [activity.stage for activity in activities] == [
+        "scaffolding",
+        "agents",
+        "preparing",
+        "downloading",
+    ]
 
 
 # ---- AC1: Gitignore only ignores .nest/errors.log ----

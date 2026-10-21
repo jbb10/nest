@@ -5,7 +5,6 @@ path on disk, without requiring a Nest project.
 """
 
 import logging
-from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -17,16 +16,13 @@ from nest.adapters.llm_provider import resolve_ai_config
 from nest.adapters.noop_processor import NoOpProcessor
 from nest.adapters.passthrough_processor import PassthroughProcessor
 from nest.core.exceptions import ModelError, NestError
-from nest.core.models import ConvertFileOutcome, ConvertResult
 from nest.services.convert_service import ConvertService
 from nest.services.output_service import OutputMirrorService
-from nest.ui.logger import enable_verbose_logging
-from nest.ui.messages import error, get_console, success
-from nest.ui.progress import SyncProgress
+from nest.ui.command import current_output
+from nest.ui.conversion import display_convert_summary
+from nest.ui.messages import error, get_console
 
 if TYPE_CHECKING:
-    from rich.console import Console
-
     from nest.adapters.llm_provider import AIConfig
     from nest.adapters.protocols import ModelCacheProtocol
 
@@ -131,7 +127,7 @@ def convert_command(
         typer.Option(
             "--verbose",
             "-v",
-            help="Show detailed processing logs (Docling, HTTP, etc.)",
+            help="Show library diagnostics and per-file skip reasons",
         ),
     ] = False,
 ) -> None:
@@ -148,30 +144,28 @@ def convert_command(
     """
     console = get_console()
 
-    if verbose:
-        enable_verbose_logging()
-
     target = path.resolve()
     output_dir = output.resolve() if output else None
 
     try:
+        ui = current_output()
         ai_config = None if no_ai else resolve_ai_config()
         service = create_convert_service(no_ai=no_ai, ai_config=ai_config)
-
+        ui.stage("Discovering documents")
         plan = service.plan(target, output_dir=output_dir, force=force)
-
+        ui.root = plan.root
         ai_status_note = ""
         if no_ai:
             ai_status_note = "disabled (--no-ai)"
         elif ai_config is None:
             ai_status_note = "not configured (run 'nest config ai' or set NEST_AI_API_KEY)"
 
-        total = len(plan.pending) + len(plan.skipped)
-        with SyncProgress(console=console, disabled=total == 0) as progress:
-            progress.start(total=total)
-            result = service.execute(plan, progress_callback=progress.advance)
-
-        _display_convert_summary(result, console, ai_status_note)
+        ui.start(len(plan.pending) + len(plan.skipped))
+        result = service.execute(plan, progress_callback=ui.advance, activity_callback=ui.activity)
+        ui.finish(failed=result.failed_count > 0)
+        display_convert_summary(
+            result, console, ai_status_note, verbose=verbose, has_warnings=ui.has_warnings
+        )
 
     except NestError as e:
         error("Convert failed")
@@ -180,68 +174,3 @@ def convert_command(
 
     if result.failed_count > 0:
         raise typer.Exit(1)
-
-
-def _display_convert_summary(
-    result: ConvertResult,
-    console: "Console",
-    ai_status_note: str = "",
-) -> None:
-    """Display convert completion summary.
-
-    Shows counts, per-file skip and failure reasons, and AI activity.
-
-    Args:
-        result: ConvertResult with all counts and reasons.
-        console: Rich console for output.
-        ai_status_note: Optional human-readable AI status note.
-    """
-    success("Convert complete")
-    console.print()
-
-    console.print(f"  Converted: {result.processed_count} files")
-    console.print(f"  Skipped:   {result.skipped_count}")
-    console.print(f"  Failed:    {result.failed_count}")
-
-    _print_reason_list(console, "Skipped files", result.skips, result.root)
-    _print_reason_list(console, "Failed files", result.failures, result.root)
-
-    if ai_status_note:
-        console.print()
-        console.print(f"  AI: {ai_status_note}")
-
-    if result.images_described > 0:
-        console.print(f"  Images described: {result.images_described}")
-    if result.images_skipped > 0:
-        console.print(f"  Images skipped:  {result.images_skipped} (logos/signatures)")
-
-    total_tokens = result.vision_prompt_tokens + result.vision_completion_tokens
-    if total_tokens > 0:
-        console.print(
-            f"  AI tokens: {total_tokens:,} "
-            f"(prompt: {result.vision_prompt_tokens:,}, "
-            f"completion: {result.vision_completion_tokens:,})"
-        )
-
-
-def _print_reason_list(
-    console: "Console",
-    title: str,
-    outcomes: Sequence[ConvertFileOutcome],
-    root: Path,
-) -> None:
-    """Print a titled list of per-file outcomes with reasons, when non-empty."""
-    if not outcomes:
-        return
-    console.print()
-    console.print(f"  {title}:")
-    for outcome in outcomes:
-        console.print(f"    [dim]{_relative_display(outcome.path, root)}: {outcome.reason}[/dim]")
-
-
-def _relative_display(path: Path, root: Path) -> str:
-    """Render a path relative to the conversion root, falling back to its name."""
-    try:
-        return path.relative_to(root).as_posix()
-    except ValueError:
-        return path.name

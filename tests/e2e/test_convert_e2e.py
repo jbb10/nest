@@ -131,7 +131,7 @@ class TestConvertE2E:
         assert second.exit_code == 0, f"stdout: {second.stdout}\nstderr: {second.stderr}"
         assert "Converted: 0" in second.stdout
         assert "Skipped:   1" in second.stdout
-        assert "already exists" in second.stdout
+        assert "Outputs already present: 1" in second.stdout
 
         forced = run_cli(["convert", "q1.pdf", "--force"], cwd=fresh_temp_dir)
         assert forced.exit_code == 0, f"stdout: {forced.stdout}\nstderr: {forced.stderr}"
@@ -198,13 +198,48 @@ class TestConvertE2E:
         )
         assert "Images described:" in result.stdout
 
-    def test_convert_no_ai_skips_image_descriptions(self, fresh_temp_dir: Path) -> None:
-        """--no-ai converts without any AI call or description."""
-        _copy_fixture("image_doc.pdf", fresh_temp_dir / "image_doc.pdf")
+    def test_convert_vision_reports_activity_and_completes_batches(
+        self, fresh_temp_dir: Path
+    ) -> None:
+        """Real PDF conversion reports work and finishes a batch before reading more PDFs."""
+        for number in range(5):
+            fixture = "image_doc.pdf" if number == 0 else "quarterly.pdf"
+            _copy_fixture(fixture, fresh_temp_dir / f"report-{number}.pdf")
 
         with MockVisionServer(response=CANNED_DESCRIPTION) as server:
             result = run_cli(
-                ["convert", "image_doc.pdf", "--no-ai"],
+                ["convert", "."],
+                cwd=fresh_temp_dir,
+                timeout=300,
+                env=server.env_vars(),
+            )
+
+        assert result.exit_code == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        assert server.call_count > 0
+        assert "Preparing conversion models" in result.stdout
+        assert "Converting document 1 of 5" in result.stdout
+        assert result.stdout.index("Describing images: 4 documents") < result.stdout.index(
+            "Converting document 5 of 5"
+        )
+        assert "Describing images: 1 document" in result.stdout
+        assert "Converted: 5" in result.stdout
+        for number in range(5):
+            assert (fresh_temp_dir / f"report-{number}.md").stat().st_size > 0
+        assert CANNED_DESCRIPTION in (fresh_temp_dir / "report-0.md").read_text()
+
+    @pytest.mark.parametrize("verbose", [False, True])
+    def test_convert_no_ai_skips_image_descriptions(
+        self, fresh_temp_dir: Path, verbose: bool
+    ) -> None:
+        """--no-ai converts without any AI call or description."""
+        _copy_fixture("image_doc.pdf", fresh_temp_dir / "image_doc.pdf")
+
+        args = ["convert", "image_doc.pdf", "--no-ai"]
+        if verbose:
+            args.append("--verbose")
+        with MockVisionServer(response=CANNED_DESCRIPTION) as server:
+            result = run_cli(
+                args,
                 cwd=fresh_temp_dir,
                 timeout=300,
                 env=server.env_vars(),
@@ -212,6 +247,16 @@ class TestConvertE2E:
 
         assert result.exit_code == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
         assert server.call_count == 0, "Expected no AI calls with --no-ai"
+        output = result.stdout + result.stderr
+        assert ("INFO [RapidOCR]" in output) is verbose, output
+        if not verbose:
+            for diagnostic in (
+                "[RapidOCR]",
+                "UserWarning:",
+                "Loading weights:",
+                "slow image processor",
+            ):
+                assert diagnostic not in output, output
         content = (fresh_temp_dir / "image_doc.md").read_text()
         assert CANNED_DESCRIPTION not in content
         assert "disabled (--no-ai)" in result.stdout

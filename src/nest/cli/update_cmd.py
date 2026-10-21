@@ -27,6 +27,7 @@ from nest.core.models import (
 from nest.services.agent_migration_service import AgentMigrationService
 from nest.services.migration_service import MetadataMigrationService
 from nest.services.update_service import UpdateService
+from nest.ui.command import command_activity
 from nest.ui.messages import error, get_console, info, success, warning
 
 
@@ -153,7 +154,7 @@ def _run_update(
         UpdateResult from the service.
     """
     available = [v for v, _ in check_result.annotated_versions]
-    with console.status(f"Installing version {version}..."):
+    with command_activity(f"Installing version {version}", console):
         return service.execute_update(version, available, check_result.source)
 
 
@@ -192,7 +193,8 @@ def _handle_agent_migration(
     console.print()
 
     if Confirm.ask("Update agent files?", default=False, console=console):
-        migration_result = migration_service.execute_migration(project_dir)
+        with command_activity("Updating agent files", console):
+            migration_result = migration_service.execute_migration(project_dir)
         if migration_result.success:
             total = len(migration_result.files_replaced) + len(migration_result.files_created)
             success(f"{total} agent files updated")
@@ -218,7 +220,8 @@ def _handle_metadata_migration(
     if not migration_service.detect_legacy_layout(project_dir):
         return  # Already new layout or not a Nest project
 
-    result = migration_service.migrate(project_dir)
+    with command_activity("Updating project metadata", console):
+        result = migration_service.migrate(project_dir)
 
     if result.migrated:
         for item in result.files_moved:
@@ -261,7 +264,8 @@ def update_command(
 
     # Step 3: Check for updates
     try:
-        check_result = service.check_for_updates()
+        with command_activity("Checking for updates", console):
+            check_result = service.check_for_updates()
     except ConfigError:
         # AC13: Network/config error
         error("Cannot check for updates")

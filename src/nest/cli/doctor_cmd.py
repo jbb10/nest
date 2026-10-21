@@ -18,6 +18,7 @@ from nest.agents.vscode_writer import VSCodeAgentWriter
 from nest.core.exceptions import ModelError
 from nest.core.project_layout import detect_project
 from nest.services.doctor_service import DoctorService, list_issues
+from nest.ui.command import current_output
 from nest.ui.doctor_display import (
     display_doctor_report,
     display_issue_summary,
@@ -67,15 +68,19 @@ def doctor_command(
         nest doctor --fix
     """
     console = get_console()
+    ui = current_output()
 
+    ui.stage("Checking environment")
     project_checker = ProjectChecker()
     service = create_doctor_service(project_checker)
     env_report = service.check_environment()
+    ui.stage("Checking conversion models")
     model_report = service.check_ml_models()
 
     # Check if we're in a Nest project
     project_dir = Path.cwd()
     if detect_project(project_dir).is_nest_project:
+        ui.stage("Checking project")
         project_report = service.check_project(project_dir)
     else:
         project_report = None
@@ -83,6 +88,7 @@ def doctor_command(
     # Detect issues
     issues = list_issues(env_report, model_report, project_report)
 
+    ui.pause()
     display_doctor_report(env_report, console, model_report, project_report)
 
     if issues:
@@ -91,9 +97,11 @@ def doctor_command(
         if fix:
             # Auto-fix mode (AC4)
             console.print("\n🔧 [bold]Attempting repairs...[/bold]\n")
+            ui.stage("Repairing environment")
             remediation_report = service.remediate_issues_auto(
                 project_dir, env_report, model_report, project_report
             )
+            ui.finish(failed=not remediation_report.all_succeeded)
             display_remediation_report(remediation_report, console)
 
             # Exit code 1 if any fix failed (AC5)
@@ -101,16 +109,25 @@ def doctor_command(
                 raise typer.Exit(code=1)
 
         elif console.is_terminal:
+
+            def confirm_repair(message: str) -> bool:
+                ui.pause()
+                confirmed = Confirm.ask(message)
+                ui.stage("Repairing environment")
+                return confirmed
+
             # Interactive mode — prompt for repair (AC8)
             if Confirm.ask("Attempt automatic repair?", default=False):
                 console.print()
+                ui.stage("Repairing environment")
                 remediation_report = service.remediate_issues_interactive(
                     project_dir,
                     env_report,
                     model_report,
                     project_report,
-                    confirm_callback=lambda msg: Confirm.ask(msg),
+                    confirm_callback=confirm_repair,
                 )
+                ui.finish(failed=not remediation_report.all_succeeded)
                 display_remediation_report(remediation_report, console)
 
                 # Exit code 1 if any fix failed (AC5)

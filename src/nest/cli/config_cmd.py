@@ -10,9 +10,12 @@ from typing import Annotated
 import typer
 
 from nest.services.shell_rc_service import ShellRCService
+from nest.ui.command import NestCommand
 from nest.ui.messages import error, get_console, info, success, warning
 
-config_app = typer.Typer(help="Commands for managing Nest configuration.")
+config_app = typer.Typer(
+    help="Commands for managing Nest configuration.", pretty_exceptions_show_locals=False
+)
 
 
 def _mask_key(key: str) -> str:
@@ -45,7 +48,7 @@ def _display_path(path: Path) -> str:
         return str(path)
 
 
-@config_app.command(name="ai")
+@config_app.command(name="ai", cls=NestCommand)
 def ai_command(
     remove: Annotated[
         bool,
@@ -110,7 +113,9 @@ def ai_command(
     # Mask default display for API key
     key_display = _mask_key(current_key) if current_key else ""
     if current_key:
-        raw_key = typer.prompt(f"  API key [{key_display}]", default="", show_default=False)
+        raw_key = typer.prompt(
+            f"  API key [{key_display}]", default="", show_default=False, hide_input=True
+        )
         api_key = raw_key if raw_key else current_key
     else:
         api_key = typer.prompt("  API key", hide_input=True)

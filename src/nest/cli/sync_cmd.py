@@ -33,9 +33,9 @@ from nest.services.metadata_service import MetadataExtractorService
 from nest.services.orphan_service import OrphanService
 from nest.services.output_service import OutputMirrorService
 from nest.services.sync_service import SyncService
-from nest.ui.logger import enable_verbose_logging, setup_error_logger
+from nest.ui.command import current_output
+from nest.ui.logger import setup_error_logger
 from nest.ui.messages import error, get_console, success
-from nest.ui.progress import SyncProgress
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -255,10 +255,10 @@ def sync_command(
     """
     console = get_console()
 
-    if verbose:
-        enable_verbose_logging()
+    ui = current_output()
 
     project_root = (target_dir or Path.cwd()).resolve()
+    ui.root = project_root
 
     if not detect_project(project_root).initialized:
         error("No Nest project found")
@@ -283,6 +283,7 @@ def sync_command(
         )
 
         # 1. Discovery phase
+        ui.stage("Discovering documents")
         changes = service.discover(force=force)
 
         # For dry-run, no progress bar needed
@@ -294,6 +295,7 @@ def sync_command(
                 force=force,
                 changes=changes,
             )
+            ui.finish()
             _display_dry_run_result(result, console)  # type: ignore[arg-type]
             return
 
@@ -311,23 +313,22 @@ def sync_command(
         # AI progress callback for console display
         def ai_progress_callback(message: str) -> None:
             if message == "start":
-                console.print("  🤖 AI enrichment...", end="")
-            else:
-                console.print(f" {message}")
+                ui.stage("Generating document descriptions and glossary")
 
         # Execute sync with progress bar
-        with SyncProgress(console=console, disabled=files_to_process_count == 0) as progress:
-            progress.start(total=files_to_process_count)
-
-            result = service.sync(
-                no_clean=no_clean,
-                on_error=validated_on_error,
-                dry_run=False,
-                force=force,
-                progress_callback=progress.advance,
-                ai_progress_callback=ai_progress_callback,
-                changes=changes,
-            )
+        ui.start(files_to_process_count)
+        result = service.sync(
+            no_clean=no_clean,
+            on_error=validated_on_error,
+            dry_run=False,
+            force=force,
+            progress_callback=ui.advance,
+            ai_progress_callback=ai_progress_callback,
+            activity_callback=ui.activity,
+            changes=changes,
+        )
+        assert isinstance(result, SyncResult)
+        ui.finish(failed=result.failed_count > 0)
 
         # Normal sync complete - display summary
         _display_sync_summary(
@@ -337,7 +338,10 @@ def sync_command(
             ai_detected_key=ai_detected_key,
             ai_status_note=ai_status_note,
             project_root=project_root,
+            has_warnings=ui.has_warnings,
         )
+        if result.failed_count:
+            raise typer.Exit(1)
 
     except ProcessingError as e:
         # Fail mode triggered - error already logged by SyncService
@@ -376,6 +380,7 @@ def _display_sync_summary(
     ai_detected_key: str = "",
     ai_status_note: str = "",
     project_root: Path | None = None,
+    has_warnings: bool = False,
 ) -> None:
     """Display sync completion summary.
 
@@ -397,7 +402,12 @@ def _display_sync_summary(
         ai_status_note: Optional human-readable AI status note for disabled or unconfigured cases.
         project_root: Project root directory for marker file operations.
     """
-    success("Sync complete")
+    if result.failed_count:
+        error("Sync finished with failures")
+    elif has_warnings:
+        console.print("Sync complete with warnings", style="yellow")
+    else:
+        success("Sync complete")
     console.print()
 
     # Show processing counts
@@ -410,6 +420,14 @@ def _display_sync_summary(
         console.print(f"  Failed:    {result.failed_count} (see {log_relative})")
     else:
         console.print(f"  Failed:    {result.failed_count}")
+    for source, reason in result.failure_reasons.items():
+        source_path = Path(source)
+        label = (
+            str(source_path.relative_to(project_root))
+            if project_root and source_path.is_relative_to(project_root)
+            else source_path.name
+        )
+        console.print(f"    {label}: {reason}", markup=False)
 
     # Show orphan info
     if result.orphans_removed > 0:
@@ -461,6 +479,8 @@ def _display_sync_summary(
         console.print(f"  Images described: {result.images_described}{mermaid_note}")
     if result.images_skipped > 0:
         console.print(f"  Images skipped:  {result.images_skipped} (logos/signatures)")
+    if result.images_failed > 0:
+        console.print(f"  Image descriptions failed: {result.images_failed}")
 
     # First-run AI discovery message
     ai_was_used = (

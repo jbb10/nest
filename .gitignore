@@ -27,3 +27,5 @@ node_modules/
 # Nest error logs (generated during processing)
 .nest_errors.log
 DELETE/
+# Nest - per-machine runtime artifacts
+.nest/errors.log

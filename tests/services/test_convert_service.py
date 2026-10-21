@@ -7,6 +7,7 @@ mirroring, passthrough handling, per-file failure recording).
 
 from pathlib import Path
 from typing import Literal
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -15,7 +16,7 @@ from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.passthrough_processor import PassthroughProcessor
 from nest.core.checksum import compute_sha256
 from nest.core.exceptions import NestError
-from nest.core.models import ProcessingResult
+from nest.core.models import Activity, PictureDescriptionResult, ProcessingResult
 from nest.services.convert_service import ConvertService
 from nest.services.output_service import OutputMirrorService
 
@@ -248,6 +249,78 @@ class TestConvertPlanSkipClassification:
 
 class TestConvertExecute:
     """Tests for execute()."""
+
+    def test_failed_image_description_preserves_existing_output(self, tmp_path: Path) -> None:
+        source = write(tmp_path / "report.pdf")
+        output = write(tmp_path / "report.md", "previous successful output")
+        vision = MagicMock()
+        description = MagicMock()
+        description.describe.return_value = PictureDescriptionResult(images_failed=1)
+        service = ConvertService(
+            output=OutputMirrorService(FileSystemAdapter(), StubProcessor()),
+            file_discovery=FileDiscoveryAdapter(),
+            vision_processor=vision,
+            picture_description=description,
+        )
+        result = service.execute(service.plan(source, force=True))
+        assert result.failed_count == 1
+        assert result.images_failed == 1
+        assert result.processed_count == 0
+        assert output.read_text() == "previous successful output"
+
+    def test_vision_writes_outputs_and_advances_before_converting_entire_folder(
+        self, tmp_path: Path
+    ) -> None:
+        """Vision conversion completes bounded batches before reading more documents."""
+        processor = MagicMock()
+        description = MagicMock()
+        completed: list[str] = []
+        completed_before_conversion: list[int] = []
+        activities: list[Activity] = []
+
+        def convert(source: Path) -> MagicMock:
+            assert activities[-1].files == [source]
+            assert activities[-1].stage == "converting"
+            completed_before_conversion.append(len(completed))
+            conversion = MagicMock()
+            conversion.document.export_to_markdown.return_value = f"converted: {source.name}"
+            return conversion
+
+        processor.convert.side_effect = convert
+        description.describe.return_value = MagicMock(
+            images_described=0,
+            images_skipped=0,
+            images_failed=0,
+            prompt_tokens=0,
+            completion_tokens=0,
+        )
+        service = ConvertService(
+            output=OutputMirrorService(FileSystemAdapter(), StubProcessor()),
+            file_discovery=FileDiscoveryAdapter(),
+            vision_processor=processor,
+            picture_description=description,
+        )
+        for number in range(5):
+            write(tmp_path / f"report-{number}.pdf")
+
+        def on_completed(name: str) -> None:
+            assert (tmp_path / name).with_suffix(".md").read_text() == f"converted: {name}"
+            completed.append(name)
+
+        result = service.execute(
+            service.plan(tmp_path),
+            progress_callback=on_completed,
+            activity_callback=activities.append,
+        )
+
+        assert result.processed_count == 5
+        assert result.failed_count == 0
+        assert completed_before_conversion[-1] > 0, (
+            "All documents were converted before any Markdown output or progress was produced"
+        )
+        assert len(completed) == 5
+        assert activities[-1].stage == "writing"
+        assert len(activities[-1].files) == 1
 
     def test_execute_writes_markdown_next_to_original(self, tmp_path: Path) -> None:
         """Each output is written next to its original: reports/q1.pdf -> reports/q1.md."""

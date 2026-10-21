@@ -83,7 +83,8 @@ class DiscoveryService:
             relative_path = file_path.relative_to(sources_dir)
 
             # Classify based on manifest (or force mode)
-            if force:
+            previous = manifest_files.get(relative_path.as_posix())
+            if force or (previous is not None and previous.status == "failed"):
                 # Force mode: treat all files as needing reprocessing
                 # New files stay "new", existing files become "modified"
                 path_key = relative_path.as_posix()

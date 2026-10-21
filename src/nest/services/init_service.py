@@ -3,6 +3,7 @@
 Orchestrates the creation of a new Nest project structure.
 """
 
+from collections.abc import Callable
 from pathlib import Path
 
 from nest.adapters.protocols import (
@@ -12,6 +13,7 @@ from nest.adapters.protocols import (
     ModelCacheProtocol,
 )
 from nest.core.exceptions import NestError
+from nest.core.models import Activity
 from nest.core.paths import (
     AGENT_DIR,
     CONTEXT_DIR,
@@ -20,7 +22,6 @@ from nest.core.paths import (
     SOURCES_DIR,
     SUPPORTED_EXTENSIONS,
 )
-from nest.ui.messages import info, status_done, status_start
 
 # Directories to create during init
 INIT_DIRECTORIES = [
@@ -70,7 +71,11 @@ class InitService:
         self._agent_writer = agent_writer
         self._model_downloader = model_downloader
 
-    def execute(self, target_dir: Path) -> None:
+    def execute(
+        self,
+        target_dir: Path,
+        activity_callback: Callable[[Activity], None] | None = None,
+    ) -> None:
         """Execute project initialization.
 
         Creates the project structure including directories
@@ -78,6 +83,7 @@ class InitService:
 
         Args:
             target_dir: Path to the project root directory.
+            activity_callback: Reports preparation stages before blocking work.
 
         Raises:
             NestError: If project already exists.
@@ -87,14 +93,14 @@ class InitService:
             raise NestError("Nest project already exists. Use `nest sync` to process documents.")
 
         # Create directories with progress
-        status_start("Creating project structure")
+        if activity_callback is not None:
+            activity_callback(Activity(stage="scaffolding"))
         for dir_name in INIT_DIRECTORIES:
             dir_path = target_dir / dir_name
             self._filesystem.create_directory(dir_path)
 
         # Create manifest
         self._manifest.create(target_dir)
-        status_done()
 
         # Create/update .gitignore
         self._setup_gitignore(target_dir)
@@ -103,20 +109,18 @@ class InitService:
         self._setup_gitattributes(target_dir)
 
         # Generate agent files with progress
-        status_start("Generating agent files")
+        if activity_callback is not None:
+            activity_callback(Activity(stage="agents"))
         agent_dir = target_dir / AGENT_DIR
         self._agent_writer.generate_all(agent_dir)
-        status_done()
 
         # Download ML models if needed
-        status_start("Checking ML models")
-        if self._model_downloader.are_models_cached():
-            status_done("cached")
-        else:
-            status_done("downloading")
+        if activity_callback is not None:
+            activity_callback(Activity(stage="preparing"))
+        if not self._model_downloader.are_models_cached():
+            if activity_callback is not None:
+                activity_callback(Activity(stage="downloading"))
             self._model_downloader.download_if_needed(progress=True)
-            cache_path = self._model_downloader.get_cache_path()
-            info(f"Models cached at {cache_path}")
 
     @staticmethod
     def _setup_gitignore(target_dir: Path) -> None:

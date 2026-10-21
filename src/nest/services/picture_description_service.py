@@ -118,6 +118,7 @@ class PictureDescriptionService:
                     logger.exception(
                         "Unexpected error describing image in %s",
                         conversion_result.input.file,
+                        extra={"source_path": str(conversion_result.input.file)},
                     )
                     images_failed += 1
                     continue
@@ -126,6 +127,7 @@ class PictureDescriptionService:
                     logger.warning(
                         "Image description failed for image in %s",
                         conversion_result.input.file,
+                        extra={"source_path": str(conversion_result.input.file)},
                     )
                 else:
                     if element.meta is None:
@@ -195,4 +197,5 @@ class PictureDescriptionService:
         image.save(buffer, format="PNG")
         image_b64 = base64.b64encode(buffer.getvalue()).decode("ascii")
 
-        return self._vision_provider.complete_with_image(prompt, image_b64, "image/png")
+        result = self._vision_provider.complete_with_image(prompt, image_b64, "image/png")
+        return result if result is not None and result.text.strip() else None

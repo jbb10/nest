@@ -14,6 +14,7 @@ from nest.adapters.manifest import ManifestAdapter
 from nest.core.exceptions import NestError
 from nest.core.project_layout import detect_project
 from nest.services.status_service import StatusService
+from nest.ui.command import current_output
 from nest.ui.messages import error, get_console
 from nest.ui.status_display import display_status
 
@@ -53,8 +54,11 @@ def status_command(
         raise typer.Exit(1)
 
     try:
+        ui = current_output()
+        ui.stage("Inspecting project status")
         service = create_status_service()
         report = service.get_status(project_root)
+        ui.finish()
         display_status(report, console)
 
     except NestError as e:

@@ -3,3 +3,40 @@ tests/e2e/fixtures/*.pdf binary
 tests/e2e/fixtures/*.docx binary
 tests/e2e/fixtures/*.pptx binary
 tests/e2e/fixtures/*.xlsx binary
+
+# Nest — cross-platform line ending normalization
+# Binary source documents — never touch line endings
+_nest_sources/**/*.pdf binary
+_nest_sources/**/*.docx binary
+_nest_sources/**/*.pptx binary
+_nest_sources/**/*.xlsx binary
+_nest_sources/**/*.html binary
+
+# Text source files — normalize to LF for consistent checksums
+_nest_sources/**/*.md text eol=lf
+_nest_sources/**/*.txt text eol=lf
+_nest_sources/**/*.text text eol=lf
+_nest_sources/**/*.rst text eol=lf
+_nest_sources/**/*.csv text eol=lf
+_nest_sources/**/*.json text eol=lf
+_nest_sources/**/*.yaml text eol=lf
+_nest_sources/**/*.yml text eol=lf
+_nest_sources/**/*.toml text eol=lf
+_nest_sources/**/*.xml text eol=lf
+
+# Context output — same LF normalization
+_nest_context/**/*.md text eol=lf
+_nest_context/**/*.txt text eol=lf
+_nest_context/**/*.text text eol=lf
+_nest_context/**/*.rst text eol=lf
+_nest_context/**/*.csv text eol=lf
+_nest_context/**/*.json text eol=lf
+_nest_context/**/*.yaml text eol=lf
+_nest_context/**/*.yml text eol=lf
+_nest_context/**/*.toml text eol=lf
+_nest_context/**/*.xml text eol=lf
+
+# Nest metadata — LF normalized
+.nest/**/*.json text eol=lf
+.nest/**/*.md text eol=lf
+.nest/**/*.yaml text eol=lf

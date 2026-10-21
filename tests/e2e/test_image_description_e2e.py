@@ -22,9 +22,14 @@ import shutil
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from io import BytesIO
 from pathlib import Path
 
 import pytest
+from PIL import Image
+from pptx import Presentation
+from pptx.oxml.ns import qn
+from pptx.util import Inches
 
 from .conftest import ai_env_vars, run_cli, skip_without_ai, skip_without_docling
 
@@ -56,7 +61,7 @@ class _MockOpenAIHandler(BaseHTTPRequestHandler):
     """
 
     # Per-server-session configuration (set in MockVisionServer.__enter__)
-    response_body: str = CANNED_DESCRIPTION
+    response_body: str | None = CANNED_DESCRIPTION
     #: Shared call counter — a one-element list so mutations are visible
     #: across the class hierarchy without needing instance state.
     call_counter: list[int] = [0]
@@ -136,7 +141,7 @@ class MockVisionServer:
         assert server.call_count > 0
     """
 
-    def __init__(self, response: str = CANNED_DESCRIPTION) -> None:
+    def __init__(self, response: str | None = CANNED_DESCRIPTION) -> None:
         self._response = response
         self._server: HTTPServer | None = None
         self._thread: threading.Thread | None = None
@@ -208,6 +213,66 @@ class TestImageDescriptionE2E:
     All tests use real Docling processing via subprocess CLI invocation.
     Vision LLM calls are intercepted by :class:`MockVisionServer`.
     """
+
+    @skip_without_docling
+    @pytest.mark.parametrize("verbose", [False, True])
+    def test_sync_groups_malformed_powerpoint_warnings(
+        self, initialized_project: Path, verbose: bool
+    ) -> None:
+        presentation = Presentation()
+        slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+        slide.shapes.title.text = "Warning regression"
+        image_data = BytesIO()
+        Image.new("RGB", (20, 20), "red").save(image_data, format="PNG")
+        for index in range(3):
+            image_data.seek(0)
+            picture = slide.shapes.add_picture(image_data, Inches(index), Inches(2))
+            blip = picture.element.find(".//" + qn("a:blip"))
+            assert blip is not None
+            blip.attrib.pop(qn("r:embed"))
+        source = initialized_project / "_nest_sources" / "warning-deck.pptx"
+        presentation.save(source)
+        args = ["sync", "--no-ai"]
+        if verbose:
+            args.append("--verbose")
+        result = run_cli(args, cwd=initialized_project)
+        output = result.stdout + result.stderr
+
+        assert result.exit_code == 0, output
+        assert "Sync complete with warnings" in output
+        assert "warning-deck.pptx" in output
+        assert output.count("A picture without embedded image data was skipped") == 1
+        assert ("UserWarning:" in output) is verbose
+        assert "Updating the project index" in output
+        assert "\x1b" not in output
+
+    @skip_without_docling
+    @pytest.mark.parametrize("command", ["sync", "convert"])
+    def test_failed_image_description_fails_command_and_can_be_retried(
+        self, initialized_project: Path, command: str
+    ) -> None:
+        source = _put_image_fixture_in_project(initialized_project)
+        args = ["sync"] if command == "sync" else ["convert", str(source)]
+        output = (
+            initialized_project / "_nest_context" / "image_doc.md"
+            if command == "sync"
+            else source.with_suffix(".md")
+        )
+        with MockVisionServer(response=None) as server:
+            failed = run_cli(args, cwd=initialized_project, env=server.env_vars())
+
+        assert failed.exit_code == 1, failed.stdout + failed.stderr
+        assert "Failed:    1" in failed.stdout
+        assert "Image descriptions failed: 1" in failed.stdout
+        assert "image description" in (failed.stdout + failed.stderr).lower()
+        assert not output.exists(), "Incomplete output must not prevent retry"
+
+        with MockVisionServer() as server:
+            retried = run_cli(args, cwd=initialized_project, env=server.env_vars())
+            assert server.call_count > 0
+
+        assert retried.exit_code == 0, retried.stdout + retried.stderr
+        assert CANNED_DESCRIPTION in output.read_text()
 
     @skip_without_docling
     def test_image_description_produces_canned_description_in_output(
