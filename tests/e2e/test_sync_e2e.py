@@ -312,23 +312,27 @@ class TestSyncPassthroughE2E:
         assert "notes.txt" not in index_content
 
     def test_sync_passthrough_ignores_binary(self, initialized_project: Path) -> None:
-        """AC1: A .png file in _nest_sources/ should not be processed or copied."""
+        """AC1: A binary file in _nest_sources/ is never passthrough-copied."""
         project_dir = initialized_project
         sources_dir = project_dir / "_nest_sources"
         context_dir = project_dir / "_nest_context"
 
-        # Create binary file in sources
+        # An unsupported binary is ignored; a corrupt image is a failed document.
+        (sources_dir / "archive.zip").write_bytes(b"PK\x03\x04" + b"\x00" * 100)
         (sources_dir / "diagram.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
 
         # Run sync
         result = run_cli(["sync"], cwd=project_dir)
-        assert result.exit_code == 0
+        assert result.exit_code == 1, result.stdout + result.stderr
+        assert "diagram.png" in result.stdout
 
         # Assert NOT copied
+        assert not (context_dir / "archive.zip").exists()
         assert not (context_dir / "diagram.png").exists()
 
         # Assert NOT in index
         index_content = (project_dir / ".nest" / "00_MASTER_INDEX.md").read_text()
+        assert "archive.zip" not in index_content
         assert "diagram.png" not in index_content
 
     def test_sync_user_curated_still_preserved(self, initialized_project: Path) -> None:
