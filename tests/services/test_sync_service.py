@@ -2088,6 +2088,58 @@ class TestSyncVisionPipeline:
         assert result.images_described == 0
         assert result.vision_prompt_tokens == 0
 
+    def test_image_needing_ai_without_vision_is_a_failed_document(self, mock_deps, tmp_path):
+        """A standalone image holding a describable picture fails and is retried next sync."""
+        from unittest.mock import MagicMock
+
+        from docling_core.types.doc.items.picture.picture import PictureItem
+
+        from nest.adapters.docling_processor import DoclingProcessor
+
+        project_root = tmp_path
+        raw_inbox = project_root / "_nest_sources"
+        raw_inbox.mkdir(parents=True)
+        (project_root / "_nest_context").mkdir(parents=True)
+        source_file = raw_inbox / "flow.png"
+        source_file.touch()
+
+        picture = MagicMock()
+        picture.__class__ = PictureItem
+        picture.meta.classification = None
+        conversion = MagicMock()
+        conversion.document.iterate_items.return_value = [(picture, 1)]
+        image_processor = Mock(spec=DoclingProcessor)
+        image_processor.convert.return_value = conversion
+
+        mock_deps["project_root"] = project_root
+        changes = DiscoveryResult(
+            new_files=[DiscoveredFile(path=source_file, checksum="abc", status="new")],
+            modified_files=[],
+            unchanged_files=[],
+        )
+        service = SyncService(
+            discovery=mock_deps["discovery"],
+            output=mock_deps["output"],
+            manifest=mock_deps["manifest"],
+            orphan=mock_deps["orphan"],
+            index=mock_deps["index"],
+            metadata=mock_deps["metadata"],
+            project_root=project_root,
+            picture_description_service=None,
+            vision_docling_processor=None,
+            image_docling_processor=image_processor,
+        )
+
+        result = service.sync(changes=changes)
+
+        assert result.failed_count == 1
+        assert result.processed_count == 0
+        assert result.needs_ai_files == [str(source_file)]
+        assert result.failure_reasons == {str(source_file): "requires AI image description"}
+        mock_deps["manifest"].record_failure.assert_called_once()
+        mock_deps["output"].process_file.assert_not_called()
+        mock_deps["output"].compute_docling_output_path.assert_not_called()
+
     def test_passthrough_files_unaffected_by_vision(self, mock_deps, tmp_path):
         """Passthrough files always go through output.process_file() even when vision active."""
         from nest.adapters.docling_processor import DoclingProcessor

@@ -10,6 +10,7 @@ from rich.console import Console
 from rich.text import Text
 
 from nest.core.models import ConvertFileOutcome, ConvertResult
+from nest.ui.messages import print_needs_ai_block
 
 
 def display_convert_summary(
@@ -50,6 +51,16 @@ def display_convert_summary(
         _print_reason_list(console, "Skipped files", other, result.root)
 
     _print_reason_list(console, "Failed files", result.failures, result.root)
+    print_needs_ai_block(
+        console,
+        [
+            _relative_display(failure.path, result.root)
+            for failure in result.failures
+            if failure.kind == "needs_ai"
+        ],
+        ai_status_note,
+        "nest convert",
+    )
     if ai_status_note:
         console.print(f"\n  AI: {ai_status_note}")
     if result.images_described > 0:

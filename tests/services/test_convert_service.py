@@ -257,6 +257,78 @@ class TestConvertPlanSkipClassification:
         assert "already exists" in reasons["q1.pdf"]
 
 
+def fake_conversion(markdown: str, *, pictures: list[str | None]) -> MagicMock:
+    """Build a conversion result holding pictures with the given top labels."""
+    from docling_core.types.doc.items.picture.picture import PictureItem
+
+    items: list[MagicMock] = []
+    for label in pictures:
+        item = MagicMock()
+        item.__class__ = PictureItem
+        if label is None:
+            item.meta.classification = None
+        else:
+            prediction = MagicMock()
+            prediction.class_name = label
+            prediction.confidence = 0.9
+            item.meta.classification.predictions = [prediction]
+        items.append(item)
+    conversion = MagicMock()
+    conversion.document.iterate_items.return_value = [(item, 1) for item in items]
+    conversion.document.export_to_markdown.return_value = markdown
+    return conversion
+
+
+class TestStandaloneImagesWithoutVision:
+    """Image files need AI only when they hold a picture the vision pass would describe."""
+
+    def make_service(self, conversions: dict[str, MagicMock]) -> ConvertService:
+        image_processor = MagicMock()
+        image_processor.convert.side_effect = lambda source: conversions[source.name]
+        return ConvertService(
+            output=OutputMirrorService(FileSystemAdapter(), StubProcessor()),
+            file_discovery=FileDiscoveryAdapter(),
+            image_processor=image_processor,
+        )
+
+    def test_image_with_describable_picture_fails_and_writes_nothing(self, tmp_path: Path) -> None:
+        source = write(tmp_path / "flow.png")
+        service = self.make_service(
+            {"flow.png": fake_conversion("<!-- image -->", pictures=["flow_chart"])}
+        )
+
+        result = service.execute(service.plan(source))
+
+        assert result.failed_count == 1
+        assert result.processed_count == 0
+        assert not (tmp_path / "flow.md").exists()
+        assert result.failures[0].path == source
+        assert result.failures[0].kind == "needs_ai"
+        assert result.failures[0].reason == "requires AI image description"
+
+    def test_image_without_describable_picture_is_written(self, tmp_path: Path) -> None:
+        write(tmp_path / "notes.png")
+        service = self.make_service(
+            {"notes.png": fake_conversion("## Meeting notes", pictures=["logo"])}
+        )
+
+        result = service.execute(service.plan(tmp_path))
+
+        assert result.failed_count == 0
+        assert result.processed_count == 1
+        assert (tmp_path / "notes.md").read_text() == "## Meeting notes"
+
+    def test_documents_keep_placeholder_behaviour_without_vision(self, tmp_path: Path) -> None:
+        """Embedded images in a PDF do not make the document fail (ADR 0002)."""
+        write(tmp_path / "report.pdf")
+        service = self.make_service({})
+
+        result = service.execute(service.plan(tmp_path))
+
+        assert result.failed_count == 0
+        assert (tmp_path / "report.md").read_text() == "converted: report.pdf\n"
+
+
 class TestConvertExecute:
     """Tests for execute()."""
 

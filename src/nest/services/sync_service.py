@@ -64,6 +64,7 @@ class SyncService:
         ai_glossary: AIGlossaryService | None = None,
         picture_description_service: PictureDescriptionService | None = None,
         vision_docling_processor: DoclingProcessor | None = None,
+        image_docling_processor: DoclingProcessor | None = None,
     ) -> None:
         self._discovery = discovery
         self._manifest = manifest
@@ -80,6 +81,7 @@ class SyncService:
             context_dir=self._context_dir,
             picture_description=picture_description_service,
             vision_processor=vision_docling_processor,
+            image_processor=image_docling_processor,
         )
         self._enrichment = EnrichmentPhase(
             project_root=project_root,

@@ -207,6 +207,77 @@ class TestDisplaySyncSummaryAggregatedTokens:
         assert "disabled (--no-ai)" in status_lines[0]
 
 
+class TestDisplaySyncSummaryNeedsAI:
+    """Image files that need AI descriptions are called out with enablement guidance."""
+
+    def _make_console(self) -> tuple["Mock", list[str]]:
+        from rich.console import Console
+
+        output_lines: list[str] = []
+        console = Mock(spec=Console)
+        console.print.side_effect = lambda *args, **kwargs: output_lines.append(
+            " ".join(str(a) for a in args)
+        )
+        return console, output_lines
+
+    def test_block_lists_files_and_how_to_enable_ai(self) -> None:
+        console, lines = self._make_console()
+        root = Path("/proj")
+        result = SyncResult(
+            failed_count=2,
+            failure_reasons={
+                "/proj/_nest_sources/flow.png": "requires AI image description",
+                "/proj/_nest_sources/arch.jpg": "requires AI image description",
+            },
+            needs_ai_files=["/proj/_nest_sources/flow.png", "/proj/_nest_sources/arch.jpg"],
+        )
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/proj/.nest/errors.log"),
+            ai_status_note="not configured (run 'nest config ai' or set NEST_AI_API_KEY)",
+            project_root=root,
+        )
+
+        output = "\n".join(lines)
+        assert "2 image files need AI image descriptions and were not processed" in output
+        assert "_nest_sources/flow.png" in output
+        assert "_nest_sources/arch.jpg" in output
+        assert "Run 'nest config ai' or set NEST_AI_API_KEY, then run 'nest sync' again" in output
+
+    def test_block_tells_user_to_drop_no_ai_flag(self) -> None:
+        console, lines = self._make_console()
+        result = SyncResult(
+            failed_count=1,
+            failure_reasons={"/proj/_nest_sources/flow.png": "requires AI image description"},
+            needs_ai_files=["/proj/_nest_sources/flow.png"],
+        )
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/proj/.nest/errors.log"),
+            ai_status_note="disabled (--no-ai)",
+            project_root=Path("/proj"),
+        )
+
+        output = "\n".join(lines)
+        assert "1 image file needs an AI image description and was not processed" in output
+        assert "Run 'nest sync' again without --no-ai" in output
+
+    def test_no_block_when_nothing_needs_ai(self) -> None:
+        console, lines = self._make_console()
+        result = SyncResult(
+            failed_count=1,
+            failure_reasons={"/proj/_nest_sources/bad.pdf": "Docling convert failed"},
+        )
+
+        _display_sync_summary(result, console, Path("/proj/.nest/errors.log"))
+
+        assert "need AI image description" not in "\n".join(lines)
+
+
 class TestDisplaySyncSummaryFirstRun:
     """Tests for first-run AI discovery message (Story 6.4)."""
 

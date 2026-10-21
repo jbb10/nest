@@ -273,6 +273,48 @@ class TestDisplayConvertSummary:
         assert "corrupt.pdf" in full_output
         assert "Docling convert failed" in full_output
 
+    def test_summary_calls_out_images_that_need_ai(self) -> None:
+        console, lines = self._make_console()
+        result = _make_result(
+            failed_count=1,
+            failures=[
+                ConvertFailure(
+                    path=Path("/tmp/docs/flow.png"),
+                    reason="requires AI image description",
+                    kind="needs_ai",
+                )
+            ],
+        )
+
+        _display_convert_summary(
+            result,
+            console,
+            "not configured (run 'nest config ai' or set NEST_AI_API_KEY)",
+        )
+
+        output = "\n".join(lines)
+        assert "1 image file needs an AI image description and was not processed" in output
+        assert "flow.png" in output
+        assert "Run 'nest config ai' or set NEST_AI_API_KEY" in output
+        assert "then run 'nest convert' again" in output
+
+    def test_summary_tells_user_to_drop_no_ai_flag(self) -> None:
+        console, lines = self._make_console()
+        result = _make_result(
+            failed_count=1,
+            failures=[
+                ConvertFailure(
+                    path=Path("/tmp/docs/flow.png"),
+                    reason="requires AI image description",
+                    kind="needs_ai",
+                )
+            ],
+        )
+
+        _display_convert_summary(result, console, "disabled (--no-ai)")
+
+        assert "Run 'nest convert' again without --no-ai" in "\n".join(lines)
+
     def test_summary_lists_skip_reasons(self) -> None:
         """Each skipped file is listed with its reason."""
         console, lines = self._make_console()

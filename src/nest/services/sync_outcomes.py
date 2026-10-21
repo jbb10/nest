@@ -20,6 +20,7 @@ from nest.core.models import (
     AIEnrichmentResult,
     AIGlossaryResult,
     DiscoveredFile,
+    FailureKind,
     OrphanCleanupResult,
     PictureDescriptionResult,
     ProcessingResult,
@@ -48,6 +49,11 @@ class SyncLedger:
     glossary: AIGlossaryResult | None = None
     skip_reasons: list[tuple[Path, str]] = field(default_factory=lambda: [])
     failure_reasons: list[tuple[Path, str]] = field(default_factory=lambda: [])
+    failure_kinds: dict[Path, FailureKind] = field(default_factory=lambda: {})
+
+    def needs_ai_files(self) -> list[Path]:
+        """Documents that failed only because an AI image description was unavailable."""
+        return [path for path, kind in self.failure_kinds.items() if kind == "needs_ai"]
 
     def to_result(
         self,
@@ -79,6 +85,7 @@ class SyncLedger:
             images_skipped=sum(v.images_skipped for v in self.vision),
             images_failed=sum(v.images_failed for v in self.vision),
             failure_reasons={str(path): reason for path, reason in self.failure_reasons},
+            needs_ai_files=[str(path) for path in self.needs_ai_files()],
         )
 
 
@@ -119,7 +126,13 @@ class OutcomeRecorder:
         self._ledger.skip_reasons.append((file.path, reason))
         self._advance(file)
 
-    def failed(self, file: DiscoveredFile, error: str, cause: BaseException | None = None) -> None:
+    def failed(
+        self,
+        file: DiscoveredFile,
+        error: str,
+        cause: BaseException | None = None,
+        kind: FailureKind = "error",
+    ) -> None:
         if cause is not None:
             logger.error(
                 "Unexpected error processing %s",
@@ -131,6 +144,7 @@ class OutcomeRecorder:
             self._manifest.record_failure(file.path, file.checksum, error)
         self._ledger.failed += 1
         self._ledger.failure_reasons.append((file.path, error))
+        self._ledger.failure_kinds[file.path] = kind
         if self._error_logger:
             log_processing_error(self._error_logger, file.path, error)
         self._advance(file)

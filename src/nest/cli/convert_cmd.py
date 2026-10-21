@@ -20,7 +20,7 @@ from nest.services.convert_service import ConvertService
 from nest.services.output_service import OutputMirrorService
 from nest.ui.command import current_output
 from nest.ui.conversion import display_convert_summary
-from nest.ui.messages import error, get_console
+from nest.ui.messages import AI_DISABLED_NOTE, AI_NOT_CONFIGURED_NOTE, error, get_console
 
 if TYPE_CHECKING:
     from nest.adapters.llm_provider import AIConfig
@@ -80,6 +80,17 @@ def create_convert_service(
 
             picture_description = PictureDescriptionService(vision_provider=vision_provider)
 
+    # Without vision, standalone images still need classification to tell
+    # whether they require an AI description (and therefore fail).
+    image_processor = None
+    if vision_processor is None:
+        try:
+            from nest.adapters.docling_processor import DoclingProcessor as ClassificationProcessor
+
+            image_processor = ClassificationProcessor(enable_classification=True)
+        except ImportError:
+            image_processor = None
+
     return ConvertService(
         output=OutputMirrorService(
             filesystem=FileSystemAdapter(),
@@ -90,6 +101,7 @@ def create_convert_service(
         model_downloader=downloader,
         picture_description=picture_description,
         vision_processor=vision_processor,
+        image_processor=image_processor,
     )
 
 
@@ -156,9 +168,9 @@ def convert_command(
         ui.root = plan.root
         ai_status_note = ""
         if no_ai:
-            ai_status_note = "disabled (--no-ai)"
+            ai_status_note = AI_DISABLED_NOTE
         elif ai_config is None:
-            ai_status_note = "not configured (run 'nest config ai' or set NEST_AI_API_KEY)"
+            ai_status_note = AI_NOT_CONFIGURED_NOTE
 
         ui.start(len(plan.pending) + len(plan.skipped))
         result = service.execute(plan, progress_callback=ui.advance, activity_callback=ui.activity)

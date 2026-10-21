@@ -52,6 +52,7 @@ class ConvertService:
         model_downloader: ModelCacheProtocol | None = None,
         picture_description: PictureDescriptionService | None = None,
         vision_processor: DoclingProcessor | None = None,
+        image_processor: DoclingProcessor | None = None,
     ) -> None:
         """Initialize with required collaborators.
 
@@ -63,12 +64,15 @@ class ConvertService:
             picture_description: Optional vision service for image descriptions.
             vision_processor: Optional classification-enabled Docling processor
                 backing the vision pipeline.
+            image_processor: Optional classification-enabled Docling processor
+                for standalone image files when vision is unavailable.
         """
         self._output = output
         self._file_discovery = file_discovery
         self._model_downloader = model_downloader
         self._picture_description = picture_description
         self._vision_processor = vision_processor
+        self._image_processor = image_processor
 
     def plan(
         self,
@@ -170,6 +174,7 @@ class ConvertService:
                 context_dir=plan.output_dir if plan.output_dir is not None else plan.root,
                 picture_description=self._picture_description,
                 vision_processor=self._vision_processor,
+                image_processor=self._image_processor,
             )
             phase.run(plan.pending, recorder, ledger, activity_callback=activity_callback)
 
@@ -180,7 +185,10 @@ class ConvertService:
             failed_count=ledger.failed,
             skips=[ConvertSkip(path=path, reason=reason) for path, reason in ledger.skip_reasons],
             failures=[
-                ConvertFailure(path=path, reason=reason) for path, reason in ledger.failure_reasons
+                ConvertFailure(
+                    path=path, reason=reason, kind=ledger.failure_kinds.get(path, "error")
+                )
+                for path, reason in ledger.failure_reasons
             ],
             images_described=sum(v.images_described for v in ledger.vision),
             images_skipped=sum(v.images_skipped for v in ledger.vision),
