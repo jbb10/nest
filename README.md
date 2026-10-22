@@ -140,7 +140,7 @@ nest sync --on-error fail    # Stop on first error
 
 Converts documents to Markdown anywhere on disk without requiring a Nest project.
 The input can be a single file or a directory; outputs are written next to the originals (`reports/q1.pdf` to `reports/q1.md`), or into `--output` mirroring the tree.
-The command uses the same discovery and conversion rules as `nest sync`: recursive discovery, hidden folders skipped, text files passed through, and AI used only for picture descriptions.
+The command uses the same discovery and conversion rules as `nest sync`: recursive discovery, hidden folders skipped, text files passed through, and AI used only for picture descriptions unless `--ai-only` is set.
 No manifest, index, or `.nest/` folder is created.
 Existing outputs are skipped; `--force` overwrites them.
 Failed files do not stop the run; the summary lists them and the exit code is non-zero if any file failed.
@@ -152,12 +152,17 @@ Routine skips are grouped by reason in the summary.
 Potential extraction problems, including dropped table content, appear under `Review recommended`, grouped by document.
 `--verbose` includes library diagnostics and individual skip reasons.
 `--no-ai` disables remote image descriptions, not local OCR or table extraction.
+`--ai-only` sends each image file and PDF page straight to the AI vision model and uses its Markdown as the output, skipping Docling layout analysis, OCR, and table recognition.
+It suits dense tables and screenshots where OCR misplaces values, but requires a capable vision model (`NEST_AI_VISION_MODEL`).
+A page the model cannot read fails the document rather than producing a partial output.
+Other formats keep the normal conversion path.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--output`, `-o` | off | Write outputs into a directory, mirroring the tree (copies text files too) |
 | `--force` | off | Overwrite existing output files |
 | `--no-ai` | off | Skip AI image descriptions even when AI credentials are configured |
+| `--ai-only` | off | Transcribe images and PDFs with the AI vision model instead of Docling |
 | `--verbose`, `-v` | off | Show library diagnostics and per-file skip reasons |
 
 ```bash
@@ -165,6 +170,7 @@ nest convert reports/q1.pdf              # One file, output next to it
 nest convert reports/                    # Whole tree, outputs next to originals
 nest convert reports/ --output md/       # Mirror the tree into md/
 nest convert reports/ --output md/ --force
+nest convert screenshots/ --ai-only      # Images and PDFs transcribed by the vision model
 ```
 
 ### `nest status`

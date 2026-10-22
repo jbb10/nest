@@ -66,6 +66,7 @@ def ai_command(
 
     Use --remove to remove the configuration block.
 
+    \b
     Examples:
         nest config ai
         nest config ai --remove

@@ -15,8 +15,13 @@ from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
 from nest.adapters.passthrough_processor import PassthroughProcessor
 from nest.core.checksum import compute_sha256
-from nest.core.exceptions import NestError
-from nest.core.models import Activity, PictureDescriptionResult, ProcessingResult
+from nest.core.exceptions import NestError, ProcessingError
+from nest.core.models import (
+    Activity,
+    PictureDescriptionResult,
+    ProcessingResult,
+    TranscriptionResult,
+)
 from nest.services.convert_service import ConvertService
 from nest.services.output_service import OutputMirrorService
 
@@ -329,10 +334,121 @@ class TestStandaloneImagesWithoutVision:
         assert (tmp_path / "report.md").read_text() == "converted: report.pdf\n"
 
 
+class StubTranscription:
+    """Transcription service that handles images and PDFs, failing named files."""
+
+    def __init__(self, fail_names: set[str] | None = None) -> None:
+        self.fail_names = fail_names or set()
+        self.transcribed: list[Path] = []
+
+    def handles(self, source: Path) -> bool:
+        return source.suffix in {".png", ".pdf"}
+
+    def transcribe(self, source: Path) -> TranscriptionResult:
+        if source.name in self.fail_names:
+            raise ProcessingError("AI transcription failed", source_path=source)
+        self.transcribed.append(source)
+        return TranscriptionResult(
+            markdown=f"transcribed: {source.name}\n",
+            pages=2,
+            prompt_tokens=100,
+            completion_tokens=10,
+        )
+
+
+class TestAIOnlyTranscription:
+    """With a transcriber, image files and PDFs skip Docling for AI transcription."""
+
+    def make_service(
+        self, transcription: StubTranscription
+    ) -> tuple[ConvertService, StubProcessor, StubDownloader, MagicMock]:
+        processor = StubProcessor()
+        downloader = StubDownloader()
+        image_processor = MagicMock()
+        service = ConvertService(
+            output=OutputMirrorService(FileSystemAdapter(), processor),
+            file_discovery=FileDiscoveryAdapter(),
+            model_downloader=downloader,
+            image_processor=image_processor,
+            transcriber=transcription,
+        )
+        return service, processor, downloader, image_processor
+
+    def test_images_and_pdfs_are_transcribed_and_other_formats_use_docling(
+        self, tmp_path: Path
+    ) -> None:
+        transcription = StubTranscription()
+        service, processor, _, image_processor = self.make_service(transcription)
+        write(tmp_path / "scan.png")
+        write(tmp_path / "report.pdf")
+        write(tmp_path / "memo.docx")
+        activities: list[Activity] = []
+
+        result = service.execute(service.plan(tmp_path), activity_callback=activities.append)
+
+        assert (tmp_path / "scan.md").read_text() == "transcribed: scan.png\n"
+        assert (tmp_path / "report.md").read_text() == "transcribed: report.pdf\n"
+        assert (tmp_path / "memo.md").read_text() == "converted: memo.docx\n"
+        assert processor.processed == [tmp_path / "memo.docx"]
+        image_processor.convert.assert_not_called()
+        assert result.processed_count == 3
+        assert result.pages_transcribed == 4
+        assert (result.vision_prompt_tokens, result.vision_completion_tokens) == (200, 20)
+        assert {a.files[0].name for a in activities if a.stage == "transcribing"} == {
+            "scan.png",
+            "report.pdf",
+        }
+
+    def test_failed_transcription_is_a_failed_document_and_writes_nothing(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        service, _, _, _ = self.make_service(StubTranscription(fail_names={"scan.png"}))
+        write(tmp_path / "scan.png")
+        write(tmp_path / "report.pdf")
+
+        result = service.execute(service.plan(tmp_path))
+
+        assert not (tmp_path / "scan.md").exists()
+        assert result.processed_count == 1
+        assert [f.path.name for f in result.failures] == ["scan.png"]
+        assert result.failures[0].reason == "AI transcription failed"
+        assert "Unexpected error" not in caplog.text
+
+    def test_failed_transcription_preserves_existing_output(self, tmp_path: Path) -> None:
+        service, _, _, _ = self.make_service(StubTranscription(fail_names={"scan.png"}))
+        source = write(tmp_path / "scan.png")
+        output = write(tmp_path / "scan.md", "previous successful output")
+
+        result = service.execute(service.plan(source, force=True))
+
+        assert result.failed_count == 1
+        assert output.read_text() == "previous successful output"
+
+    def test_no_model_download_when_every_file_is_transcribed(self, tmp_path: Path) -> None:
+        service, _, downloader, _ = self.make_service(StubTranscription())
+        write(tmp_path / "scan.png")
+        write(tmp_path / "report.pdf")
+
+        service.execute(service.plan(tmp_path))
+
+        assert downloader.download_calls == 0
+
+    def test_models_download_when_some_file_needs_docling(self, tmp_path: Path) -> None:
+        service, _, downloader, _ = self.make_service(StubTranscription())
+        write(tmp_path / "scan.png")
+        write(tmp_path / "memo.docx")
+
+        service.execute(service.plan(tmp_path))
+
+        assert downloader.download_calls == 1
+
+
 class TestConvertExecute:
     """Tests for execute()."""
 
-    def test_failed_image_description_preserves_existing_output(self, tmp_path: Path) -> None:
+    def test_failed_image_description_preserves_existing_output(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
         source = write(tmp_path / "report.pdf")
         output = write(tmp_path / "report.md", "previous successful output")
         vision = MagicMock()
@@ -349,6 +465,11 @@ class TestConvertExecute:
         assert result.images_failed == 1
         assert result.processed_count == 0
         assert output.read_text() == "previous successful output"
+        assert (
+            result.failures[0].reason
+            == "Vision describe failed: 1 required image description failed"
+        )
+        assert "Unexpected error" not in caplog.text
 
     def test_vision_writes_outputs_and_advances_before_converting_entire_folder(
         self, tmp_path: Path

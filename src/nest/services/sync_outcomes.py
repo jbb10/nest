@@ -27,6 +27,7 @@ from nest.core.models import (
     PictureDescriptionResult,
     ProcessingResult,
     SyncResult,
+    TranscriptionResult,
 )
 from nest.ui.logger import log_processing_error
 
@@ -47,10 +48,25 @@ class SyncLedger:
     skipped: int = 0
     failed: int = 0
     vision: list[PictureDescriptionResult] = field(default_factory=lambda: [])
+    transcriptions: list[TranscriptionResult] = field(default_factory=lambda: [])
     enrichment: AIEnrichmentResult | None = None
     glossary: AIGlossaryResult | None = None
     skips: list[ConvertSkip] = field(default_factory=lambda: [])
     failures: list[ConvertFailure] = field(default_factory=lambda: [])
+
+    @property
+    def vision_prompt_tokens(self) -> int:
+        """Prompt tokens spent by the vision model on descriptions and transcriptions."""
+        return sum(v.prompt_tokens for v in self.vision) + sum(
+            t.prompt_tokens for t in self.transcriptions
+        )
+
+    @property
+    def vision_completion_tokens(self) -> int:
+        """Completion tokens spent by the vision model on descriptions and transcriptions."""
+        return sum(v.completion_tokens for v in self.vision) + sum(
+            t.completion_tokens for t in self.transcriptions
+        )
 
     def needs_ai_files(self) -> list[Path]:
         """Documents that failed only because an AI image description was unavailable."""
@@ -79,8 +95,8 @@ class SyncLedger:
             ai_glossary_terms_added=glossary.terms_added,
             ai_glossary_prompt_tokens=glossary.prompt_tokens,
             ai_glossary_completion_tokens=glossary.completion_tokens,
-            vision_prompt_tokens=sum(v.prompt_tokens for v in self.vision),
-            vision_completion_tokens=sum(v.completion_tokens for v in self.vision),
+            vision_prompt_tokens=self.vision_prompt_tokens,
+            vision_completion_tokens=self.vision_completion_tokens,
             images_described=sum(v.images_described for v in self.vision),
             images_mermaid=sum(v.images_mermaid for v in self.vision),
             images_skipped=sum(v.images_skipped for v in self.vision),

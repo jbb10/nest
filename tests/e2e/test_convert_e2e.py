@@ -260,3 +260,46 @@ class TestConvertE2E:
         content = (fresh_temp_dir / "image_doc.md").read_text()
         assert CANNED_DESCRIPTION not in content
         assert "disabled (--no-ai)" in result.stdout
+
+
+@pytest.mark.e2e
+class TestConvertAIOnlyE2E:
+    """E2E tests for nest convert --ai-only with a mocked vision model."""
+
+    def test_ai_only_writes_the_model_transcription_without_docling(
+        self, fresh_temp_dir: Path
+    ) -> None:
+        """An image file is prepared from the model's Markdown, without loading Docling models."""
+        _copy_fixture("notes.png", fresh_temp_dir / "notes.png")
+        transcript = "# Notes\n\n| Metric | Value |\n| --- | --- |\n| Growth | 69% |"
+
+        with MockVisionServer(response=transcript) as server:
+            result = run_cli(
+                ["convert", "notes.png", "--ai-only"],
+                cwd=fresh_temp_dir,
+                timeout=120,
+                env=server.env_vars(),
+            )
+
+        assert result.exit_code == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        assert server.call_count == 1
+        assert (fresh_temp_dir / "notes.md").read_text() == transcript + "\n"
+        assert "Preparing conversion models" not in result.stdout
+        assert "Pages transcribed by AI: 1" in result.stdout
+
+    def test_ai_only_unreadable_page_fails_the_document(self, fresh_temp_dir: Path) -> None:
+        """A page the model reports as unreadable fails the document and writes nothing."""
+        _copy_fixture("notes.png", fresh_temp_dir / "notes.png")
+
+        with MockVisionServer(response="NEST_UNREADABLE_PAGE") as server:
+            result = run_cli(
+                ["convert", "notes.png", "--ai-only"],
+                cwd=fresh_temp_dir,
+                timeout=120,
+                env=server.env_vars(),
+            )
+
+        assert result.exit_code == 1, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+        assert server.call_count == 1
+        assert not (fresh_temp_dir / "notes.md").exists()
+        assert "could not read the page" in result.stdout + result.stderr

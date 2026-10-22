@@ -69,6 +69,8 @@ def display_convert_summary(
         console.print(f"  Images skipped:  {result.images_skipped} (logos/signatures)")
     if result.images_failed > 0:
         console.print(f"  Image descriptions failed: {result.images_failed}")
+    if result.pages_transcribed > 0:
+        console.print(f"  Pages transcribed by AI: {result.pages_transcribed}")
     total_tokens = result.vision_prompt_tokens + result.vision_completion_tokens
     if total_tokens > 0:
         console.print(

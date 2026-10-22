@@ -256,9 +256,10 @@ def sync_command(
 ) -> None:
     """Sync documents from sources to context directory.
 
-    Processes PDF, DOCX, PPTX, XLSX, and HTML files from _nest_sources/
+    Processes PDF, DOCX, PPTX, XLSX, HTML, and image files from _nest_sources/
     and converts them to Markdown in _nest_context/.
 
+    \b
     Examples:
         nest sync
         nest sync --dry-run

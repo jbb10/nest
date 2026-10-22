@@ -13,6 +13,8 @@ _nest_sources/
 
 # Nest project artifacts (if repo is accidentally initialized as Nest project)
 .nest_manifest.json
+.nest/
+.github/agents/nest*.agent.md
 _nest_context/
 
 # Node.js / Sandbox

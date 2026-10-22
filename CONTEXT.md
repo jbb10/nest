@@ -13,7 +13,7 @@ A readable representation of a source document with the extraction and descripti
 _Avoid_: Successful file merely because an output exists
 
 **Image file**:
-A standalone raster image supplied as a source document and converted as a one-page scanned document.
+A standalone raster image supplied as a source document and treated as a scanned document with one page per frame.
 _Avoid_: Embedded image, attachment
 
 **Required image description**:
@@ -24,6 +24,10 @@ _Avoid_: Optional enrichment
 **Failed document**:
 A source document whose requested preparation did not complete, including failure of a required image description.
 _Avoid_: Completed with warnings for failed required descriptions
+
+**AI transcription**:
+Preparation of a source document in which an AI vision model reads every page as an image and its reading of those pages becomes the prepared document.
+_Avoid_: Straight-to-AI transcription, AI-only conversion, OCR
 
 **Quality warning**:
 A condition that warrants reviewing a prepared document without establishing that a requested preparation step failed.

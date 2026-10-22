@@ -77,14 +77,11 @@ class CommandUI:
         self._progress.set_activity(label)
 
     def activity(self, activity: Activity) -> None:
-        if activity.stage in ("converting", "writing"):
+        document_stage = _document_stage(activity)
+        if document_stage is not None:
             source = activity.files[0]
             self._diagnostics.source = source
-            self._stage = (
-                f"Converting document {activity.current} of {activity.total}"
-                if activity.stage == "converting"
-                else "Writing document"
-            )
+            self._stage = document_stage
             self._file = (
                 str(source.relative_to(self.root))
                 if source.is_relative_to(self.root)
@@ -121,6 +118,17 @@ class CommandUI:
 
     def _download_activity(self, label: str | None) -> None:
         self._progress.set_activity(label or self._stage, self._file)
+
+
+def _document_stage(activity: Activity) -> str | None:
+    """Progress label for a stage that works on one document, else None."""
+    if activity.stage == "converting":
+        return f"Converting document {activity.current} of {activity.total}"
+    if activity.stage == "transcribing":
+        return f"Transcribing document {activity.current} of {activity.total}"
+    if activity.stage == "writing":
+        return "Writing document"
+    return None
 
 
 def current_output() -> CommandUI:

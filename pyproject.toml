@@ -12,6 +12,8 @@ dependencies = [
     "docling>=2.140.0",
     "pyyaml>=6.0",
     "openai>=3.35.1",
+    "pypdfium2>=4.30.0",
+    "pillow>=11.0.0",
 ]
 
 [project.urls]

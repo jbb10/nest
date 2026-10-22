@@ -74,6 +74,7 @@ class TestConvertCommandHelp:
         assert "--output" in output
         assert "--force" in output
         assert "--no-ai" in output
+        assert "--ai-only" in output
 
 
 class TestConvertCommandErrors:
@@ -224,7 +225,45 @@ class TestConvertCommandRun:
         result = runner.invoke(app, ["convert", str(tmp_path), "--no-ai"])
 
         assert result.exit_code == 0
-        mock_create_service.assert_called_once_with(no_ai=True, ai_config=None)
+        mock_create_service.assert_called_once_with(no_ai=True, ai_config=None, ai_only=False)
+
+    @patch("nest.cli.convert_cmd.resolve_ai_config")
+    @patch("nest.cli.convert_cmd.create_convert_service")
+    def test_convert_ai_only_is_forwarded(
+        self, mock_create_service: MagicMock, mock_resolve: MagicMock, tmp_path: Path
+    ) -> None:
+        mock_service = MagicMock()
+        mock_service.plan.return_value = _make_plan(tmp_path)
+        mock_service.execute.return_value = _make_result()
+        mock_create_service.return_value = mock_service
+
+        result = runner.invoke(app, ["convert", str(tmp_path), "--ai-only"])
+
+        assert result.exit_code == 0
+        mock_create_service.assert_called_once_with(
+            no_ai=False, ai_config=mock_resolve.return_value, ai_only=True
+        )
+
+    @patch("nest.cli.convert_cmd.create_convert_service")
+    def test_convert_ai_only_conflicts_with_no_ai(
+        self, mock_create_service: MagicMock, tmp_path: Path
+    ) -> None:
+        result = runner.invoke(app, ["convert", str(tmp_path), "--ai-only", "--no-ai"])
+
+        assert result.exit_code == 1
+        assert "Convert failed" in result.output
+        assert "--ai-only cannot be combined with --no-ai" in result.output
+        mock_create_service.assert_not_called()
+
+    @patch("nest.cli.convert_cmd.resolve_ai_config", return_value=None)
+    def test_convert_ai_only_requires_ai(self, mock_resolve: MagicMock, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["convert", str(tmp_path), "--ai-only"])
+
+        assert result.exit_code == 1
+        mock_resolve.assert_called()
+        assert "Convert failed" in result.output
+        assert "--ai-only requires an AI vision model" in result.output
+        assert "nest config ai" in result.output
 
 
 class TestDisplayConvertSummary:
@@ -364,6 +403,14 @@ class TestDisplayConvertSummary:
         assert "Images described: 2" in full_output
         assert "Images skipped:  1" in full_output
         assert "150" in full_output
+
+    def test_summary_shows_transcribed_page_count(self) -> None:
+        console, lines = self._make_console()
+        result = _make_result(pages_transcribed=3)
+
+        _display_convert_summary(result, console)
+
+        assert "Pages transcribed by AI: 3" in "\n".join(lines)
 
     def test_summary_shows_paths_relative_to_root(self) -> None:
         """Skipped files are shown relative to the conversion root."""

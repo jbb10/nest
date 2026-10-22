@@ -223,6 +223,7 @@ class Activity(BaseModel):
         "preparing",
         "downloading",
         "converting",
+        "transcribing",
         "describing",
         "writing",
         "committing",
@@ -269,8 +270,9 @@ class ConvertResult(BaseModel):
         failures: Failed files with reasons.
         images_described: Number of images described by the vision model.
         images_skipped: Number of images intentionally skipped (logos/signatures).
-        vision_prompt_tokens: Total prompt tokens used for image descriptions.
-        vision_completion_tokens: Total completion tokens used for image descriptions.
+        pages_transcribed: Number of pages prepared by AI transcription.
+        vision_prompt_tokens: Total prompt tokens used by the vision model.
+        vision_completion_tokens: Total completion tokens used by the vision model.
     """
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -284,6 +286,7 @@ class ConvertResult(BaseModel):
     images_described: int = 0
     images_skipped: int = 0
     images_failed: int = 0
+    pages_transcribed: int = 0
     vision_prompt_tokens: int = 0
     vision_completion_tokens: int = 0
 
@@ -500,5 +503,21 @@ class PictureDescriptionResult(BaseModel):
     images_mermaid: int = 0
     images_skipped: int = 0
     images_failed: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+
+
+class TranscriptionResult(BaseModel):
+    """Result of an AITranscriptionService.transcribe() call.
+
+    Attributes:
+        markdown: The document's Markdown, pages joined in order.
+        pages: Number of pages transcribed.
+        prompt_tokens: Total prompt tokens across all pages.
+        completion_tokens: Total completion tokens across all pages.
+    """
+
+    markdown: str
+    pages: int
     prompt_tokens: int = 0
     completion_tokens: int = 0
