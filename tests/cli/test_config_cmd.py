@@ -48,25 +48,25 @@ class TestDisplayPath:
 
 
 class TestConfigAiHelp:
-    """Tests for config ai help text."""
+    """Tests for config llm help text."""
 
-    def test_config_ai_help_shows_usage(self) -> None:
-        """'nest config ai --help' displays help text."""
-        result = runner.invoke(app, ["config", "ai", "--help"])
+    def test_config_llm_help_shows_usage(self) -> None:
+        """'nest config llm --help' displays help text."""
+        result = runner.invoke(app, ["config", "llm", "--help"])
         assert result.exit_code == 0
         assert "--remove" in result.output
 
-    def test_config_help_shows_ai_subcommand(self) -> None:
-        """'nest config --help' lists 'ai' subcommand."""
+    def test_config_help_shows_llm_subcommand(self) -> None:
+        """'nest config --help' lists 'llm' subcommand."""
         result = runner.invoke(app, ["config", "--help"])
         assert result.exit_code == 0
-        assert "ai" in result.output
+        assert "llm" in result.output
 
 
 class TestConfigAiRemove:
-    """Tests for config ai --remove flag."""
+    """Tests for config llm --remove flag."""
 
-    def test_config_ai_remove_no_block(self, tmp_path: Path) -> None:
+    def test_config_llm_remove_no_block(self, tmp_path: Path) -> None:
         """--remove with no block shows info message."""
         rc_path = tmp_path / ".zshrc"
         rc_path.write_text("# existing\n", encoding="utf-8")
@@ -78,12 +78,12 @@ class TestConfigAiRemove:
                 return_value=rc_path,
             ),
         ):
-            result = runner.invoke(app, ["config", "ai", "--remove"])
+            result = runner.invoke(app, ["config", "llm", "--remove"])
 
         assert result.exit_code == 0
-        assert "No Nest AI configuration found" in result.output
+        assert "No Nest LLM configuration found" in result.output
 
-    def test_config_ai_remove_with_block(self, tmp_path: Path) -> None:
+    def test_config_llm_remove_with_block(self, tmp_path: Path) -> None:
         """--remove with block shows success message."""
         from nest.services.shell_rc_service import ShellRCService
 
@@ -98,16 +98,16 @@ class TestConfigAiRemove:
                 return_value=rc_path,
             ),
         ):
-            result = runner.invoke(app, ["config", "ai", "--remove"])
+            result = runner.invoke(app, ["config", "llm", "--remove"])
 
         assert result.exit_code == 0
-        assert "AI configuration removed" in result.output
+        assert "LLM configuration removed" in result.output
 
 
 class TestConfigAiInteractive:
-    """Tests for config ai interactive flow."""
+    """Tests for config llm interactive flow."""
 
-    def test_config_ai_displays_shell_info(self, tmp_path: Path) -> None:
+    def test_config_llm_displays_shell_info(self, tmp_path: Path) -> None:
         """Command outputs detected shell and RC file path."""
         rc_path = tmp_path / ".zshrc"
 
@@ -120,7 +120,7 @@ class TestConfigAiInteractive:
         ):
             result = runner.invoke(
                 app,
-                ["config", "ai"],
+                ["config", "llm"],
                 input="https://api.openai.com/v1\ngpt-4o-mini\nsk-testkey123\n",
             )
 
@@ -128,8 +128,8 @@ class TestConfigAiInteractive:
         assert "Shell: zsh" in result.output
         assert "Added to" in result.output
 
-    def test_config_ai_writes_expected_exports_for_azure_endpoint(self, tmp_path: Path) -> None:
-        """Azure endpoint input writes standard Nest AI env vars only."""
+    def test_config_llm_writes_expected_exports_for_azure_endpoint(self, tmp_path: Path) -> None:
+        """Azure endpoint input writes standard Nest LLM env vars only."""
         rc_path = tmp_path / ".zshrc"
 
         with (
@@ -141,13 +141,13 @@ class TestConfigAiInteractive:
         ):
             result = runner.invoke(
                 app,
-                ["config", "ai"],
+                ["config", "llm"],
                 input=("https://myorg.openai.azure.com\nmy-deployment\nazure-key-123\n"),
             )
 
         assert result.exit_code == 0
         content = rc_path.read_text(encoding="utf-8")
-        assert 'export NEST_AI_ENDPOINT="https://myorg.openai.azure.com"' in content
-        assert 'export NEST_AI_MODEL="my-deployment"' in content
-        assert 'export NEST_AI_API_KEY="azure-key-123"' in content
-        assert "NEST_AI_PROVIDER" not in content
+        assert 'export NEST_LLM_ENDPOINT="https://myorg.openai.azure.com"' in content
+        assert 'export NEST_LLM_MODEL="my-deployment"' in content
+        assert 'export NEST_LLM_API_KEY="azure-key-123"' in content
+        assert "NEST_LLM_PROVIDER" not in content

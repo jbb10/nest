@@ -439,6 +439,33 @@ class TestDoclingProcessorImageFormat:
         assert result.status == "success", result.error
         assert output.exists()
 
+    def test_short_numeric_cells_are_not_read_upside_down(self, tmp_path: Path) -> None:
+        """Short cells like ``69%`` must not come back rotated as ``%69``."""
+        import re
+
+        from PIL import Image, ImageDraw, ImageFont
+
+        from nest.adapters.docling_processor import DoclingProcessor
+
+        values = ["69%", "65%", "67%", "61%", "81%", "68%", "66%", "89%", "19%", "86%"]
+        font = ImageFont.load_default(size=11)
+        image = Image.new("RGB", (720, 200), "white")
+        draw = ImageDraw.Draw(image)
+        for row in range(10):
+            for col in range(12):
+                text = values[(row + col) % len(values)]
+                draw.text((10 + col * 58, 10 + row * 18), text, fill="black", font=font)
+        source = tmp_path / "percentages.png"
+        image.save(source)
+        output = tmp_path / "percentages.md"
+
+        result = DoclingProcessor().process(source, output)
+
+        assert result.status == "success", result.error
+        markdown = output.read_text()
+        assert re.findall(r"%\d+", markdown) == []
+        assert len(re.findall(r"\d+%", markdown)) >= 100
+
 
 class TestDoclingProcessorConvertMethod:
     """Tests for the new convert() method (AC3)."""

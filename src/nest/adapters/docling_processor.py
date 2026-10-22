@@ -9,6 +9,7 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.document import ConversionResult
 from docling.datamodel.pipeline_options import (
     PdfPipelineOptions,
+    RapidOcrOptions,
     TableFormerMode,
     TableStructureOptions,
 )
@@ -56,6 +57,9 @@ class DoclingProcessor:
             mode=TableFormerMode.ACCURATE,
         )
 
+        # The direction classifier flips short cells such as "69%" into "%69".
+        ocr_options = RapidOcrOptions(backend="torch", use_cls=False)
+
         if enable_classification:
             # Classification-enabled pipeline: activates local image classifier
             # and image extraction for the two-pass vision LLM pipeline.
@@ -64,6 +68,7 @@ class DoclingProcessor:
             pipeline_options = PdfPipelineOptions(
                 do_table_structure=True,
                 table_structure_options=table_structure_options,
+                ocr_options=ocr_options,
                 do_picture_classification=True,
                 do_picture_description=False,
                 generate_picture_images=True,
@@ -74,6 +79,7 @@ class DoclingProcessor:
             pipeline_options = PdfPipelineOptions(
                 do_table_structure=True,
                 table_structure_options=table_structure_options,
+                ocr_options=ocr_options,
             )
 
         self._converter = DocumentConverter(

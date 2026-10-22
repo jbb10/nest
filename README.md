@@ -87,11 +87,11 @@ Prompts and reports are displayed without a competing progress animation.
 Every command accepts `--verbose` or `-v` for detailed diagnostics.
 
 Repeated diagnostic warnings are grouped by affected document, and potential extraction problems remain visible in a review summary.
-Failed required AI image descriptions make the document and command fail, including empty responses and images that cannot be extracted for description.
+Failed required LLM image descriptions make the document and command fail, including empty responses and images that cannot be extracted for description.
 Both `sync` and `convert` return a nonzero exit code when any document fails.
 By default, other documents continue processing; `sync --on-error fail` aborts at the first failure.
 Failed documents remain eligible for retry, and an image-description failure does not replace an existing successful output with an incomplete one.
-`--no-ai` disables remote AI work, not local OCR or table extraction.
+`--no-llm` disables remote LLM work, not local OCR or table extraction.
 
 ### `nest init`
 
@@ -116,9 +116,9 @@ my-project/
 
 Processes new and changed documents.
 
-AI description generation and glossary creation run automatically only when AI is configured.
-Use `nest config ai` or set `NEST_API_KEY` or `OPENAI_API_KEY` before running `nest sync`.
-Without AI configuration, sync still completes, but index descriptions may be blank and `glossary.md` will not be created.
+LLM description generation and glossary creation run automatically only when an LLM is configured.
+Use `nest config llm` or set `NEST_API_KEY` or `OPENAI_API_KEY` before running `nest sync`.
+Without LLM configuration, sync still completes, but index descriptions may be blank and `glossary.md` will not be created.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -126,7 +126,7 @@ Without AI configuration, sync still completes, but index descriptions may be bl
 | `--no-clean` | clean ON | Disable orphan cleanup (keeps output when source is deleted) |
 | `--dry-run` | off | Preview what would be processed without making changes |
 | `--force` | off | Re-process all files, ignoring checksums |
-| `--no-ai` | off | Skip AI enrichment even when AI credentials are configured |
+| `--no-llm` | off | Skip LLM enrichment even when LLM credentials are configured |
 | `--verbose`, `-v` | off | Show detailed diagnostics |
 
 ```bash
@@ -140,7 +140,7 @@ nest sync --on-error fail    # Stop on first error
 
 Converts documents to Markdown anywhere on disk without requiring a Nest project.
 The input can be a single file or a directory; outputs are written next to the originals (`reports/q1.pdf` to `reports/q1.md`), or into `--output` mirroring the tree.
-The command uses the same discovery and conversion rules as `nest sync`: recursive discovery, hidden folders skipped, text files passed through, and AI used only for picture descriptions.
+The command uses the same discovery and conversion rules as `nest sync`: recursive discovery, hidden folders skipped, text files passed through, and the LLM used only for picture descriptions unless `--llm-only` is set.
 No manifest, index, or `.nest/` folder is created.
 Existing outputs are skipped; `--force` overwrites them.
 Failed files do not stop the run; the summary lists them and the exit code is non-zero if any file failed.
@@ -151,13 +151,18 @@ Image descriptions finish in bounded batches, allowing outputs to be written bef
 Routine skips are grouped by reason in the summary.
 Potential extraction problems, including dropped table content, appear under `Review recommended`, grouped by document.
 `--verbose` includes library diagnostics and individual skip reasons.
-`--no-ai` disables remote image descriptions, not local OCR or table extraction.
+`--no-llm` disables remote image descriptions, not local OCR or table extraction.
+`--llm-only` sends each image file and PDF page straight to the LLM vision model and uses its Markdown as the output, skipping Docling layout analysis, OCR, and table recognition.
+It suits dense tables and screenshots where OCR misplaces values, but requires a capable vision model (`NEST_LLM_VISION_MODEL`).
+A page the model cannot read fails the document rather than producing a partial output.
+Other formats keep the normal conversion path.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--output`, `-o` | off | Write outputs into a directory, mirroring the tree (copies text files too) |
 | `--force` | off | Overwrite existing output files |
-| `--no-ai` | off | Skip AI image descriptions even when AI credentials are configured |
+| `--no-llm` | off | Skip LLM image descriptions even when LLM credentials are configured |
+| `--llm-only` | off | Transcribe images and PDFs with the LLM vision model instead of Docling |
 | `--verbose`, `-v` | off | Show library diagnostics and per-file skip reasons |
 
 ```bash
@@ -165,6 +170,7 @@ nest convert reports/q1.pdf              # One file, output next to it
 nest convert reports/                    # Whole tree, outputs next to originals
 nest convert reports/ --output md/       # Mirror the tree into md/
 nest convert reports/ --output md/ --force
+nest convert screenshots/ --llm-only      # Images and PDFs transcribed by the vision model
 ```
 
 ### `nest status`
@@ -173,7 +179,8 @@ Shows project state at a glance — pending files, last sync time, and what to d
 
 ### `nest doctor`
 
-Validates your environment, ML models, and project state.
+Validates your environment, ML models, LLM configuration, and project state.
+A shell that still exports the pre-3.0 `NEST_AI_*` variables is reported with a pointer to `nest config llm`.
 
 | Flag | Description |
 |------|-------------|
@@ -188,20 +195,20 @@ Checks for new versions, updates Nest, and migrates your agent file if the templ
 | `--check` | Only check for updates without installing |
 | `--dir` | Specify project directory for agent migration check |
 
-### `nest config ai`
+### `nest config llm`
 
-Interactively configures AI enrichment by writing API credentials to your shell RC file (e.g. `~/.zshrc`). Prompts for API endpoint, model name, and API key.
+Interactively configures LLM enrichment by writing API credentials to your shell RC file (e.g. `~/.zshrc`). Prompts for API endpoint, model name, and API key.
 
 Once configured, `nest sync` will automatically generate file descriptions and a project glossary that help your agents understand your documents better.
 
 ```bash
-nest config ai            # Set up AI credentials
-nest config ai --remove   # Remove AI configuration
+nest config llm            # Set up LLM credentials
+nest config llm --remove   # Remove LLM configuration
 ```
 
 | Flag | Description |
 |------|-------------|
-| `--remove` | Remove Nest AI configuration from your shell RC file |
+| `--remove` | Remove Nest LLM configuration from your shell RC file |
 
 ---
 
@@ -220,8 +227,8 @@ You can also place Markdown, text, CSV, JSON, YAML, and other text files into `_
 
 Standalone image files are converted as one-page scanned documents: text is OCR'd, tables are extracted, and figures are classified.
 Flowcharts and block diagrams become Mermaid diagrams, other figures are described in prose, and logos and signatures are left out.
-Because a figure is usually the whole point of an image file, an image that holds a figure needing an AI description is a failed document when AI is unavailable (`--no-ai` or not configured).
-The run summary lists these files with instructions to enable AI, and the next `nest sync` retries them.
+Because a figure is usually the whole point of an image file, an image that holds a figure needing an LLM description is a failed document when no LLM is available (`--no-llm` or not configured).
+The run summary lists these files with instructions to enable an LLM, and the next `nest sync` retries them.
 SVG is not supported.
 
 ---

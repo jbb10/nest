@@ -303,7 +303,7 @@ def create_chart_png(output_path: Path) -> None:
 def create_notes_png(output_path: Path) -> None:
     """Create a screenshot-of-text PNG that Docling converts via OCR only.
 
-    Contains no figure, so it never requires an AI image description.
+    Contains no figure, so it never requires an LLM image description.
     """
     from PIL import Image, ImageDraw, ImageFont
 

@@ -1118,17 +1118,17 @@ class TestSyncCollisionDetection:
         assert "collision" in skipped_call[1].get("reason", skipped_call[0][-1]).lower()
 
 
-class TestSyncAIEnrichment:
-    """Tests for AI enrichment integration in SyncService."""
+class TestSyncLLMEnrichment:
+    """Tests for LLM enrichment integration in SyncService."""
 
-    def test_sync_with_ai_enrichment_merges_descriptions(self, mock_deps):
-        """AI descriptions should be merged into old_descriptions before index generation."""
-        from nest.core.models import AIEnrichmentResult, FileMetadata
-        from nest.services.ai_enrichment_service import AIEnrichmentService
+    def test_sync_with_llm_enrichment_merges_descriptions(self, mock_deps):
+        """LLM descriptions should be merged into old_descriptions before index generation."""
+        from nest.core.models import FileMetadata, LLMEnrichmentResult
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.return_value = AIEnrichmentResult(
-            descriptions={"doc.md": "AI generated description"},
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.return_value = LLMEnrichmentResult(
+            descriptions={"doc.md": "LLM generated description"},
             prompt_tokens=50,
             completion_tokens=5,
             files_enriched=1,
@@ -1136,7 +1136,7 @@ class TestSyncAIEnrichment:
             files_failed=0,
         )
 
-        # Metadata returns a file so AI enrichment has something to process
+        # Metadata returns a file so LLM enrichment has something to process
         file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
         mock_deps["metadata"].extract_all.return_value = [file_meta]
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
@@ -1150,26 +1150,26 @@ class TestSyncAIEnrichment:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
+            llm_enrichment=llm_mock,
         )
 
         service.sync()
 
-        # AI enrichment should have been called
-        ai_mock.enrich.assert_called_once()
+        # LLM enrichment should have been called
+        llm_mock.enrich.assert_called_once()
         # Index generation should have been called with merged descriptions
         mock_deps["index"].generate_content.assert_called_once()
         call_args = mock_deps["index"].generate_content.call_args
         passed_old_descriptions = call_args[0][1]
         passed_old_hints = call_args[0][2]
-        # AI description must be in old_descriptions
+        # LLM description must be in old_descriptions
         assert "doc.md" in passed_old_descriptions
-        assert passed_old_descriptions["doc.md"] == "AI generated description"
+        assert passed_old_descriptions["doc.md"] == "LLM generated description"
         # old_hints must be updated so generate_content reads the description
         assert passed_old_hints.get("doc.md") == "new_hash"
 
-    def test_sync_without_ai_generates_unenriched_index(self, mock_deps):
-        """ai_enrichment=None → same behavior as before, no AI calls."""
+    def test_sync_without_llm_generates_unenriched_index(self, mock_deps):
+        """llm_enrichment=None → same behavior as before, no LLM calls."""
         service = _create_sync_service(mock_deps)
 
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
@@ -1178,17 +1178,17 @@ class TestSyncAIEnrichment:
         result = service.sync()
 
         assert isinstance(result, SyncResult)
-        assert result.ai_prompt_tokens == 0
-        assert result.ai_completion_tokens == 0
-        assert result.ai_files_enriched == 0
+        assert result.llm_prompt_tokens == 0
+        assert result.llm_completion_tokens == 0
+        assert result.llm_files_enriched == 0
 
-    def test_sync_returns_ai_token_counts(self, mock_deps):
-        """Token counts should propagate from AI enrichment to SyncResult."""
-        from nest.core.models import AIEnrichmentResult
-        from nest.services.ai_enrichment_service import AIEnrichmentService
+    def test_sync_returns_llm_token_counts(self, mock_deps):
+        """Token counts should propagate from LLM enrichment to SyncResult."""
+        from nest.core.models import LLMEnrichmentResult
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.return_value = AIEnrichmentResult(
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.return_value = LLMEnrichmentResult(
             descriptions={"a.md": "Desc A", "b.md": "Desc B"},
             prompt_tokens=200,
             completion_tokens=30,
@@ -1208,26 +1208,26 @@ class TestSyncAIEnrichment:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
+            llm_enrichment=llm_mock,
         )
 
         result = service.sync()
 
-        assert result.ai_prompt_tokens == 200
-        assert result.ai_completion_tokens == 30
-        assert result.ai_files_enriched == 2
+        assert result.llm_prompt_tokens == 200
+        assert result.llm_completion_tokens == 30
+        assert result.llm_files_enriched == 2
 
 
-class TestSyncAIGlossary:
-    """Tests for AI glossary integration in SyncService."""
+class TestSyncLLMGlossary:
+    """Tests for LLM glossary integration in SyncService."""
 
-    def test_sync_with_ai_glossary_generates_terms(self, mock_deps):
-        """AI glossary called when changed context files exist."""
-        from nest.core.models import AIGlossaryResult, FileMetadata
-        from nest.services.ai_glossary_service import AIGlossaryService
+    def test_sync_with_llm_glossary_generates_terms(self, mock_deps):
+        """LLM glossary called when changed context files exist."""
+        from nest.core.models import FileMetadata, LLMGlossaryResult
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(
             terms_added=3,
             terms_skipped_existing=0,
             terms_failed=0,
@@ -1248,18 +1248,18 @@ class TestSyncAIGlossary:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_glossary=ai_glossary_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        ai_glossary_mock.generate.assert_called_once()
-        assert result.ai_glossary_terms_added == 3
-        assert result.ai_glossary_prompt_tokens == 300
-        assert result.ai_glossary_completion_tokens == 40
+        llm_glossary_mock.generate.assert_called_once()
+        assert result.llm_glossary_terms_added == 3
+        assert result.llm_glossary_prompt_tokens == 300
+        assert result.llm_glossary_completion_tokens == 40
 
-    def test_sync_without_ai_glossary_skips_generation(self, mock_deps):
-        """ai_glossary=None -> same behavior as before."""
+    def test_sync_without_llm_glossary_skips_generation(self, mock_deps):
+        """llm_glossary=None -> same behavior as before."""
         service = _create_sync_service(mock_deps)
 
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
@@ -1268,17 +1268,17 @@ class TestSyncAIGlossary:
         result = service.sync()
 
         assert isinstance(result, SyncResult)
-        assert result.ai_glossary_terms_added == 0
-        assert result.ai_glossary_prompt_tokens == 0
-        assert result.ai_glossary_completion_tokens == 0
+        assert result.llm_glossary_terms_added == 0
+        assert result.llm_glossary_prompt_tokens == 0
+        assert result.llm_glossary_completion_tokens == 0
 
-    def test_sync_returns_ai_glossary_token_counts(self, mock_deps):
-        """Token counts should propagate from AI glossary to SyncResult."""
-        from nest.core.models import AIGlossaryResult, FileMetadata
-        from nest.services.ai_glossary_service import AIGlossaryService
+    def test_sync_returns_llm_glossary_token_counts(self, mock_deps):
+        """Token counts should propagate from LLM glossary to SyncResult."""
+        from nest.core.models import FileMetadata, LLMGlossaryResult
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(
             terms_added=2,
             prompt_tokens=150,
             completion_tokens=25,
@@ -1297,20 +1297,20 @@ class TestSyncAIGlossary:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_glossary=ai_glossary_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        assert result.ai_glossary_prompt_tokens == 150
-        assert result.ai_glossary_completion_tokens == 25
-        assert result.ai_glossary_terms_added == 2
+        assert result.llm_glossary_prompt_tokens == 150
+        assert result.llm_glossary_completion_tokens == 25
+        assert result.llm_glossary_terms_added == 2
 
-    def test_sync_skips_ai_glossary_when_no_terms(self, mock_deps):
+    def test_sync_skips_llm_glossary_when_no_terms(self, mock_deps):
         """No changed files -> glossary service not called."""
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
 
         # Default mock_deps returns no metadata (no changed files)
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
@@ -1324,23 +1324,23 @@ class TestSyncAIGlossary:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_glossary=ai_glossary_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        ai_glossary_mock.generate.assert_not_called()
-        assert result.ai_glossary_terms_added == 0
+        llm_glossary_mock.generate.assert_not_called()
+        assert result.llm_glossary_terms_added == 0
 
     def test_sync_backfills_glossary_when_missing_and_files_unchanged(
         self, tmp_path: Path, mock_deps
     ):
         """Missing glossary.md should trigger glossary generation for existing files."""
-        from nest.core.models import AIGlossaryResult, FileMetadata
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.core.models import FileMetadata, LLMGlossaryResult
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(terms_added=2)
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(terms_added=2)
 
         file_meta = FileMetadata(path="doc.md", content_hash="same_hash", lines=10)
         mock_deps["project_root"] = tmp_path
@@ -1357,26 +1357,26 @@ class TestSyncAIGlossary:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_glossary=ai_glossary_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        ai_glossary_mock.generate.assert_called_once()
-        changed_files = ai_glossary_mock.generate.call_args.args[0]
+        llm_glossary_mock.generate.assert_called_once()
+        changed_files = llm_glossary_mock.generate.call_args.args[0]
         assert changed_files == [tmp_path / "_nest_context" / "doc.md"]
         # Glossary path should be in .nest/ not _nest_context/
-        glossary_path_arg = ai_glossary_mock.generate.call_args.args[2]
+        glossary_path_arg = llm_glossary_mock.generate.call_args.args[2]
         assert glossary_path_arg == tmp_path / ".nest" / "glossary.md"
-        assert result.ai_glossary_terms_added == 2
+        assert result.llm_glossary_terms_added == 2
 
     def test_sync_passes_project_context_to_glossary(self, mock_deps, tmp_path):
         """Glossary call includes optional project context when available."""
-        from nest.core.models import AIGlossaryResult, FileMetadata
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.core.models import FileMetadata, LLMGlossaryResult
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(terms_added=1)
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(terms_added=1)
 
         file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
         mock_deps["metadata"].extract_all.return_value = [file_meta]
@@ -1392,21 +1392,21 @@ class TestSyncAIGlossary:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=tmp_path,
-            ai_glossary=ai_glossary_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         service.sync()
 
-        args = ai_glossary_mock.generate.call_args.args
+        args = llm_glossary_mock.generate.call_args.args
         assert args[3] == "Project context text"
 
     def test_sync_ignores_legacy_planning_output_project_context(self, mock_deps, tmp_path):
         """Project context comes from docs/, never from a legacy planning output directory."""
-        from nest.core.models import AIGlossaryResult, FileMetadata
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.core.models import FileMetadata, LLMGlossaryResult
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(terms_added=1)
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(terms_added=1)
 
         file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
         mock_deps["metadata"].extract_all.return_value = [file_meta]
@@ -1425,23 +1425,23 @@ class TestSyncAIGlossary:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=tmp_path,
-            ai_glossary=ai_glossary_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         service.sync()
 
-        args = ai_glossary_mock.generate.call_args.args
+        args = llm_glossary_mock.generate.call_args.args
         assert args[3] == "Current project context"
 
     def test_sync_passes_no_project_context_when_only_legacy_planning_output_exists(
         self, mock_deps, tmp_path
     ):
         """A project keeping context only in the legacy planning output directory gets none."""
-        from nest.core.models import AIGlossaryResult, FileMetadata
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.core.models import FileMetadata, LLMGlossaryResult
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(terms_added=1)
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(terms_added=1)
 
         file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
         mock_deps["metadata"].extract_all.return_value = [file_meta]
@@ -1458,38 +1458,38 @@ class TestSyncAIGlossary:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=tmp_path,
-            ai_glossary=ai_glossary_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         service.sync()
 
-        args = ai_glossary_mock.generate.call_args.args
+        args = llm_glossary_mock.generate.call_args.args
         assert args[3] is None
 
 
-class TestSyncParallelAI:
-    """Tests for parallel AI execution in SyncService (Story 6.4)."""
+class TestSyncParallelLLM:
+    """Tests for parallel LLM execution in SyncService (Story 6.4)."""
 
-    def test_sync_runs_ai_tasks_in_parallel_when_both_have_work(self, mock_deps):
+    def test_sync_runs_llm_tasks_in_parallel_when_both_have_work(self, mock_deps):
         """Both enrichment and glossary execute and results merge correctly."""
         from nest.core.models import (
-            AIEnrichmentResult,
-            AIGlossaryResult,
             FileMetadata,
+            LLMEnrichmentResult,
+            LLMGlossaryResult,
         )
-        from nest.services.ai_enrichment_service import AIEnrichmentService
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.return_value = AIEnrichmentResult(
-            descriptions={"doc.md": "AI desc"},
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.return_value = LLMEnrichmentResult(
+            descriptions={"doc.md": "LLM desc"},
             prompt_tokens=100,
             completion_tokens=20,
             files_enriched=1,
         )
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(
             terms_added=2,
             prompt_tokens=200,
             completion_tokens=30,
@@ -1510,36 +1510,36 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=llm_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        ai_mock.enrich.assert_called_once()
-        ai_glossary_mock.generate.assert_called_once()
-        assert result.ai_files_enriched == 1
-        assert result.ai_glossary_terms_added == 2
-        assert result.ai_prompt_tokens == 100
-        assert result.ai_completion_tokens == 20
-        assert result.ai_glossary_prompt_tokens == 200
-        assert result.ai_glossary_completion_tokens == 30
+        llm_mock.enrich.assert_called_once()
+        llm_glossary_mock.generate.assert_called_once()
+        assert result.llm_files_enriched == 1
+        assert result.llm_glossary_terms_added == 2
+        assert result.llm_prompt_tokens == 100
+        assert result.llm_completion_tokens == 20
+        assert result.llm_glossary_prompt_tokens == 200
+        assert result.llm_glossary_completion_tokens == 30
 
     def test_sync_runs_only_enrichment_when_no_glossary_terms(self, mock_deps):
         """No changed files → no glossary thread spawned."""
-        from nest.core.models import AIEnrichmentResult
-        from nest.services.ai_enrichment_service import AIEnrichmentService
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.core.models import LLMEnrichmentResult
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.return_value = AIEnrichmentResult(
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.return_value = LLMEnrichmentResult(
             descriptions={"x.md": "desc"},
             prompt_tokens=50,
             completion_tokens=10,
             files_enriched=1,
         )
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
 
         # Default: no metadata (no changed files)
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
@@ -1552,24 +1552,24 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=llm_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        ai_mock.enrich.assert_called_once()
-        ai_glossary_mock.generate.assert_not_called()
-        assert result.ai_files_enriched == 1
-        assert result.ai_glossary_terms_added == 0
+        llm_mock.enrich.assert_called_once()
+        llm_glossary_mock.generate.assert_not_called()
+        assert result.llm_files_enriched == 1
+        assert result.llm_glossary_terms_added == 0
 
     def test_sync_runs_only_glossary_when_no_enrichment_service(self, mock_deps):
         """Enrichment is None, changed files exist."""
-        from nest.core.models import AIGlossaryResult, FileMetadata
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.core.models import FileMetadata, LLMGlossaryResult
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(
             terms_added=3,
             prompt_tokens=150,
             completion_tokens=25,
@@ -1587,17 +1587,17 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=None,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=None,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        ai_glossary_mock.generate.assert_called_once()
-        assert result.ai_glossary_terms_added == 3
-        assert result.ai_files_enriched == 0
+        llm_glossary_mock.generate.assert_called_once()
+        assert result.llm_glossary_terms_added == 3
+        assert result.llm_files_enriched == 0
 
-    def test_sync_skips_ai_entirely_when_both_none(self, mock_deps):
+    def test_sync_skips_llm_entirely_when_both_none(self, mock_deps):
         """Both services None → no executor created."""
         service = _create_sync_service(mock_deps)
 
@@ -1605,17 +1605,17 @@ class TestSyncParallelAI:
 
         result = service.sync()
 
-        assert result.ai_files_enriched == 0
-        assert result.ai_glossary_terms_added == 0
-        assert result.ai_prompt_tokens == 0
-        assert result.ai_glossary_prompt_tokens == 0
+        assert result.llm_files_enriched == 0
+        assert result.llm_glossary_terms_added == 0
+        assert result.llm_prompt_tokens == 0
+        assert result.llm_glossary_prompt_tokens == 0
 
     def test_sync_sequential_enrichment_failure_degrades_gracefully(self, mock_deps):
-        """Enrichment-only path raises → sync completes with zero AI results."""
-        from nest.services.ai_enrichment_service import AIEnrichmentService
+        """Enrichment-only path raises → sync completes with zero LLM results."""
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.side_effect = RuntimeError("Sequential enrichment crash")
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.side_effect = RuntimeError("Sequential enrichment crash")
 
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
 
@@ -1627,22 +1627,22 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
-            ai_glossary=None,
+            llm_enrichment=llm_mock,
+            llm_glossary=None,
         )
 
         result = service.sync()
 
-        assert result.ai_files_enriched == 0
-        assert result.ai_prompt_tokens == 0
+        assert result.llm_files_enriched == 0
+        assert result.llm_prompt_tokens == 0
 
     def test_sync_sequential_glossary_failure_degrades_gracefully(self, mock_deps):
         """Glossary-only path raises → sync completes with zero glossary results."""
         from nest.core.models import FileMetadata
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.side_effect = RuntimeError("Sequential glossary crash")
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.side_effect = RuntimeError("Sequential glossary crash")
 
         file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
         mock_deps["metadata"].extract_all.return_value = [file_meta]
@@ -1656,26 +1656,26 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=None,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=None,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        assert result.ai_glossary_terms_added == 0
-        assert result.ai_glossary_prompt_tokens == 0
+        assert result.llm_glossary_terms_added == 0
+        assert result.llm_glossary_prompt_tokens == 0
 
     def test_sync_enrichment_failure_doesnt_block_glossary(self, mock_deps):
         """Enrichment raises exception → glossary still succeeds."""
-        from nest.core.models import AIGlossaryResult, FileMetadata
-        from nest.services.ai_enrichment_service import AIEnrichmentService
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.core.models import FileMetadata, LLMGlossaryResult
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.side_effect = RuntimeError("Enrichment network timeout")
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.side_effect = RuntimeError("Enrichment network timeout")
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(
             terms_added=2,
             prompt_tokens=100,
             completion_tokens=15,
@@ -1693,33 +1693,33 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=llm_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        assert result.ai_files_enriched == 0
-        assert result.ai_prompt_tokens == 0
-        assert result.ai_glossary_terms_added == 2
-        assert result.ai_glossary_prompt_tokens == 100
+        assert result.llm_files_enriched == 0
+        assert result.llm_prompt_tokens == 0
+        assert result.llm_glossary_terms_added == 2
+        assert result.llm_glossary_prompt_tokens == 100
 
     def test_sync_glossary_failure_doesnt_block_enrichment(self, mock_deps):
         """Glossary raises exception → enrichment still succeeds."""
-        from nest.core.models import AIEnrichmentResult, FileMetadata
-        from nest.services.ai_enrichment_service import AIEnrichmentService
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.core.models import FileMetadata, LLMEnrichmentResult
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.return_value = AIEnrichmentResult(
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.return_value = LLMEnrichmentResult(
             descriptions={"f.md": "desc"},
             prompt_tokens=80,
             completion_tokens=12,
             files_enriched=1,
         )
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.side_effect = RuntimeError("Glossary API rate limit exceeded")
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.side_effect = RuntimeError("Glossary API rate limit exceeded")
 
         file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
         mock_deps["metadata"].extract_all.return_value = [file_meta]
@@ -1733,28 +1733,28 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=llm_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        assert result.ai_files_enriched == 1
-        assert result.ai_prompt_tokens == 80
-        assert result.ai_glossary_terms_added == 0
-        assert result.ai_glossary_prompt_tokens == 0
+        assert result.llm_files_enriched == 1
+        assert result.llm_prompt_tokens == 80
+        assert result.llm_glossary_terms_added == 0
+        assert result.llm_glossary_prompt_tokens == 0
 
-    def test_sync_both_ai_tasks_fail_gracefully(self, mock_deps):
-        """Both fail → sync completes, zero AI results."""
+    def test_sync_both_llm_tasks_fail_gracefully(self, mock_deps):
+        """Both fail → sync completes, zero LLM results."""
         from nest.core.models import FileMetadata
-        from nest.services.ai_enrichment_service import AIEnrichmentService
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.side_effect = RuntimeError("Enrichment crash")
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.side_effect = RuntimeError("Enrichment crash")
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.side_effect = RuntimeError("Glossary crash")
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.side_effect = RuntimeError("Glossary crash")
 
         file_meta = FileMetadata(path="doc.md", content_hash="new_hash", lines=10)
         mock_deps["metadata"].extract_all.return_value = [file_meta]
@@ -1768,37 +1768,37 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=llm_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
-        assert result.ai_files_enriched == 0
-        assert result.ai_prompt_tokens == 0
-        assert result.ai_glossary_terms_added == 0
-        assert result.ai_glossary_prompt_tokens == 0
+        assert result.llm_files_enriched == 0
+        assert result.llm_prompt_tokens == 0
+        assert result.llm_glossary_terms_added == 0
+        assert result.llm_glossary_prompt_tokens == 0
 
-    def test_sync_aggregates_tokens_from_both_ai_tasks(self, mock_deps):
+    def test_sync_aggregates_tokens_from_both_llm_tasks(self, mock_deps):
         """Token counts from both tasks sum correctly in SyncResult."""
         from nest.core.models import (
-            AIEnrichmentResult,
-            AIGlossaryResult,
             FileMetadata,
+            LLMEnrichmentResult,
+            LLMGlossaryResult,
         )
-        from nest.services.ai_enrichment_service import AIEnrichmentService
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.return_value = AIEnrichmentResult(
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.return_value = LLMEnrichmentResult(
             descriptions={"a.md": "A"},
             prompt_tokens=500,
             completion_tokens=100,
             files_enriched=1,
         )
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(
             terms_added=2,
             prompt_tokens=300,
             completion_tokens=50,
@@ -1816,47 +1816,47 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=llm_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         result = service.sync()
 
         # Enrichment tokens
-        assert result.ai_prompt_tokens == 500
-        assert result.ai_completion_tokens == 100
+        assert result.llm_prompt_tokens == 500
+        assert result.llm_completion_tokens == 100
         # Glossary tokens
-        assert result.ai_glossary_prompt_tokens == 300
-        assert result.ai_glossary_completion_tokens == 50
+        assert result.llm_glossary_prompt_tokens == 300
+        assert result.llm_glossary_completion_tokens == 50
         # Total (aggregation tests at display layer)
         total = (
-            result.ai_prompt_tokens
-            + result.ai_glossary_prompt_tokens
-            + result.ai_completion_tokens
-            + result.ai_glossary_completion_tokens
+            result.llm_prompt_tokens
+            + result.llm_glossary_prompt_tokens
+            + result.llm_completion_tokens
+            + result.llm_glossary_completion_tokens
         )
         assert total == 950
 
     def test_sync_parallel_results_applied_to_descriptions(self, mock_deps):
         """Enrichment descriptions merged into old_descriptions after parallel run."""
         from nest.core.models import (
-            AIEnrichmentResult,
-            AIGlossaryResult,
             FileMetadata,
+            LLMEnrichmentResult,
+            LLMGlossaryResult,
         )
-        from nest.services.ai_enrichment_service import AIEnrichmentService
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.return_value = AIEnrichmentResult(
-            descriptions={"doc.md": "Parallel AI desc"},
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.return_value = LLMEnrichmentResult(
+            descriptions={"doc.md": "Parallel LLM desc"},
             prompt_tokens=10,
             completion_tokens=5,
             files_enriched=1,
         )
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(
             terms_added=1,
             prompt_tokens=10,
             completion_tokens=5,
@@ -1877,24 +1877,24 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=llm_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         service.sync()
 
-        # Verify index was generated with AI descriptions
+        # Verify index was generated with LLM descriptions
         call_args = mock_deps["index"].generate_content.call_args
         passed_descriptions = call_args[0][1]
-        assert passed_descriptions.get("doc.md") == "Parallel AI desc"
+        assert passed_descriptions.get("doc.md") == "Parallel LLM desc"
 
-    def test_sync_calls_ai_progress_callback_on_start(self, mock_deps):
-        """Callback receives 'start' when AI phase begins."""
-        from nest.core.models import AIEnrichmentResult
-        from nest.services.ai_enrichment_service import AIEnrichmentService
+    def test_sync_calls_llm_progress_callback_on_start(self, mock_deps):
+        """Callback receives 'start' when the LLM phase begins."""
+        from nest.core.models import LLMEnrichmentResult
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.return_value = AIEnrichmentResult(
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.return_value = LLMEnrichmentResult(
             descriptions={},
             prompt_tokens=0,
             completion_tokens=0,
@@ -1911,34 +1911,34 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
+            llm_enrichment=llm_mock,
         )
 
         callback_calls: list[str] = []
-        service.sync(ai_progress_callback=lambda msg: callback_calls.append(msg))
+        service.sync(llm_progress_callback=lambda msg: callback_calls.append(msg))
 
         assert "start" in callback_calls
 
-    def test_sync_calls_ai_progress_callback_with_summary(self, mock_deps):
+    def test_sync_calls_llm_progress_callback_with_summary(self, mock_deps):
         """Callback receives summary like '4 descriptions, 3 glossary terms'."""
         from nest.core.models import (
-            AIEnrichmentResult,
-            AIGlossaryResult,
             FileMetadata,
+            LLMEnrichmentResult,
+            LLMGlossaryResult,
         )
-        from nest.services.ai_enrichment_service import AIEnrichmentService
-        from nest.services.ai_glossary_service import AIGlossaryService
+        from nest.services.llm_enrichment_service import LLMEnrichmentService
+        from nest.services.llm_glossary_service import LLMGlossaryService
 
-        ai_mock = Mock(spec=AIEnrichmentService)
-        ai_mock.enrich.return_value = AIEnrichmentResult(
+        llm_mock = Mock(spec=LLMEnrichmentService)
+        llm_mock.enrich.return_value = LLMEnrichmentResult(
             descriptions={"a.md": "d1", "b.md": "d2", "c.md": "d3", "d.md": "d4"},
             prompt_tokens=100,
             completion_tokens=20,
             files_enriched=4,
         )
 
-        ai_glossary_mock = Mock(spec=AIGlossaryService)
-        ai_glossary_mock.generate.return_value = AIGlossaryResult(
+        llm_glossary_mock = Mock(spec=LLMGlossaryService)
+        llm_glossary_mock.generate.return_value = LLMGlossaryResult(
             terms_added=3,
             prompt_tokens=50,
             completion_tokens=10,
@@ -1956,24 +1956,24 @@ class TestSyncParallelAI:
             index=mock_deps["index"],
             metadata=mock_deps["metadata"],
             project_root=mock_deps["project_root"],
-            ai_enrichment=ai_mock,
-            ai_glossary=ai_glossary_mock,
+            llm_enrichment=llm_mock,
+            llm_glossary=llm_glossary_mock,
         )
 
         callback_calls: list[str] = []
-        service.sync(ai_progress_callback=lambda msg: callback_calls.append(msg))
+        service.sync(llm_progress_callback=lambda msg: callback_calls.append(msg))
 
         assert "start" in callback_calls
         assert "4 descriptions, 3 glossary terms" in callback_calls
 
-    def test_sync_no_ai_progress_callback_when_no_ai_work(self, mock_deps):
-        """Callback not called when no AI tasks."""
+    def test_sync_no_ai_progress_callback_when_no_llm_work(self, mock_deps):
+        """Callback not called when no LLM tasks."""
         service = _create_sync_service(mock_deps)
 
         mock_deps["discovery"].discover_changes.return_value = _empty_discovery_result()
 
         callback_calls: list[str] = []
-        service.sync(ai_progress_callback=lambda msg: callback_calls.append(msg))
+        service.sync(llm_progress_callback=lambda msg: callback_calls.append(msg))
 
         assert callback_calls == []
 
@@ -2105,7 +2105,7 @@ class TestSyncVisionPipeline:
         assert result.images_described == 0
         assert result.vision_prompt_tokens == 0
 
-    def test_image_needing_ai_without_vision_is_a_failed_document(self, mock_deps, tmp_path):
+    def test_image_needing_llm_without_vision_is_a_failed_document(self, mock_deps, tmp_path):
         """A standalone image holding a describable picture fails and is retried next sync."""
         from unittest.mock import MagicMock
 
@@ -2151,8 +2151,8 @@ class TestSyncVisionPipeline:
 
         assert result.failed_count == 1
         assert result.processed_count == 0
-        assert result.needs_ai_files == [str(source_file)]
-        assert result.failure_reasons == {str(source_file): "requires AI image description"}
+        assert result.needs_llm_files == [str(source_file)]
+        assert result.failure_reasons == {str(source_file): "requires LLM image description"}
         mock_deps["manifest"].record_failure.assert_called_once()
         mock_deps["output"].process_file.assert_not_called()
         mock_deps["output"].compute_docling_output_path.assert_not_called()

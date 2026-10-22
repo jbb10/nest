@@ -32,6 +32,7 @@ from nest.services.sync_outcomes import OutcomeRecorder, ProgressCallback, SyncL
 
 if TYPE_CHECKING:
     from nest.adapters.docling_processor import DoclingProcessor
+    from nest.services.llm_transcription_service import LLMTranscriptionService
     from nest.services.output_service import OutputMirrorService
     from nest.services.picture_description_service import PictureDescriptionService
 
@@ -51,6 +52,7 @@ class ConvertService:
         picture_description: PictureDescriptionService | None = None,
         vision_processor: DoclingProcessor | None = None,
         image_processor: DoclingProcessor | None = None,
+        transcriber: LLMTranscriptionService | None = None,
     ) -> None:
         """Initialize with required collaborators.
 
@@ -64,6 +66,8 @@ class ConvertService:
                 backing the vision pipeline.
             image_processor: Optional classification-enabled Docling processor
                 for standalone image files when vision is unavailable.
+            transcriber: Optional service that prepares the files it handles
+                by LLM transcription instead of Docling.
         """
         self._output = output
         self._file_discovery = file_discovery
@@ -71,6 +75,7 @@ class ConvertService:
         self._picture_description = picture_description
         self._vision_processor = vision_processor
         self._image_processor = image_processor
+        self._transcriber = transcriber
 
     def plan(
         self,
@@ -157,7 +162,16 @@ class ConvertService:
         for file in plan.skipped:
             recorder.skipped(file, file.collision_reason or "Skipped")
 
-        needs_models = any(not is_passthrough_extension(f.path.suffix) for f in plan.pending)
+        phase = ConversionPhase(
+            output=self._output,
+            sources_dir=plan.root,
+            context_dir=plan.output_dir if plan.output_dir is not None else plan.root,
+            picture_description=self._picture_description,
+            vision_processor=self._vision_processor,
+            image_processor=self._image_processor,
+            transcriber=self._transcriber,
+        )
+        needs_models = any(phase.uses_docling(f.path) for f in plan.pending)
         if needs_models and self._model_downloader is not None:
             if activity_callback is not None:
                 activity_callback(Activity(stage="preparing"))
@@ -166,14 +180,6 @@ class ConvertService:
             self._model_downloader.download_if_needed(progress=True)
 
         if plan.pending:
-            phase = ConversionPhase(
-                output=self._output,
-                sources_dir=plan.root,
-                context_dir=plan.output_dir if plan.output_dir is not None else plan.root,
-                picture_description=self._picture_description,
-                vision_processor=self._vision_processor,
-                image_processor=self._image_processor,
-            )
             phase.run(plan.pending, recorder, ledger, activity_callback=activity_callback)
 
         return ConvertResult(
@@ -186,8 +192,9 @@ class ConvertService:
             images_described=sum(v.images_described for v in ledger.vision),
             images_skipped=sum(v.images_skipped for v in ledger.vision),
             images_failed=sum(v.images_failed for v in ledger.vision),
-            vision_prompt_tokens=sum(v.prompt_tokens for v in ledger.vision),
-            vision_completion_tokens=sum(v.completion_tokens for v in ledger.vision),
+            pages_transcribed=sum(t.pages for t in ledger.transcriptions),
+            vision_prompt_tokens=ledger.vision_prompt_tokens,
+            vision_completion_tokens=ledger.vision_completion_tokens,
         )
 
     def _discovered_file(self, path: Path) -> DiscoveredFile:

@@ -139,6 +139,27 @@ class TestSyncE2E:
 
 
 @pytest.mark.e2e
+@pytest.mark.e2e
+class TestSyncStaleLLMConfigE2E:
+    """Sync in a shell whose RC still exports the pre-rename NEST_AI_* variables."""
+
+    def test_sync_points_upgraded_user_at_config_llm(self, initialized_project: Path) -> None:
+        stale_env = {
+            "NEST_LLM_API_KEY": "",
+            "NEST_API_KEY": "",
+            "OPENAI_API_KEY": "",
+            "AZURE_OPENAI_API_KEY": "",
+            "NEST_AI_API_KEY": "sk-stale",
+            "NEST_AI_MODEL": "old-model",
+        }
+        (initialized_project / "_nest_sources" / "notes.txt").write_text("plain text\n")
+
+        result = run_cli(["sync"], cwd=initialized_project, env=stale_env)
+
+        assert result.exit_code == 0, result.stdout + result.stderr
+        assert "not configured (NEST_AI_* ignored; run 'nest config llm')" in result.stdout
+
+
 class TestSyncContextTextFilesE2E:
     """E2E tests for non-Markdown text files in context indexing (Story 2.11)."""
 
@@ -455,7 +476,7 @@ class TestSyncLinkedFoldersE2E:
         assert status.exit_code == 0, status.stdout
         assert "New: 1" in status.stdout, status.stdout
 
-        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+        result = run_cli(["sync", "--no-llm"], cwd=project_dir)
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
         output = project_dir / "_nest_context" / "shared" / "team" / "notes.txt"
@@ -470,17 +491,17 @@ class TestSyncLinkedFoldersE2E:
     ) -> None:
         project_dir = initialized_project
         _link_dir(project_dir / "_nest_sources" / "shared", shared, link_kind)
-        assert run_cli(["sync", "--no-ai"], cwd=project_dir).exit_code == 0
+        assert run_cli(["sync", "--no-llm"], cwd=project_dir).exit_code == 0
         output = project_dir / "_nest_context" / "shared" / "team" / "notes.txt"
 
         offline = shared.with_name(shared.name + "-offline")
         shared.rename(offline)
-        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+        result = run_cli(["sync", "--no-llm"], cwd=project_dir)
         assert result.exit_code == 0, result.stdout
         assert output.exists(), "Output deleted while linked folder was offline"
 
         offline.rename(shared)
-        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+        result = run_cli(["sync", "--no-llm"], cwd=project_dir)
         assert result.exit_code == 0, result.stdout
         assert "processed: 0" in result.stdout.lower(), result.stdout
         assert output.read_text() == "linked notes"
@@ -491,13 +512,13 @@ class TestSyncLinkedFoldersE2E:
         project_dir = initialized_project
         link = project_dir / "_nest_sources" / "shared"
         _link_dir(link, shared, link_kind)
-        assert run_cli(["sync", "--no-ai"], cwd=project_dir).exit_code == 0
+        assert run_cli(["sync", "--no-llm"], cwd=project_dir).exit_code == 0
 
         if link_kind == "junction":
             link.rmdir()
         else:
             link.unlink()
-        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+        result = run_cli(["sync", "--no-llm"], cwd=project_dir)
 
         assert result.exit_code == 0, result.stdout
         assert not (project_dir / "_nest_context" / "shared" / "team" / "notes.txt").exists()
@@ -511,7 +532,7 @@ class TestSyncLinkedFoldersE2E:
         _link_dir(project_dir / "_nest_sources" / "shared", shared, link_kind)
         _link_dir(shared / "team" / "loop", shared, link_kind)
 
-        result = run_cli(["sync", "--no-ai"], cwd=project_dir)
+        result = run_cli(["sync", "--no-llm"], cwd=project_dir)
 
         assert result.exit_code == 0, result.stdout
         assert (project_dir / "_nest_context" / "shared" / "team" / "notes.txt").exists()

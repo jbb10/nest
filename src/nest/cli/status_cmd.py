@@ -41,6 +41,10 @@ def status_command(
 ) -> None:
     """Show project status.
 
+    Counts new, modified, and unchanged files in _nest_sources/, reports
+    orphaned files in _nest_context/, and shows when the last sync ran.
+
+    \b
     Examples:
         nest status
         nest status --dir /path/to/project

@@ -14,21 +14,21 @@ from pathlib import Path
 import pytest
 from dotenv import load_dotenv
 
-# Load environment variables from .env (if present) so NEST_AI_API_KEY and
+# Load environment variables from .env (if present) so NEST_LLM_API_KEY and
 # other optional vars are picked up automatically during local development.
 load_dotenv()
 
-# ── Default AI test-proxy settings ────────────────────────────────────────────
+# ── Default LLM test-proxy settings ────────────────────────────────────────────
 # The endpoint is an Azure-hosted test proxy. The API key MUST be provided via
-# the NEST_AI_API_KEY environment variable (set as a GitHub Actions secret in
-# CI). AI-gated tests will skip when the key is absent.
-_TEST_AI_DEFAULTS: dict[str, str] = {
-    "NEST_AI_ENDPOINT": "https://jbb-ai-proxy.azurewebsites.net/v1",
-    "NEST_AI_MODEL": "gpt-5-nano",
-    "NEST_AI_VISION_MODEL": "gpt-5-nano",
+# the NEST_LLM_API_KEY environment variable (set as a GitHub Actions secret in
+# CI). LLM-gated tests will skip when the key is absent.
+_TEST_LLM_DEFAULTS: dict[str, str] = {
+    "NEST_LLM_ENDPOINT": "https://jbb-ai-proxy.azurewebsites.net/v1",
+    "NEST_LLM_MODEL": "gpt-5-nano",
+    "NEST_LLM_VISION_MODEL": "gpt-5-nano",
 }
 
-for _key, _val in _TEST_AI_DEFAULTS.items():
+for _key, _val in _TEST_LLM_DEFAULTS.items():
     os.environ.setdefault(_key, _val)
 
 
@@ -50,25 +50,25 @@ skip_without_docling = pytest.mark.skipif(
 )
 
 
-def ai_available() -> bool:
-    """Check if an AI API key is configured in the environment."""
-    return bool(os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY"))
+def llm_available() -> bool:
+    """Check if an LLM API key is configured in the environment."""
+    return bool(os.environ.get("NEST_LLM_API_KEY") or os.environ.get("NEST_API_KEY"))
 
 
-skip_without_ai = pytest.mark.skipif(
-    not ai_available(),
-    reason="AI API key not configured",
+skip_without_llm = pytest.mark.skipif(
+    not llm_available(),
+    reason="LLM API key not configured",
 )
 
 
-def ai_env_vars() -> dict[str, str]:
-    """Return AI env vars from current environment for subprocess."""
+def llm_env_vars() -> dict[str, str]:
+    """Return LLM env vars from current environment for subprocess."""
     env: dict[str, str] = {}
     for key in (
-        "NEST_AI_API_KEY",
-        "NEST_AI_ENDPOINT",
-        "NEST_AI_MODEL",
-        "NEST_AI_VISION_MODEL",
+        "NEST_LLM_API_KEY",
+        "NEST_LLM_ENDPOINT",
+        "NEST_LLM_MODEL",
+        "NEST_LLM_VISION_MODEL",
         "NEST_API_KEY",
         "NEST_BASE_URL",
         "NEST_TEXT_MODEL",
@@ -120,7 +120,7 @@ def run_cli(
         cwd: Working directory for the command.
         timeout: Timeout in seconds. Default 300s for Docling processing.
         env: Optional extra environment variables merged into the subprocess
-            environment. Falls back to os.environ defaults for AI credentials.
+            environment. Falls back to os.environ defaults for LLM credentials.
 
     Returns:
         CLIResult with exit code, stdout, and stderr.

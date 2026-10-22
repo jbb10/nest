@@ -248,6 +248,7 @@ def update_command(
     Queries available versions, displays comparison, and optionally
     installs a selected version via uv.
 
+    \b
     Examples:
         nest update
         nest update --check

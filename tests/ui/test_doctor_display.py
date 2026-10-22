@@ -55,6 +55,33 @@ class TestFormatSize:
         assert format_size(1024 * 1024 * 1024 * 2) == "2.0 GB"
 
 
+class TestDisplayEnvironmentReport:
+    """Tests for the environment section."""
+
+    def test_llm_check_rendered_with_suggestion(self) -> None:
+        buffer = StringIO()
+        console = Console(file=buffer, force_terminal=False, width=120)
+        env_report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+            llm=EnvironmentStatus(
+                "LLM",
+                "warning",
+                "not configured",
+                message="NEST_AI_API_KEY no longer read",
+                suggestion="Run `nest config llm` to rewrite your shell configuration",
+            ),
+        )
+
+        display_doctor_report(env_report, console)
+
+        output = buffer.getvalue()
+        assert "LLM: not configured" in output
+        assert "NEST_AI_API_KEY no longer read" in output
+        assert "nest config llm" in output
+
+
 class TestDisplayModelReport:
     """Tests for model report display functionality."""
 

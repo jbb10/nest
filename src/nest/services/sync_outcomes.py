@@ -17,16 +17,17 @@ from typing import TYPE_CHECKING, Literal
 
 from nest.core.exceptions import ProcessingError
 from nest.core.models import (
-    AIEnrichmentResult,
-    AIGlossaryResult,
     ConvertFailure,
     ConvertSkip,
     DiscoveredFile,
     FailureKind,
+    LLMEnrichmentResult,
+    LLMGlossaryResult,
     OrphanCleanupResult,
     PictureDescriptionResult,
     ProcessingResult,
     SyncResult,
+    TranscriptionResult,
 )
 from nest.ui.logger import log_processing_error
 
@@ -47,14 +48,29 @@ class SyncLedger:
     skipped: int = 0
     failed: int = 0
     vision: list[PictureDescriptionResult] = field(default_factory=lambda: [])
-    enrichment: AIEnrichmentResult | None = None
-    glossary: AIGlossaryResult | None = None
+    transcriptions: list[TranscriptionResult] = field(default_factory=lambda: [])
+    enrichment: LLMEnrichmentResult | None = None
+    glossary: LLMGlossaryResult | None = None
     skips: list[ConvertSkip] = field(default_factory=lambda: [])
     failures: list[ConvertFailure] = field(default_factory=lambda: [])
 
-    def needs_ai_files(self) -> list[Path]:
-        """Documents that failed only because an AI image description was unavailable."""
-        return [failure.path for failure in self.failures if failure.kind == "needs_ai"]
+    @property
+    def vision_prompt_tokens(self) -> int:
+        """Prompt tokens spent by the vision model on descriptions and transcriptions."""
+        return sum(v.prompt_tokens for v in self.vision) + sum(
+            t.prompt_tokens for t in self.transcriptions
+        )
+
+    @property
+    def vision_completion_tokens(self) -> int:
+        """Completion tokens spent by the vision model on descriptions and transcriptions."""
+        return sum(v.completion_tokens for v in self.vision) + sum(
+            t.completion_tokens for t in self.transcriptions
+        )
+
+    def needs_llm_files(self) -> list[Path]:
+        """Documents that failed only because an LLM image description was unavailable."""
+        return [failure.path for failure in self.failures if failure.kind == "needs_llm"]
 
     def to_result(
         self,
@@ -62,8 +78,8 @@ class SyncLedger:
         user_curated_count: int,
         enrichment_needed: int,
     ) -> SyncResult:
-        enrichment = self.enrichment or AIEnrichmentResult()
-        glossary = self.glossary or AIGlossaryResult()
+        enrichment = self.enrichment or LLMEnrichmentResult()
+        glossary = self.glossary or LLMGlossaryResult()
         return SyncResult(
             processed_count=self.processed,
             skipped_count=self.skipped,
@@ -73,20 +89,20 @@ class SyncLedger:
             skipped_orphan_cleanup=orphans.skipped,
             user_curated_count=user_curated_count,
             enrichment_needed=enrichment_needed,
-            ai_prompt_tokens=enrichment.prompt_tokens,
-            ai_completion_tokens=enrichment.completion_tokens,
-            ai_files_enriched=enrichment.files_enriched,
-            ai_glossary_terms_added=glossary.terms_added,
-            ai_glossary_prompt_tokens=glossary.prompt_tokens,
-            ai_glossary_completion_tokens=glossary.completion_tokens,
-            vision_prompt_tokens=sum(v.prompt_tokens for v in self.vision),
-            vision_completion_tokens=sum(v.completion_tokens for v in self.vision),
+            llm_prompt_tokens=enrichment.prompt_tokens,
+            llm_completion_tokens=enrichment.completion_tokens,
+            llm_files_enriched=enrichment.files_enriched,
+            llm_glossary_terms_added=glossary.terms_added,
+            llm_glossary_prompt_tokens=glossary.prompt_tokens,
+            llm_glossary_completion_tokens=glossary.completion_tokens,
+            vision_prompt_tokens=self.vision_prompt_tokens,
+            vision_completion_tokens=self.vision_completion_tokens,
             images_described=sum(v.images_described for v in self.vision),
             images_mermaid=sum(v.images_mermaid for v in self.vision),
             images_skipped=sum(v.images_skipped for v in self.vision),
             images_failed=sum(v.images_failed for v in self.vision),
             failure_reasons={str(failure.path): failure.reason for failure in self.failures},
-            needs_ai_files=[str(path) for path in self.needs_ai_files()],
+            needs_llm_files=[str(path) for path in self.needs_llm_files()],
         )
 
 

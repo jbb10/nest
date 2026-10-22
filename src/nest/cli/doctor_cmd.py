@@ -63,6 +63,7 @@ def doctor_command(
     Checks Python version, uv installation, Nest version, and optionally
     project-specific validations if run inside a Nest project.
 
+    \b
     Examples:
         nest doctor
         nest doctor --fix

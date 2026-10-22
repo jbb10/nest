@@ -26,6 +26,11 @@ def _is_azure_endpoint(endpoint: str) -> bool:
     return ".openai.azure.com" in endpoint.lower()
 
 
+# Seconds allowed per request before the SDK retries. The SDK default of 600s
+# lets one stalled connection block a sync for many minutes.
+LLM_REQUEST_TIMEOUT = 120.0
+
+
 class OpenAIAdapter:
     """OpenAI-compatible LLM adapter.
 
@@ -34,7 +39,9 @@ class OpenAIAdapter:
     """
 
     def __init__(self, api_key: str, endpoint: str, model: str) -> None:
-        self._client = openai.OpenAI(api_key=api_key, base_url=endpoint)
+        self._client = openai.OpenAI(
+            api_key=api_key, base_url=endpoint, timeout=LLM_REQUEST_TIMEOUT
+        )
         self._model = model
 
     @property
@@ -110,6 +117,7 @@ class AzureOpenAIAdapter:
             api_key=api_key,
             azure_endpoint=endpoint,
             api_version=api_version,
+            timeout=LLM_REQUEST_TIMEOUT,
         )
         self._deployment = deployment
 
@@ -169,8 +177,8 @@ class AzureOpenAIAdapter:
 
 
 @dataclass(frozen=True)
-class AIConfig:
-    """AI settings resolved from the environment.
+class LLMConfig:
+    """LLM settings resolved from the environment.
 
     Attributes:
         api_key: The API key.
@@ -199,25 +207,40 @@ def _first_env(*names: str) -> tuple[str, str] | None:
     return None
 
 
-def resolve_ai_config() -> AIConfig | None:
-    """Resolve AI settings from Nest-prefixed environment variables.
+# Variable names read before the AI-to-LLM rename. Their values are never used;
+# they are only detected so an upgraded user learns why nothing is configured.
+LEGACY_LLM_ENV_VARS = (
+    "NEST_AI_API_KEY",
+    "NEST_AI_ENDPOINT",
+    "NEST_AI_MODEL",
+    "NEST_AI_VISION_MODEL",
+)
+
+
+def legacy_llm_env_vars() -> list[str]:
+    """Names of pre-rename ``NEST_AI_*`` variables present in the environment."""
+    return [name for name in LEGACY_LLM_ENV_VARS if os.environ.get(name)]
+
+
+def resolve_llm_config() -> LLMConfig | None:
+    """Resolve LLM settings from Nest-prefixed environment variables.
 
     Fallback chains:
-        API key:      NEST_AI_API_KEY → NEST_API_KEY
-        Endpoint:     NEST_AI_ENDPOINT → NEST_BASE_URL → https://api.openai.com/v1
-        Text model:   NEST_AI_MODEL → NEST_TEXT_MODEL
-        Vision model: NEST_AI_VISION_MODEL → NEST_VISION_MODEL → the text model
+        API key:      NEST_LLM_API_KEY → NEST_API_KEY
+        Endpoint:     NEST_LLM_ENDPOINT → NEST_BASE_URL → https://api.openai.com/v1
+        Text model:   NEST_LLM_MODEL → NEST_TEXT_MODEL
+        Vision model: NEST_LLM_VISION_MODEL → NEST_VISION_MODEL → the text model
 
     Returns:
         The resolved configuration, or None when no API key is set.
     """
-    key = _first_env("NEST_AI_API_KEY", "NEST_API_KEY")
+    key = _first_env("NEST_LLM_API_KEY", "NEST_API_KEY")
     if key is None:
         return None
-    endpoint = _first_env("NEST_AI_ENDPOINT", "NEST_BASE_URL")
-    text_model = _first_env("NEST_AI_MODEL", "NEST_TEXT_MODEL")
-    vision_model = _first_env("NEST_AI_VISION_MODEL", "NEST_VISION_MODEL") or text_model
-    return AIConfig(
+    endpoint = _first_env("NEST_LLM_ENDPOINT", "NEST_BASE_URL")
+    text_model = _first_env("NEST_LLM_MODEL", "NEST_TEXT_MODEL")
+    vision_model = _first_env("NEST_LLM_VISION_MODEL", "NEST_VISION_MODEL") or text_model
+    return LLMConfig(
         api_key=key[1],
         api_key_var=key[0],
         endpoint=endpoint[1] if endpoint else DEFAULT_ENDPOINT,
@@ -227,24 +250,24 @@ def resolve_ai_config() -> AIConfig | None:
 
 
 def create_llm_provider(
-    config: AIConfig | None = None,
+    config: LLMConfig | None = None,
 ) -> OpenAIAdapter | AzureOpenAIAdapter | None:
-    """Create a text LLM adapter from the resolved AI configuration.
+    """Create a text LLM adapter from the resolved LLM configuration.
 
     Returns None when no API key or text model is configured, so callers skip
-    AI features rather than sending a wrong model name to the API. Azure
+    LLM features rather than sending a wrong model name to the API. Azure
     endpoints (``.openai.azure.com``) get an ``AzureOpenAIAdapter``.
 
     Args:
         config: Pre-resolved configuration; resolved from the environment when omitted.
     """
-    config = config or resolve_ai_config()
+    config = config or resolve_llm_config()
     if config is None:
         return None
     if not config.text_model:
         logger.warning(
-            "No LLM model configured. Set NEST_AI_MODEL"
-            " (or run 'nest config ai') to enable AI features."
+            "No LLM model configured. Set NEST_LLM_MODEL"
+            " (or run 'nest config llm') to enable LLM features."
         )
         return None
 
@@ -267,7 +290,9 @@ class OpenAIVisionAdapter:
     """
 
     def __init__(self, api_key: str, endpoint: str, model: str) -> None:
-        self._client = openai.OpenAI(api_key=api_key, base_url=endpoint)
+        self._client = openai.OpenAI(
+            api_key=api_key, base_url=endpoint, timeout=LLM_REQUEST_TIMEOUT
+        )
         self._model = model
 
     @property
@@ -355,6 +380,7 @@ class AzureOpenAIVisionAdapter:
             api_key=api_key,
             azure_endpoint=endpoint,
             api_version=api_version,
+            timeout=LLM_REQUEST_TIMEOUT,
         )
         self._deployment = deployment
 
@@ -425,25 +451,25 @@ class AzureOpenAIVisionAdapter:
 
 
 def create_vision_provider(
-    config: AIConfig | None = None,
+    config: LLMConfig | None = None,
 ) -> OpenAIVisionAdapter | AzureOpenAIVisionAdapter | None:
-    """Create a vision LLM adapter from the resolved AI configuration.
+    """Create a vision LLM adapter from the resolved LLM configuration.
 
     Returns None when no API key or vision model is configured. The vision
-    model falls back to the text model, so a single ``NEST_AI_MODEL`` enables
+    model falls back to the text model, so a single ``NEST_LLM_MODEL`` enables
     both text and vision features. Azure endpoints get an
     ``AzureOpenAIVisionAdapter``.
 
     Args:
         config: Pre-resolved configuration; resolved from the environment when omitted.
     """
-    config = config or resolve_ai_config()
+    config = config or resolve_llm_config()
     if config is None:
         return None
     if not config.vision_model:
         logger.warning(
-            "No vision model configured. Set NEST_AI_VISION_MODEL"
-            " (or run 'nest config ai') to enable vision features."
+            "No vision model configured. Set NEST_LLM_VISION_MODEL"
+            " (or run 'nest config llm') to enable vision features."
         )
         return None
 

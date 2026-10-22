@@ -1,4 +1,4 @@
-"""AI enrichment phase of the sync pipeline.
+"""LLM enrichment phase of the sync pipeline.
 
 Runs index description enrichment and glossary generation, concurrently when
 both have work. Failures in either task are logged and never abort the sync.
@@ -15,9 +15,9 @@ from typing import TYPE_CHECKING, TypeVar
 from nest.core.paths import GLOSSARY_FILE, NEST_META_DIR
 
 if TYPE_CHECKING:
-    from nest.core.models import AIEnrichmentResult, AIGlossaryResult, FileMetadata
-    from nest.services.ai_enrichment_service import AIEnrichmentService
-    from nest.services.ai_glossary_service import AIGlossaryService
+    from nest.core.models import FileMetadata, LLMEnrichmentResult, LLMGlossaryResult
+    from nest.services.llm_enrichment_service import LLMEnrichmentService
+    from nest.services.llm_glossary_service import LLMGlossaryService
     from nest.services.sync_outcomes import SyncLedger
 
 logger = logging.getLogger(__name__)
@@ -28,14 +28,14 @@ PROJECT_CONTEXT_FILE = Path("docs") / "project-context.md"
 
 
 class EnrichmentPhase:
-    """Generates AI index descriptions and glossary terms for changed context files."""
+    """Generates LLM index descriptions and glossary terms for changed context files."""
 
     def __init__(
         self,
         project_root: Path,
         context_dir: Path,
-        enrichment: AIEnrichmentService | None = None,
-        glossary: AIGlossaryService | None = None,
+        enrichment: LLMEnrichmentService | None = None,
+        glossary: LLMGlossaryService | None = None,
     ) -> None:
         self._project_root = project_root
         self._context_dir = context_dir
@@ -64,11 +64,11 @@ class EnrichmentPhase:
         if progress is not None:
             progress("start")
 
-        def enrich() -> AIEnrichmentResult:
+        def enrich() -> LLMEnrichmentResult:
             assert enrichment is not None
             return enrichment.enrich(metadata, descriptions, hints)
 
-        def define_terms() -> AIGlossaryResult:
+        def define_terms() -> LLMGlossaryResult:
             assert glossary is not None
             return glossary.generate(
                 changed_files,
@@ -81,12 +81,12 @@ class EnrichmentPhase:
             with ThreadPoolExecutor(max_workers=2) as executor:
                 enrichment_future = executor.submit(enrich)
                 glossary_future = executor.submit(define_terms)
-                ledger.enrichment = _safely(enrichment_future.result, "AI enrichment")
-                ledger.glossary = _safely(glossary_future.result, "AI glossary generation")
+                ledger.enrichment = _safely(enrichment_future.result, "LLM enrichment")
+                ledger.glossary = _safely(glossary_future.result, "LLM glossary generation")
         elif enrichment is not None:
-            ledger.enrichment = _safely(enrich, "AI enrichment")
+            ledger.enrichment = _safely(enrich, "LLM enrichment")
         else:
-            ledger.glossary = _safely(define_terms, "AI glossary generation")
+            ledger.glossary = _safely(define_terms, "LLM glossary generation")
 
         if ledger.enrichment is not None:
             descriptions.update(ledger.enrichment.descriptions)

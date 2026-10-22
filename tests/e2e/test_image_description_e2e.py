@@ -33,7 +33,7 @@ from pptx import Presentation
 from pptx.oxml.ns import qn
 from pptx.util import Inches
 
-from .conftest import ai_env_vars, run_cli, skip_without_ai, skip_without_docling
+from .conftest import llm_env_vars, run_cli, skip_without_docling, skip_without_llm
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -87,7 +87,7 @@ class _MockOpenAIHandler(BaseHTTPRequestHandler):
             for msg in req.get("messages", []):
                 if msg.get("role") == "system" and "glossary" in msg.get("content", "").lower():
                     response_content = (
-                        "| Vision Pipeline | Technical | AI-based image description subsystem |"
+                        "| Vision Pipeline | Technical | LLM-based image description subsystem |"
                     )
                     break
         except Exception:  # noqa: BLE001
@@ -177,17 +177,17 @@ class MockVisionServer:
         return _MockOpenAIHandler.call_counter[0]
 
     def env_vars(self) -> dict[str, str]:
-        """Env vars that route subprocess AI calls to this mock server.
+        """Env vars that route subprocess LLM calls to this mock server.
 
-        Both ``NEST_AI_*`` and ``OPENAI_*`` vars are set (with ``NEST_AI_*``
+        Both ``NEST_LLM_*`` and ``OPENAI_*`` vars are set (with ``NEST_LLM_*``
         taking priority in the nest fallback chain) so the subprocess uses the
         mock credentials regardless of the existing shell environment.
         """
         return {
-            "NEST_AI_API_KEY": "mock-api-key-for-e2e-testing",
-            "NEST_AI_ENDPOINT": f"http://127.0.0.1:{self.port}/v1",
-            "NEST_AI_VISION_MODEL": "mock-vision-model",
-            "NEST_AI_MODEL": "mock-text-model",
+            "NEST_LLM_API_KEY": "mock-api-key-for-e2e-testing",
+            "NEST_LLM_ENDPOINT": f"http://127.0.0.1:{self.port}/v1",
+            "NEST_LLM_VISION_MODEL": "mock-vision-model",
+            "NEST_LLM_MODEL": "mock-text-model",
         }
 
 
@@ -239,7 +239,7 @@ class TestImageDescriptionE2E:
             blip.attrib.pop(qn("r:embed"))
         source = initialized_project / "_nest_sources" / "warning-deck.pptx"
         presentation.save(source)
-        args = ["sync", "--no-ai"]
+        args = ["sync", "--no-llm"]
         if verbose:
             args.append("--verbose")
         result = run_cli(args, cwd=initialized_project)
@@ -346,10 +346,10 @@ class TestImageDescriptionE2E:
         )
 
     @skip_without_docling
-    def test_no_ai_env_vars_produces_image_placeholder(self, initialized_project: Path) -> None:
-        """AC: Without AI credentials, image output contains <!-- image --> placeholder.
+    def test_no_llm_env_vars_produces_image_placeholder(self, initialized_project: Path) -> None:
+        """AC: Without LLM credentials, image output contains <!-- image --> placeholder.
 
-        Given no AI API keys are configured,
+        Given no LLM API keys are configured,
         when nest sync runs on a PDF with an image,
         then the output markdown uses the Docling placeholder (<!-- image -->)
         and no description text is present.
@@ -365,9 +365,9 @@ class TestImageDescriptionE2E:
             cwd=project_dir,
             timeout=300,
             env={
-                "NEST_AI_API_KEY": "",
-                "NEST_AI_MODEL": "",
-                "NEST_AI_VISION_MODEL": "",
+                "NEST_LLM_API_KEY": "",
+                "NEST_LLM_MODEL": "",
+                "NEST_LLM_VISION_MODEL": "",
                 "NEST_API_KEY": "",
             },
         )
@@ -380,24 +380,24 @@ class TestImageDescriptionE2E:
         assert output_md.exists()
         content = output_md.read_text()
         assert "<!-- image -->" in content, (
-            f"Expected '<!-- image -->' placeholder in no-AI output.\n"
+            f"Expected '<!-- image -->' placeholder in no-LLM output.\n"
             f"Markdown (first 600 chars): {content[:600]}"
         )
         assert CANNED_DESCRIPTION not in content, (
-            "Expected no description text in output without AI vision configured"
+            "Expected no description text in output without LLM vision configured"
         )
         assert "Images described:" not in result.stdout, (
-            f"Expected no 'Images described:' line without AI.\nstdout: {result.stdout}"
+            f"Expected no 'Images described:' line without an LLM.\nstdout: {result.stdout}"
         )
 
     @skip_without_docling
-    def test_no_ai_flag_produces_image_placeholder_and_no_vision_calls(
+    def test_no_llm_flag_produces_image_placeholder_and_no_vision_calls(
         self, initialized_project: Path
     ) -> None:
-        """AC: --no-ai flag disables vision even when AI env vars are configured.
+        """AC: --no-llm flag disables vision even when LLM env vars are configured.
 
-        Given AI env vars point at the mock server,
-        when nest sync --no-ai runs,
+        Given LLM env vars point at the mock server,
+        when nest sync --no-llm runs,
         then the output uses <!-- image --> placeholders
         and zero calls are made to the mock (vision) server.
         """
@@ -406,12 +406,12 @@ class TestImageDescriptionE2E:
 
         with MockVisionServer(response=CANNED_DESCRIPTION) as server:
             result = run_cli(
-                ["sync", "--no-ai"],
+                ["sync", "--no-llm"],
                 cwd=project_dir,
                 timeout=300,
                 env=server.env_vars(),
             )
-            calls_with_no_ai_flag = server.call_count
+            calls_with_no_llm_flag = server.call_count
 
         assert result.exit_code == 0, (
             f"Sync failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -421,21 +421,21 @@ class TestImageDescriptionE2E:
         assert output_md.exists()
         content = output_md.read_text()
         assert "<!-- image -->" in content, (
-            f"Expected '<!-- image -->' placeholder with --no-ai.\n"
+            f"Expected '<!-- image -->' placeholder with --no-llm.\n"
             f"Markdown (first 600 chars): {content[:600]}"
         )
-        assert CANNED_DESCRIPTION not in content, "Expected no description text with --no-ai flag"
-        assert calls_with_no_ai_flag == 0, (
-            f"Expected zero mock server calls with --no-ai, got {calls_with_no_ai_flag}"
+        assert CANNED_DESCRIPTION not in content, "Expected no description text with --no-llm flag"
+        assert calls_with_no_llm_flag == 0, (
+            f"Expected zero mock server calls with --no-llm, got {calls_with_no_llm_flag}"
         )
 
     @skip_without_docling
     def test_token_reporting_includes_vision_tokens(self, initialized_project: Path) -> None:
-        """AC: Sync summary 'AI tokens:' line aggregates vision description tokens.
+        """AC: Sync summary 'LLM tokens:' line aggregates vision description tokens.
 
         Given image descriptions are generated via the mocked vision LLM,
         when nest sync completes,
-        then stdout includes an 'AI tokens:' line with non-zero token counts.
+        then stdout includes an 'LLM tokens:' line with non-zero token counts.
         """
         project_dir = initialized_project
         _put_image_fixture_in_project(project_dir)
@@ -446,8 +446,8 @@ class TestImageDescriptionE2E:
         assert result.exit_code == 0, (
             f"Sync failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        assert "AI tokens:" in result.stdout, (
-            f"Expected 'AI tokens:' in sync summary.\nstdout: {result.stdout}"
+        assert "LLM tokens:" in result.stdout, (
+            f"Expected 'LLM tokens:' in sync summary.\nstdout: {result.stdout}"
         )
 
     @skip_without_docling
@@ -500,18 +500,18 @@ class TestImageDescriptionE2E:
 class TestImageDescriptionRealLLM:
     """E2E tests for vision-based image description using a real LLM.
 
-    These tests require both Docling models and a configured AI API key
+    These tests require both Docling models and a configured LLM API key
     with a vision-capable model.  They hit a real LLM endpoint and verify
     that the pipeline produces meaningful image descriptions (not
     placeholders) in the output markdown.
     """
 
     @skip_without_docling
-    @skip_without_ai
+    @skip_without_llm
     def test_real_vision_generates_image_description(self, initialized_project: Path) -> None:
         """Real vision LLM produces a description, not an <!-- image --> placeholder.
 
-        Given a PDF with an embedded image and real AI credentials,
+        Given a PDF with an embedded image and real LLM credentials,
         when nest sync runs,
         then the output markdown contains descriptive text (not a placeholder)
         and the sync summary includes 'Images described:'.
@@ -519,7 +519,7 @@ class TestImageDescriptionRealLLM:
         project_dir = initialized_project
         _put_image_fixture_in_project(project_dir)
 
-        result = run_cli(["sync"], cwd=project_dir, timeout=300, env=ai_env_vars())
+        result = run_cli(["sync"], cwd=project_dir, timeout=300, env=llm_env_vars())
 
         assert result.exit_code == 0, (
             f"Sync failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -561,24 +561,24 @@ class TestImageDescriptionRealLLM:
         )
 
     @skip_without_docling
-    @skip_without_ai
+    @skip_without_llm
     def test_real_vision_token_reporting(self, initialized_project: Path) -> None:
-        """Real vision LLM usage is reflected in AI token reporting.
+        """Real vision LLM usage is reflected in LLM token reporting.
 
-        Given a PDF with an embedded image and real AI credentials,
+        Given a PDF with an embedded image and real LLM credentials,
         when nest sync runs,
-        then stdout includes an 'AI tokens:' line with non-zero counts.
+        then stdout includes an 'LLM tokens:' line with non-zero counts.
         """
         project_dir = initialized_project
         _put_image_fixture_in_project(project_dir)
 
-        result = run_cli(["sync"], cwd=project_dir, timeout=300, env=ai_env_vars())
+        result = run_cli(["sync"], cwd=project_dir, timeout=300, env=llm_env_vars())
 
         assert result.exit_code == 0, (
             f"Sync failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
         )
-        assert "AI tokens:" in result.stdout, (
-            f"Expected 'AI tokens:' in sync summary.\nstdout: {result.stdout}"
+        assert "LLM tokens:" in result.stdout, (
+            f"Expected 'LLM tokens:' in sync summary.\nstdout: {result.stdout}"
         )
 
 
@@ -586,7 +586,7 @@ class TestImageDescriptionRealLLM:
 class TestStandaloneImageFilesE2E:
     """Standalone image files are source documents (#35).
 
-    ``chart.png`` holds a figure, so it needs an AI description.
+    ``chart.png`` holds a figure, so it needs an LLM description.
     ``notes.png`` is a text screenshot, so OCR alone prepares it.
     """
 
@@ -607,7 +607,7 @@ class TestStandaloneImageFilesE2E:
 
     @skip_without_docling
     @pytest.mark.parametrize("command", ["sync", "convert"])
-    def test_image_file_needing_ai_fails_without_ai_and_is_retried_with_ai(
+    def test_image_file_needing_ai_fails_without_llm_and_is_retried_with_llm(
         self, initialized_project: Path, command: str
     ) -> None:
         source = _put_fixture_in_project(initialized_project, "chart.png")
@@ -618,13 +618,13 @@ class TestStandaloneImageFilesE2E:
             else source.with_suffix(".md")
         )
 
-        failed = run_cli([*args, "--no-ai"], cwd=initialized_project)
+        failed = run_cli([*args, "--no-llm"], cwd=initialized_project)
 
         assert failed.exit_code == 1, failed.stdout + failed.stderr
         assert "Failed:    1" in failed.stdout
-        assert "chart.png: requires AI image description" in failed.stdout
-        assert "1 image file needs an AI image description and was not processed" in failed.stdout
-        assert f"Run 'nest {command}' again without --no-ai" in failed.stdout
+        assert "chart.png: requires LLM image description" in failed.stdout
+        assert "1 image file needs an LLM image description and was not processed" in failed.stdout
+        assert f"Run 'nest {command}' again without --no-llm" in failed.stdout
         assert not output.exists()
 
         with MockVisionServer(response=CANNED_DESCRIPTION) as server:
@@ -635,30 +635,30 @@ class TestStandaloneImageFilesE2E:
         assert CANNED_DESCRIPTION in output.read_text()
 
     @skip_without_docling
-    def test_sync_without_configured_ai_tells_user_how_to_enable_it(
+    def test_sync_without_configured_llm_tells_user_how_to_enable_it(
         self, initialized_project: Path
     ) -> None:
         _put_fixture_in_project(initialized_project, "chart.png")
-        no_ai_env = {
-            "NEST_AI_API_KEY": "",
+        no_llm_env = {
+            "NEST_LLM_API_KEY": "",
             "OPENAI_API_KEY": "",
             "AZURE_OPENAI_API_KEY": "",
-            "NEST_AI_ENDPOINT": "",
+            "NEST_LLM_ENDPOINT": "",
         }
 
-        result = run_cli(["sync"], cwd=initialized_project, env=no_ai_env)
+        result = run_cli(["sync"], cwd=initialized_project, env=no_llm_env)
 
         assert result.exit_code == 1, result.stdout + result.stderr
-        assert "1 image file needs an AI image description and was not processed" in result.stdout
-        assert "Run 'nest config ai' or set NEST_AI_API_KEY, then run 'nest sync' again" in (
+        assert "1 image file needs an LLM image description and was not processed" in result.stdout
+        assert "Run 'nest config llm' or set NEST_LLM_API_KEY, then run 'nest sync' again" in (
             result.stdout
         )
 
     @skip_without_docling
-    def test_text_screenshot_is_prepared_without_ai(self, initialized_project: Path) -> None:
+    def test_text_screenshot_is_prepared_without_llm(self, initialized_project: Path) -> None:
         _put_fixture_in_project(initialized_project, "notes.png")
 
-        result = run_cli(["sync", "--no-ai"], cwd=initialized_project)
+        result = run_cli(["sync", "--no-llm"], cwd=initialized_project)
 
         assert result.exit_code == 0, result.stdout + result.stderr
         output = initialized_project / "_nest_context" / "notes.md"

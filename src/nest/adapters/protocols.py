@@ -548,7 +548,7 @@ class LLMProviderProtocol(Protocol):
     """Protocol for LLM completion operations.
 
     Implementations handle sending chat completion requests to LLM APIs.
-    Used by AI enrichment and glossary services.
+    Used by LLM enrichment and glossary services.
     """
 
     def complete(

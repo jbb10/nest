@@ -1,4 +1,4 @@
-"""Service for managing shell RC file AI configuration blocks.
+"""Service for managing shell RC file LLM configuration blocks.
 
 Handles detection of user's shell, resolution of the correct RC file path,
 and idempotent writing/removal of env var export blocks.
@@ -9,14 +9,39 @@ import os
 import sys
 from pathlib import Path
 
-BLOCK_START = "# --- Nest AI Configuration (managed by `nest config ai`) ---"
-BLOCK_END = "# --- End Nest AI Configuration ---"
+BLOCK_START = "# --- Nest LLM Configuration (managed by `nest config llm`) ---"
+BLOCK_END = "# --- End Nest LLM Configuration ---"
+
+# Marker pair written by `nest config ai` before the AI-to-LLM rename. Still
+# recognised so upgraded users can replace or remove the stale block.
+_LEGACY_BLOCK_START = "# --- Nest AI Configuration (managed by `nest config ai`) ---"
+_LEGACY_BLOCK_END = "# --- End Nest AI Configuration ---"
+
+_MARKER_PAIRS = ((BLOCK_START, BLOCK_END), (_LEGACY_BLOCK_START, _LEGACY_BLOCK_END))
 
 logger = logging.getLogger(__name__)
 
 
+def _find_block(content: str) -> tuple[int, int] | None:
+    """Locate a managed config block, current or legacy.
+
+    Returns:
+        ``(start, end)`` offsets where ``end`` points just past the end marker
+        and its trailing newline, or None when no block is present.
+    """
+    for start_marker, end_marker in _MARKER_PAIRS:
+        start_idx = content.find(start_marker)
+        end_idx = content.find(end_marker)
+        if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
+            end_of_block = end_idx + len(end_marker)
+            if end_of_block < len(content) and content[end_of_block] == "\n":
+                end_of_block += 1
+            return start_idx, end_of_block
+    return None
+
+
 class ShellRCService:
-    """Service for managing shell RC file AI configuration blocks."""
+    """Service for managing shell RC file LLM configuration blocks."""
 
     def detect_shell(self) -> str:
         """Detect current shell from environment.
@@ -127,9 +152,9 @@ class ShellRCService:
             safe_key = self._escape_powershell_value(api_key)
             lines = [
                 BLOCK_START,
-                f"$Env:NEST_AI_ENDPOINT = '{safe_endpoint}'",
-                f"$Env:NEST_AI_MODEL = '{safe_model}'",
-                f"$Env:NEST_AI_API_KEY = '{safe_key}'",
+                f"$Env:NEST_LLM_ENDPOINT = '{safe_endpoint}'",
+                f"$Env:NEST_LLM_MODEL = '{safe_model}'",
+                f"$Env:NEST_LLM_API_KEY = '{safe_key}'",
                 BLOCK_END,
             ]
         elif shell == "fish":
@@ -138,9 +163,9 @@ class ShellRCService:
             safe_key = self._escape_shell_value(api_key)
             lines = [
                 BLOCK_START,
-                f'set -gx NEST_AI_ENDPOINT "{safe_endpoint}"',
-                f'set -gx NEST_AI_MODEL "{safe_model}"',
-                f'set -gx NEST_AI_API_KEY "{safe_key}"',
+                f'set -gx NEST_LLM_ENDPOINT "{safe_endpoint}"',
+                f'set -gx NEST_LLM_MODEL "{safe_model}"',
+                f'set -gx NEST_LLM_API_KEY "{safe_key}"',
                 BLOCK_END,
             ]
         else:
@@ -149,9 +174,9 @@ class ShellRCService:
             safe_key = self._escape_shell_value(api_key)
             lines = [
                 BLOCK_START,
-                f'export NEST_AI_ENDPOINT="{safe_endpoint}"',
-                f'export NEST_AI_MODEL="{safe_model}"',
-                f'export NEST_AI_API_KEY="{safe_key}"',
+                f'export NEST_LLM_ENDPOINT="{safe_endpoint}"',
+                f'export NEST_LLM_MODEL="{safe_model}"',
+                f'export NEST_LLM_API_KEY="{safe_key}"',
                 BLOCK_END,
             ]
         return "\n".join(lines) + "\n"
@@ -164,7 +189,7 @@ class ShellRCService:
         api_key: str,
         shell: str,
     ) -> None:
-        """Write or replace the Nest AI config block in the RC file.
+        """Write or replace the Nest LLM config block in the RC file.
 
         Creates the file and parent directories if they don't exist.
         If a config block already exists, replaces it in-place.
@@ -207,24 +232,18 @@ class ShellRCService:
         Returns:
             Updated file content.
         """
-        start_idx = content.find(BLOCK_START)
-        end_idx = content.find(BLOCK_END)
-
-        if start_idx != -1 and end_idx != -1 and start_idx < end_idx:
-            # Replace existing block (include the end marker + newline)
-            end_of_block = end_idx + len(BLOCK_END)
-            # Consume trailing newline if present
-            if end_of_block < len(content) and content[end_of_block] == "\n":
-                end_of_block += 1
+        found = _find_block(content)
+        if found is not None:
+            start_idx, end_of_block = found
             return content[:start_idx] + block + content[end_of_block:]
 
-        # Append — ensure preceding newline
+        # Append - ensure preceding newline
         if content and not content.endswith("\n"):
             content += "\n"
         return content + "\n" + block
 
     def remove_config(self, rc_path: Path) -> bool:
-        """Remove the Nest AI config block from the RC file.
+        """Remove the Nest LLM config block from the RC file.
 
         Args:
             rc_path: Path to the shell RC file.
@@ -242,15 +261,11 @@ class ShellRCService:
             msg = f"Failed to read RC file {rc_path}: {exc}"
             raise OSError(msg) from exc
 
-        start_idx = content.find(BLOCK_START)
-        end_idx = content.find(BLOCK_END)
-
-        if start_idx == -1 or end_idx == -1 or start_idx >= end_idx:
+        found = _find_block(content)
+        if found is None:
             return False
 
-        end_of_block = end_idx + len(BLOCK_END)
-        if end_of_block < len(content) and content[end_of_block] == "\n":
-            end_of_block += 1
+        start_idx, end_of_block = found
         # Also remove preceding blank line if present
         if start_idx > 0 and content[start_idx - 1] == "\n":
             start_idx -= 1

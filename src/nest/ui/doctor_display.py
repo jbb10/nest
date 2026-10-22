@@ -205,20 +205,10 @@ def display_doctor_report(
 
     env = tree.add("Environment")
 
-    # Python
-    python_node = env.add(_format_status_line(report.python))
-    if report.python.suggestion:
-        python_node.add(f"→ {report.python.suggestion}")
-
-    # uv
-    uv_node = env.add(_format_status_line(report.uv))
-    if report.uv.suggestion:
-        uv_node.add(f"→ {report.uv.suggestion}")
-
-    # Nest
-    nest_node = env.add(_format_status_line(report.nest))
-    if report.nest.suggestion:
-        nest_node.add(f"→ {report.nest.suggestion}")
+    for check in report.checks:
+        node = env.add(_format_status_line(check))
+        if check.suggestion:
+            node.add(f"→ {check.suggestion}")
 
     # ML Models section (if report provided)
     if model_report:

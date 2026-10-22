@@ -51,11 +51,17 @@ class EnvironmentReport:
     python: EnvironmentStatus
     uv: EnvironmentStatus
     nest: EnvironmentStatus
+    llm: EnvironmentStatus | None = None
+
+    @property
+    def checks(self) -> list[EnvironmentStatus]:
+        """Every populated environment check, in display order."""
+        return [check for check in (self.python, self.uv, self.nest, self.llm) if check]
 
     @property
     def all_pass(self) -> bool:
         """True if all checks passed (no failures)."""
-        return all(check.status != "fail" for check in [self.python, self.uv, self.nest])
+        return all(check.status != "fail" for check in self.checks)
 
 
 @dataclass
@@ -150,7 +156,7 @@ def list_issues(
 ) -> list[str]:
     """Describe every failing check across all doctor reports."""
     issues: list[str] = []
-    for check in (env_report.python, env_report.uv, env_report.nest):
+    for check in env_report.checks:
         if check.status == "fail":
             msg = f"{check.name} check failed"
             if check.message:
@@ -255,6 +261,42 @@ class DoctorService:
             python=self._check_python_version(),
             uv=self._check_uv_installation(),
             nest=self._check_nest_version(),
+            llm=self._check_llm_config(),
+        )
+
+    def _check_llm_config(self) -> EnvironmentStatus:
+        """Report whether an LLM is configured, flagging stale pre-rename variables.
+
+        Returns:
+            Environment status for the LLM configuration check.
+        """
+        from nest.adapters.llm_provider import legacy_llm_env_vars, resolve_llm_config
+
+        config = resolve_llm_config()
+        if config is not None:
+            return EnvironmentStatus(
+                name="LLM",
+                status="pass",
+                current_value="configured",
+                message=f"via {config.api_key_var}",
+            )
+
+        legacy = legacy_llm_env_vars()
+        if legacy:
+            return EnvironmentStatus(
+                name="LLM",
+                status="warning",
+                current_value="not configured",
+                message=f"{', '.join(legacy)} no longer read",
+                suggestion="Run `nest config llm` to rewrite your shell configuration",
+            )
+
+        return EnvironmentStatus(
+            name="LLM",
+            status="pass",
+            current_value="not configured",
+            message="optional",
+            suggestion="Run `nest config llm` to enable LLM enrichment",
         )
 
     def _check_python_version(self) -> EnvironmentStatus:

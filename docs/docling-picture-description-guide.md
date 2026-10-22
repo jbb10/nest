@@ -203,7 +203,7 @@ descriptions (and Mermaid blocks) inline.
 ## Integration with `DoclingProcessor`
 
 The current processor in `src/nest/adapters/docling_processor.py` would need
-these changes to enable AI-powered picture descriptions:
+these changes to enable LLM picture descriptions:
 
 1. Accept Azure config (endpoint, API key, model name) from user config or
    environment.
@@ -216,7 +216,7 @@ these changes to enable AI-powered picture descriptions:
 4. Store descriptions back via `PictureDescriptionData` before exporting
    Markdown.
 
-When `--no-ai` is passed (or no AI config exists), skip both classification
+When `--no-llm` is passed (or no LLM config exists), skip both classification
 and description — the processor falls back to the existing `[Image: ...]`
 placeholder behavior. The classification step is local and cheap, but there's
 no point running it if we're not going to call the API afterward.

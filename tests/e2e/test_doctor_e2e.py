@@ -6,6 +6,17 @@ import pytest
 
 from .conftest import run_cli, skip_without_docling
 
+# Environment of a user who ran `nest config ai` before the AI-to-LLM rename.
+_STALE_NEST_AI_ENV = {
+    "NEST_LLM_API_KEY": "",
+    "NEST_API_KEY": "",
+    "OPENAI_API_KEY": "",
+    "AZURE_OPENAI_API_KEY": "",
+    "NEST_AI_API_KEY": "sk-stale",
+    "NEST_AI_ENDPOINT": "https://example.invalid/v1",
+    "NEST_AI_MODEL": "old-model",
+}
+
 
 @pytest.mark.e2e
 class TestDoctorE2E:
@@ -26,6 +37,15 @@ class TestDoctorE2E:
         assert "Python:" in result.stdout
         assert "uv:" in result.stdout
         assert "Nest:" in result.stdout
+
+    def test_doctor_flags_stale_nest_ai_variables(self, fresh_temp_dir: Path) -> None:
+        """An upgraded shell still exporting NEST_AI_* gets a specific pointer."""
+        result = run_cli(["doctor"], cwd=fresh_temp_dir, timeout=30, env=_STALE_NEST_AI_ENV)
+
+        assert result.exit_code == 0
+        assert "LLM: not configured" in result.stdout
+        assert "NEST_AI_API_KEY" in result.stdout
+        assert "nest config llm" in result.stdout
 
     @skip_without_docling
     def test_doctor_shows_model_status(self, fresh_temp_dir: Path) -> None:

@@ -31,8 +31,8 @@ from nest.services.sync_outcomes import OnError, OutcomeRecorder, ProgressCallba
 
 if TYPE_CHECKING:
     from nest.adapters.docling_processor import DoclingProcessor
-    from nest.services.ai_enrichment_service import AIEnrichmentService
-    from nest.services.ai_glossary_service import AIGlossaryService
+    from nest.services.llm_enrichment_service import LLMEnrichmentService
+    from nest.services.llm_glossary_service import LLMGlossaryService
     from nest.services.picture_description_service import PictureDescriptionService
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class SyncService:
     """Runs the document sync pipeline.
 
     Phases, in order: conversion (with collision resolution and vision),
-    manifest commit, orphan cleanup, metadata extraction, AI enrichment,
+    manifest commit, orphan cleanup, metadata extraction, LLM enrichment,
     and index generation.
     """
 
@@ -60,8 +60,8 @@ class SyncService:
         metadata: MetadataExtractorService,
         project_root: Path,
         error_logger: logging.Logger | logging.LoggerAdapter[logging.Logger] | None = None,
-        ai_enrichment: AIEnrichmentService | None = None,
-        ai_glossary: AIGlossaryService | None = None,
+        llm_enrichment: LLMEnrichmentService | None = None,
+        llm_glossary: LLMGlossaryService | None = None,
         picture_description_service: PictureDescriptionService | None = None,
         vision_docling_processor: DoclingProcessor | None = None,
         image_docling_processor: DoclingProcessor | None = None,
@@ -86,8 +86,8 @@ class SyncService:
         self._enrichment = EnrichmentPhase(
             project_root=project_root,
             context_dir=self._context_dir,
-            enrichment=ai_enrichment,
-            glossary=ai_glossary,
+            enrichment=llm_enrichment,
+            glossary=llm_glossary,
         )
 
     @property
@@ -106,7 +106,7 @@ class SyncService:
         dry_run: bool = False,
         force: bool = False,
         progress_callback: ProgressCallback | None = None,
-        ai_progress_callback: Callable[[str], None] | None = None,
+        llm_progress_callback: Callable[[str], None] | None = None,
         changes: DiscoveryResult | None = None,
         activity_callback: Callable[[Activity], None] | None = None,
     ) -> SyncResult | DryRunResult:
@@ -119,7 +119,7 @@ class SyncService:
             dry_run: Report what would change without modifying anything.
             force: Reprocess all files and regenerate the glossary input set.
             progress_callback: Called with the file name once per attempted file.
-            ai_progress_callback: Called with ``"start"`` when AI work begins and
+            llm_progress_callback: Called with ``"start"`` when LLM work begins and
                 with a summary string when it completes.
             changes: Pre-computed discovery result; discovered when omitted.
             activity_callback: Reports document and finalization stages before blocking work.
@@ -174,7 +174,7 @@ class SyncService:
             hints,
             self._glossary_input(metadata, hints, force),
             ledger,
-            ai_progress_callback,
+            llm_progress_callback,
         )
 
         if activity_callback is not None:
@@ -196,7 +196,7 @@ class SyncService:
         """Context files whose content changed since the last sync.
 
         All files are included when forced, or when the glossary is missing so
-        a project synced before AI was configured gets backfilled.
+        a project synced before an LLM was configured gets backfilled.
         """
         glossary_missing = not (self._meta_dir / GLOSSARY_FILE).exists()
         if force or (metadata and glossary_missing):

@@ -39,7 +39,7 @@ The `Makefile` is the single source of truth for checks.
 
 Before each commit, run `make lint format-check typecheck test`. Fix formatting with `make format`.
 
-Before outputting COMPLETE, also run `make test-e2e E2E_TIMEOUT=180`. AI-gated E2E tests skip when `NEST_AI_API_KEY` is unset; that is expected.
+Before outputting COMPLETE, also run `make test-e2e E2E_TIMEOUT=180`. LLM-gated E2E tests skip when `NEST_LLM_API_KEY` is unset; that is expected.
 
 Never run `nest init` or `nest sync` in the repository root. Verify CLI behavior through the E2E tests, which use isolated temporary workspaces.
 

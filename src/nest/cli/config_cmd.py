@@ -1,6 +1,6 @@
 """Config command for nest CLI.
 
-Handles the `nest config ai` subcommand for AI credential management.
+Handles the `nest config llm` subcommand for LLM credential management.
 """
 
 import os
@@ -48,17 +48,17 @@ def _display_path(path: Path) -> str:
         return str(path)
 
 
-@config_app.command(name="ai", cls=NestCommand)
-def ai_command(
+@config_app.command(name="llm", cls=NestCommand)
+def llm_command(
     remove: Annotated[
         bool,
         typer.Option(
             "--remove",
-            help="Remove Nest AI configuration from shell RC file",
+            help="Remove Nest LLM configuration from shell RC file",
         ),
     ] = False,
 ) -> None:
-    """Configure AI enrichment by writing API credentials to your shell RC file.
+    """Configure LLM enrichment by writing API credentials to your shell RC file.
 
     Interactively prompts for API endpoint, model name, and API key,
     then writes them as environment variable exports to your shell RC file
@@ -66,9 +66,10 @@ def ai_command(
 
     Use --remove to remove the configuration block.
 
+    \b
     Examples:
-        nest config ai
-        nest config ai --remove
+        nest config llm
+        nest config llm --remove
     """
     console = get_console()
     service = ShellRCService()
@@ -85,9 +86,9 @@ def ai_command(
             console.print(f"  Reason: {exc}")
             raise typer.Exit(code=1) from exc
         if removed:
-            success(f"AI configuration removed from {_display_path(rc_path)}")
+            success(f"LLM configuration removed from {_display_path(rc_path)}")
         else:
-            info(f"No Nest AI configuration found in {_display_path(rc_path)}")
+            info(f"No Nest LLM configuration found in {_display_path(rc_path)}")
         return
 
     # Show detected shell info
@@ -97,12 +98,12 @@ def ai_command(
 
     # Prompt with smart defaults from existing env vars
     current_endpoint = (
-        os.environ.get("NEST_AI_ENDPOINT")
+        os.environ.get("NEST_LLM_ENDPOINT")
         or os.environ.get("NEST_BASE_URL")
         or "https://api.openai.com/v1"
     )
-    current_model = os.environ.get("NEST_AI_MODEL") or os.environ.get("NEST_TEXT_MODEL") or ""
-    current_key = os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY") or ""
+    current_model = os.environ.get("NEST_LLM_MODEL") or os.environ.get("NEST_TEXT_MODEL") or ""
+    current_key = os.environ.get("NEST_LLM_API_KEY") or os.environ.get("NEST_API_KEY") or ""
 
     endpoint = typer.prompt("  API endpoint", default=current_endpoint)
     if current_model:

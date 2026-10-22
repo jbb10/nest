@@ -1,4 +1,4 @@
-"""AI-powered glossary generation service.
+"""LLM glossary generation service.
 
 Generates project-specific glossary definitions using LLM calls during sync.
 Processes each changed document (or chunk) in a single LLM pass, extracting
@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from nest.core.models import AIGlossaryResult
+from nest.core.models import LLMGlossaryResult
 from nest.core.paths import GLOSSARY_TABLE_END, GLOSSARY_TABLE_START
 
 if TYPE_CHECKING:
@@ -46,8 +46,8 @@ GLOSSARY_TABLE_HEADER = "| Term | Category | Definition |\n|------|----------|--
 DEFAULT_MAX_CHARS = 160_000
 
 
-class AIGlossaryService:
-    """Generates AI-powered glossary definitions from project documents.
+class LLMGlossaryService:
+    """Generates LLM glossary definitions from project documents.
 
     Processes each changed file (or chunk for large files) in a single LLM
     pass that extracts and defines all glossary-worthy terms. Operates
@@ -68,7 +68,7 @@ class AIGlossaryService:
         context_dir: Path,
         glossary_path: Path,
         project_context: str | None = None,
-    ) -> AIGlossaryResult:
+    ) -> LLMGlossaryResult:
         """Generate glossary definitions from changed project documents.
 
         Args:
@@ -78,10 +78,10 @@ class AIGlossaryService:
             project_context: Optional project context text.
 
         Returns:
-            AIGlossaryResult with counts and token usage.
+            LLMGlossaryResult with counts and token usage.
         """
         if not changed_files:
-            return AIGlossaryResult()
+            return LLMGlossaryResult()
 
         # Load existing glossary terms (case-insensitive dedup)
         existing_rows, existing_terms = self._load_existing_glossary(glossary_path)
@@ -118,7 +118,7 @@ class AIGlossaryService:
                 result = self._llm.complete(system_prompt, chunk)
 
                 if result is None:
-                    logger.warning("AI glossary LLM call failed for file: %s", file_path)
+                    logger.warning("Glossary LLM call failed for file: %s", file_path)
                     terms_failed += 1
                     continue
 
@@ -140,13 +140,13 @@ class AIGlossaryService:
 
         # Write glossary if we have new terms, or create an empty one so the
         # sync-service backfill check (`not glossary_path.exists()`) does not
-        # re-invoke AI on every subsequent sync when no terms were extracted.
+        # re-invoke the LLM on every subsequent sync when no terms were extracted.
         if new_rows:
             self._write_glossary(glossary_path, existing_rows, new_rows)
         elif files_processed > 0 and not glossary_path.exists():
             self._write_glossary(glossary_path, existing_rows, [])
 
-        return AIGlossaryResult(
+        return LLMGlossaryResult(
             terms_added=terms_added,
             terms_skipped_existing=terms_skipped_existing,
             terms_failed=terms_failed,
@@ -239,8 +239,8 @@ class AIGlossaryService:
                 category = "Domain Term"
 
             # Sanitize and truncate definition
-            definition = AIGlossaryService._sanitize_definition(definition)
-            definition = AIGlossaryService._truncate_definition(definition)
+            definition = LLMGlossaryService._sanitize_definition(definition)
+            definition = LLMGlossaryService._truncate_definition(definition)
 
             if definition:
                 results.append((term, category, definition))
