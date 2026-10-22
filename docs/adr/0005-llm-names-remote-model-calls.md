@@ -11,5 +11,6 @@ The public surface was renamed without aliases (`--no-ai` to `--no-llm`, `--ai-o
 
 ## Consequences
 
-- A `nest config ai` block already written to a shell RC file is recognised by `nest config llm` and replaced or removed, and an existing `.ai_seen` marker is renamed on sight, so upgrading needs no manual cleanup.
+- A `nest config ai` block already written to a shell RC file is recognised by `nest config llm` and replaced or removed, and an existing `.ai_seen` marker is renamed on sight.
+- The values of lingering `NEST_AI_*` variables are never read, so an upgraded shell has no LLM until `nest config llm` is run again; `nest sync`, `nest convert`, and `nest doctor` detect those variables and say so, rather than reporting a plain "not configured".
 - `NEST_API_KEY`, `NEST_BASE_URL`, `NEST_TEXT_MODEL`, and `NEST_VISION_MODEL` are unchanged; only the `NEST_AI_*` names moved.

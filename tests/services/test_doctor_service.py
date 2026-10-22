@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from nest.services.doctor_service import (
     DoctorService,
     EnvironmentReport,
@@ -11,6 +13,7 @@ from nest.services.doctor_service import (
     ModelStatus,
     ProjectReport,
     ProjectStatus,
+    list_issues,
 )
 
 
@@ -227,6 +230,7 @@ class TestCheckEnvironment:
         assert report.python.status == "pass"
         assert report.uv.status == "pass"
         assert report.nest.status == "pass"
+        assert report.llm is not None
 
     def test_all_pass_property_true_when_no_failures(self) -> None:
         """all_pass should be True when no failures."""
@@ -276,6 +280,68 @@ class MockModelChecker:
 
     def download_if_needed(self, progress: bool = True) -> bool:
         return not self._cached
+
+
+class TestLLMConfigCheck:
+    """Tests for the LLM configuration environment check."""
+
+    _ALL_VARS = (
+        "NEST_LLM_API_KEY",
+        "NEST_API_KEY",
+        "OPENAI_API_KEY",
+        "NEST_AI_API_KEY",
+        "NEST_AI_ENDPOINT",
+        "NEST_AI_MODEL",
+        "NEST_AI_VISION_MODEL",
+    )
+
+    @pytest.fixture(autouse=True)
+    def _clean_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        for name in self._ALL_VARS:
+            monkeypatch.delenv(name, raising=False)
+
+    def test_configured_llm_passes_and_names_the_variable(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("NEST_LLM_API_KEY", "k")
+
+        status = DoctorService()._check_llm_config()
+
+        assert status.status == "pass"
+        assert status.current_value == "configured"
+        assert status.message == "via NEST_LLM_API_KEY"
+
+    def test_legacy_nest_ai_vars_warn_and_point_at_config_llm(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """An upgraded user whose RC still exports NEST_AI_* is told what to do."""
+        monkeypatch.setenv("NEST_AI_API_KEY", "old")
+        monkeypatch.setenv("NEST_AI_ENDPOINT", "https://old")
+
+        status = DoctorService()._check_llm_config()
+
+        assert status.status == "warning"
+        assert status.current_value == "not configured"
+        assert status.message == "NEST_AI_API_KEY, NEST_AI_ENDPOINT no longer read"
+        assert status.suggestion is not None
+        assert "nest config llm" in status.suggestion
+
+    def test_unconfigured_llm_is_optional(self) -> None:
+        status = DoctorService()._check_llm_config()
+
+        assert status.status == "pass"
+        assert status.current_value == "not configured"
+        assert status.message == "optional"
+
+    def test_list_issues_includes_llm_check_failures(self) -> None:
+        report = EnvironmentReport(
+            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            uv=EnvironmentStatus("uv", "pass", "0.4.12"),
+            nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
+            llm=EnvironmentStatus("LLM", "fail", "broken", message="bad"),
+        )
+
+        assert list_issues(report, None, None) == ["LLM check failed (bad)"]
 
 
 class TestModelValidation:

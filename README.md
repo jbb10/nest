@@ -179,7 +179,8 @@ Shows project state at a glance — pending files, last sync time, and what to d
 
 ### `nest doctor`
 
-Validates your environment, ML models, and project state.
+Validates your environment, ML models, LLM configuration, and project state.
+A shell that still exports the pre-3.0 `NEST_AI_*` variables is reported with a pointer to `nest config llm`.
 
 | Flag | Description |
 |------|-------------|

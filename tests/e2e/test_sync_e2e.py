@@ -139,6 +139,27 @@ class TestSyncE2E:
 
 
 @pytest.mark.e2e
+@pytest.mark.e2e
+class TestSyncStaleLLMConfigE2E:
+    """Sync in a shell whose RC still exports the pre-rename NEST_AI_* variables."""
+
+    def test_sync_points_upgraded_user_at_config_llm(self, initialized_project: Path) -> None:
+        stale_env = {
+            "NEST_LLM_API_KEY": "",
+            "NEST_API_KEY": "",
+            "OPENAI_API_KEY": "",
+            "AZURE_OPENAI_API_KEY": "",
+            "NEST_AI_API_KEY": "sk-stale",
+            "NEST_AI_MODEL": "old-model",
+        }
+        (initialized_project / "_nest_sources" / "notes.txt").write_text("plain text\n")
+
+        result = run_cli(["sync"], cwd=initialized_project, env=stale_env)
+
+        assert result.exit_code == 0, result.stdout + result.stderr
+        assert "not configured (NEST_AI_* ignored; run 'nest config llm')" in result.stdout
+
+
 class TestSyncContextTextFilesE2E:
     """E2E tests for non-Markdown text files in context indexing (Story 2.11)."""
 

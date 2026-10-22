@@ -39,10 +39,10 @@ from nest.ui.command import current_output
 from nest.ui.logger import setup_error_logger
 from nest.ui.messages import (
     LLM_DISABLED_NOTE,
-    LLM_NOT_CONFIGURED_NOTE,
     display_path,
     error,
     get_console,
+    llm_not_configured_note,
     print_needs_llm_block,
     success,
 )
@@ -322,7 +322,7 @@ def sync_command(
         if no_llm:
             llm_status_note = LLM_DISABLED_NOTE
         elif not llm_detected_key:
-            llm_status_note = LLM_NOT_CONFIGURED_NOTE
+            llm_status_note = llm_not_configured_note()
 
         # LLM progress callback for console display
         def llm_progress_callback(message: str) -> None:

@@ -24,9 +24,9 @@ from nest.ui.conversion import display_convert_summary
 from nest.ui.messages import (
     LLM_DISABLED_NOTE,
     LLM_ENABLE_HINT,
-    LLM_NOT_CONFIGURED_NOTE,
     error,
     get_console,
+    llm_not_configured_note,
 )
 
 if TYPE_CHECKING:
@@ -195,7 +195,7 @@ def convert_command(
         if no_llm:
             llm_status_note = LLM_DISABLED_NOTE
         elif llm_config is None:
-            llm_status_note = LLM_NOT_CONFIGURED_NOTE
+            llm_status_note = llm_not_configured_note()
 
         ui.start(len(plan.pending) + len(plan.skipped))
         result = service.execute(plan, progress_callback=ui.advance, activity_callback=ui.activity)

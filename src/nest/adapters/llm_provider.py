@@ -199,6 +199,21 @@ def _first_env(*names: str) -> tuple[str, str] | None:
     return None
 
 
+# Variable names read before the AI-to-LLM rename. Their values are never used;
+# they are only detected so an upgraded user learns why nothing is configured.
+LEGACY_LLM_ENV_VARS = (
+    "NEST_AI_API_KEY",
+    "NEST_AI_ENDPOINT",
+    "NEST_AI_MODEL",
+    "NEST_AI_VISION_MODEL",
+)
+
+
+def legacy_llm_env_vars() -> list[str]:
+    """Names of pre-rename ``NEST_AI_*`` variables present in the environment."""
+    return [name for name in LEGACY_LLM_ENV_VARS if os.environ.get(name)]
+
+
 def resolve_llm_config() -> LLMConfig | None:
     """Resolve LLM settings from Nest-prefixed environment variables.
 

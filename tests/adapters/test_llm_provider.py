@@ -21,6 +21,7 @@ from nest.adapters.llm_provider import (
     _is_azure_endpoint,
     create_llm_provider,
     create_vision_provider,
+    legacy_llm_env_vars,
     resolve_llm_config,
 )
 from nest.adapters.protocols import LLMProviderProtocol, VisionLLMProviderProtocol
@@ -72,6 +73,10 @@ _LLM_ENV_VARS = (
     "NEST_TEXT_MODEL",
     "NEST_LLM_VISION_MODEL",
     "NEST_VISION_MODEL",
+    "NEST_AI_API_KEY",
+    "NEST_AI_ENDPOINT",
+    "NEST_AI_MODEL",
+    "NEST_AI_VISION_MODEL",
 )
 
 
@@ -84,6 +89,17 @@ class TestResolveLLMConfig:
     def test_returns_none_without_api_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("NEST_LLM_MODEL", "gpt-4o")
         assert resolve_llm_config() is None
+
+    def test_legacy_nest_ai_vars_are_not_read(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Pre-rename NEST_AI_* variables never configure an LLM, only get reported."""
+        monkeypatch.setenv("NEST_AI_API_KEY", "old-key")
+        monkeypatch.setenv("NEST_AI_MODEL", "old-model")
+        assert resolve_llm_config() is None
+        assert legacy_llm_env_vars() == ["NEST_AI_API_KEY", "NEST_AI_MODEL"]
+
+    def test_no_legacy_vars_reported_when_absent(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("NEST_AI_API_KEY", raising=False)
+        assert legacy_llm_env_vars() == []
 
     def test_reports_which_variable_supplied_the_key(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("NEST_API_KEY", "legacy-key")

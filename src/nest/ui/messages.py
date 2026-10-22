@@ -69,7 +69,17 @@ def get_console() -> Console:
 LLM_DISABLED_NOTE = "disabled (--no-llm)"
 LLM_ENABLE_HINT = "run 'nest config llm' or set NEST_LLM_API_KEY"
 LLM_NOT_CONFIGURED_NOTE = f"not configured ({LLM_ENABLE_HINT})"
+LLM_LEGACY_CONFIG_NOTE = "not configured (NEST_AI_* ignored; run 'nest config llm')"
 _LLM_ENABLE_SENTENCE = LLM_ENABLE_HINT[0].upper() + LLM_ENABLE_HINT[1:]
+
+
+def llm_not_configured_note() -> str:
+    """Status note for a run without an LLM, pointing at stale ``NEST_AI_*`` vars when present."""
+    from nest.adapters.llm_provider import legacy_llm_env_vars
+
+    if legacy_llm_env_vars():
+        return LLM_LEGACY_CONFIG_NOTE
+    return LLM_NOT_CONFIGURED_NOTE
 
 
 def display_path(source: Path, root: Path | None) -> str:
