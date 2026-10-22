@@ -14,6 +14,7 @@ import pytest
 from nest.adapters.llm_provider import (
     DEFAULT_AZURE_API_VERSION,
     DEFAULT_ENDPOINT,
+    LLM_REQUEST_TIMEOUT,
     AzureOpenAIAdapter,
     AzureOpenAIVisionAdapter,
     OpenAIAdapter,
@@ -144,7 +145,9 @@ class TestCreateLLMProvider:
         assert result is not None
         assert result.model_name == "gpt-4o"
         mock_openai.assert_called_once_with(
-            api_key="nest-llm-key-123", base_url="https://custom.api/v1"
+            api_key="nest-llm-key-123",
+            base_url="https://custom.api/v1",
+            timeout=LLM_REQUEST_TIMEOUT,
         )
 
     def test_create_with_openai_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -203,7 +206,9 @@ class TestCreateLLMProvider:
             result = create_llm_provider()
 
         assert result is not None
-        mock_openai.assert_called_once_with(api_key="nest-llm-key", base_url=DEFAULT_ENDPOINT)
+        mock_openai.assert_called_once_with(
+            api_key="nest-llm-key", base_url=DEFAULT_ENDPOINT, timeout=LLM_REQUEST_TIMEOUT
+        )
 
     def test_endpoint_fallback_chain(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test three levels: NEST_LLM_ENDPOINT \u2192 NEST_BASE_URL \u2192 default."""
@@ -217,19 +222,25 @@ class TestCreateLLMProvider:
         monkeypatch.setenv("NEST_BASE_URL", "https://nest-ep/v1")
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
             create_llm_provider()
-        mock_openai.assert_called_once_with(api_key="key", base_url="https://nest-llm-ep/v1")
+        mock_openai.assert_called_once_with(
+            api_key="key", base_url="https://nest-llm-ep/v1", timeout=LLM_REQUEST_TIMEOUT
+        )
 
         # Level 2: NEST_BASE_URL fallback
         monkeypatch.delenv("NEST_LLM_ENDPOINT", raising=False)
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
             create_llm_provider()
-        mock_openai.assert_called_once_with(api_key="key", base_url="https://nest-ep/v1")
+        mock_openai.assert_called_once_with(
+            api_key="key", base_url="https://nest-ep/v1", timeout=LLM_REQUEST_TIMEOUT
+        )
 
         # Level 3: default
         monkeypatch.delenv("NEST_BASE_URL", raising=False)
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
             create_llm_provider()
-        mock_openai.assert_called_once_with(api_key="key", base_url=DEFAULT_ENDPOINT)
+        mock_openai.assert_called_once_with(
+            api_key="key", base_url=DEFAULT_ENDPOINT, timeout=LLM_REQUEST_TIMEOUT
+        )
 
     def test_model_fallback_chain(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test three levels: NEST_LLM_MODEL → NEST_TEXT_MODEL → None."""
@@ -268,7 +279,9 @@ class TestCreateLLMProvider:
 
         with patch("nest.adapters.llm_provider.openai.OpenAI") as mock_openai:
             create_llm_provider()
-        mock_openai.assert_called_once_with(api_key="key", base_url="https://api.openai.com/v1")
+        mock_openai.assert_called_once_with(
+            api_key="key", base_url="https://api.openai.com/v1", timeout=LLM_REQUEST_TIMEOUT
+        )
 
     def test_no_model_configured_returns_none(
         self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
@@ -477,6 +490,7 @@ class TestCreateLLMProviderAzure:
             api_key="azure-key-123",
             azure_endpoint="https://myorg.openai.azure.com",
             api_version=DEFAULT_AZURE_API_VERSION,
+            timeout=LLM_REQUEST_TIMEOUT,
         )
 
     def test_create_returns_openai_adapter_for_standard_endpoint(
@@ -890,6 +904,7 @@ class TestCreateVisionProvider:
             api_key="azure-key",
             azure_endpoint="https://myorg.openai.azure.com",
             api_version=DEFAULT_AZURE_API_VERSION,
+            timeout=LLM_REQUEST_TIMEOUT,
         )
 
     # 6.15z — Azure with no model at all → None
@@ -986,4 +1001,6 @@ class TestCreateVisionProvider:
 
         assert result is not None
         assert isinstance(result, OpenAIVisionAdapter)
-        mock_openai.assert_called_once_with(api_key="key", base_url="https://custom-vision.api/v1")
+        mock_openai.assert_called_once_with(
+            api_key="key", base_url="https://custom-vision.api/v1", timeout=LLM_REQUEST_TIMEOUT
+        )

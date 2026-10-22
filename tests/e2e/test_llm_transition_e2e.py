@@ -55,6 +55,7 @@ def _index_descriptions_by_file(index_content: str) -> dict[str, str]:
 
 
 @pytest.mark.e2e
+@pytest.mark.timeout(300)
 class TestLLMTransitionE2E:
     """E2E tests for transitioning from non-LLM to LLM-enabled sync."""
 
@@ -87,7 +88,7 @@ class TestLLMTransitionE2E:
         )
         saved = {k: os.environ.pop(k) for k in llm_keys if k in os.environ}
         try:
-            first = run_cli(["sync"], cwd=project_dir, timeout=120)
+            first = run_cli(["sync"], cwd=project_dir)
         finally:
             os.environ.update(saved)
         assert first.exit_code == 0, f"First sync failed: {first.stderr}\n{first.stdout}"
@@ -114,7 +115,7 @@ class TestLLMTransitionE2E:
         )
 
         # --- Second sync: WITH LLM credentials ---
-        second = run_cli(["sync"], cwd=project_dir, timeout=120, env=llm_env_vars())
+        second = run_cli(["sync"], cwd=project_dir, env=llm_env_vars())
         assert second.exit_code == 0, f"Second sync failed: {second.stderr}\n{second.stdout}"
 
         # Glossary should now exist in .nest/
@@ -160,14 +161,14 @@ class TestLLMTransitionE2E:
         (sources_dir / "overview.md").write_text(_SAMPLE_CONTENT)
 
         # First sync with --no-llm (credentials present but disabled)
-        first = run_cli(["sync", "--no-llm"], cwd=project_dir, timeout=120, env=llm_env_vars())
+        first = run_cli(["sync", "--no-llm"], cwd=project_dir, env=llm_env_vars())
         assert first.exit_code == 0, f"First sync failed: {first.stderr}\n{first.stdout}"
 
         glossary_path = project_dir / ".nest" / "glossary.md"
         assert not glossary_path.exists(), "Glossary should NOT exist after --no-llm sync"
 
         # Second sync with the LLM enabled (no --no-llm flag)
-        second = run_cli(["sync"], cwd=project_dir, timeout=120, env=llm_env_vars())
+        second = run_cli(["sync"], cwd=project_dir, env=llm_env_vars())
         assert second.exit_code == 0, f"Second sync failed: {second.stderr}\n{second.stdout}"
 
         assert glossary_path.exists(), "Glossary should be created when the LLM is re-enabled"

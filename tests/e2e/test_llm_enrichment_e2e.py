@@ -68,6 +68,7 @@ def _index_descriptions_by_file(index_content: str) -> dict[str, str]:
 
 
 @pytest.mark.e2e
+@pytest.mark.timeout(300)
 class TestLLMEnrichmentE2E:
     """E2E tests for LLM index enrichment."""
 
@@ -79,7 +80,7 @@ class TestLLMEnrichmentE2E:
         project_dir = initialized_project
         _add_sample_files(project_dir / "_nest_sources")
 
-        result = run_cli(["sync"], cwd=project_dir, timeout=120, env=llm_env_vars())
+        result = run_cli(["sync"], cwd=project_dir, env=llm_env_vars())
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
         # Index should have non-empty descriptions
@@ -109,7 +110,7 @@ class TestLLMEnrichmentE2E:
         env = llm_env_vars()
 
         # First sync — generates descriptions
-        first = run_cli(["sync"], cwd=project_dir, timeout=120, env=env)
+        first = run_cli(["sync"], cwd=project_dir, env=env)
         assert first.exit_code == 0, f"First sync failed: {first.stderr}\n{first.stdout}"
         assert "LLM tokens:" in first.stdout
 
@@ -119,7 +120,7 @@ class TestLLMEnrichmentE2E:
         first_descriptions = _index_descriptions_by_file(first_index)
 
         # Second sync — no changes, should skip LLM
-        second = run_cli(["sync"], cwd=project_dir, timeout=120, env=env)
+        second = run_cli(["sync"], cwd=project_dir, env=env)
         assert second.exit_code == 0, f"Second sync failed: {second.stderr}\n{second.stdout}"
         assert "LLM tokens:" not in second.stdout
 
@@ -142,7 +143,7 @@ class TestLLMEnrichmentE2E:
         project_dir = initialized_project
         _add_sample_files(project_dir / "_nest_sources")
 
-        result = run_cli(["sync", "--no-llm"], cwd=project_dir, timeout=120, env=llm_env_vars())
+        result = run_cli(["sync", "--no-llm"], cwd=project_dir, env=llm_env_vars())
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
         # Index should exist but descriptions should be empty

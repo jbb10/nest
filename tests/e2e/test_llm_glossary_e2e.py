@@ -30,6 +30,7 @@ Target completion: Q4 2026.
 
 
 @pytest.mark.e2e
+@pytest.mark.timeout(300)
 class TestLLMGlossaryE2E:
     """E2E tests for LLM glossary generation."""
 
@@ -43,7 +44,7 @@ class TestLLMGlossaryE2E:
         (sources_dir / "contracts" / "overview.md").write_text(_GLOSSARY_CONTENT_1)
         (sources_dir / "contracts" / "notes.txt").write_text(_GLOSSARY_CONTENT_2)
 
-        result = run_cli(["sync"], cwd=project_dir, timeout=120, env=llm_env_vars())
+        result = run_cli(["sync"], cwd=project_dir, env=llm_env_vars())
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
         glossary_path = project_dir / ".nest" / "glossary.md"
@@ -86,7 +87,7 @@ class TestLLMGlossaryE2E:
         (sources_dir / "contracts").mkdir(parents=True, exist_ok=True)
         (sources_dir / "contracts" / "overview.md").write_text(_GLOSSARY_CONTENT_1)
 
-        result = run_cli(["sync", "--no-llm"], cwd=project_dir, timeout=120, env=llm_env_vars())
+        result = run_cli(["sync", "--no-llm"], cwd=project_dir, env=llm_env_vars())
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
         glossary_path = project_dir / ".nest" / "glossary.md"

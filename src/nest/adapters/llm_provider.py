@@ -26,6 +26,11 @@ def _is_azure_endpoint(endpoint: str) -> bool:
     return ".openai.azure.com" in endpoint.lower()
 
 
+# Seconds allowed per request before the SDK retries. The SDK default of 600s
+# lets one stalled connection block a sync for many minutes.
+LLM_REQUEST_TIMEOUT = 120.0
+
+
 class OpenAIAdapter:
     """OpenAI-compatible LLM adapter.
 
@@ -34,7 +39,9 @@ class OpenAIAdapter:
     """
 
     def __init__(self, api_key: str, endpoint: str, model: str) -> None:
-        self._client = openai.OpenAI(api_key=api_key, base_url=endpoint)
+        self._client = openai.OpenAI(
+            api_key=api_key, base_url=endpoint, timeout=LLM_REQUEST_TIMEOUT
+        )
         self._model = model
 
     @property
@@ -110,6 +117,7 @@ class AzureOpenAIAdapter:
             api_key=api_key,
             azure_endpoint=endpoint,
             api_version=api_version,
+            timeout=LLM_REQUEST_TIMEOUT,
         )
         self._deployment = deployment
 
@@ -282,7 +290,9 @@ class OpenAIVisionAdapter:
     """
 
     def __init__(self, api_key: str, endpoint: str, model: str) -> None:
-        self._client = openai.OpenAI(api_key=api_key, base_url=endpoint)
+        self._client = openai.OpenAI(
+            api_key=api_key, base_url=endpoint, timeout=LLM_REQUEST_TIMEOUT
+        )
         self._model = model
 
     @property
@@ -370,6 +380,7 @@ class AzureOpenAIVisionAdapter:
             api_key=api_key,
             azure_endpoint=endpoint,
             api_version=api_version,
+            timeout=LLM_REQUEST_TIMEOUT,
         )
         self._deployment = deployment
 
