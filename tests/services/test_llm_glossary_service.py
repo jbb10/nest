@@ -1,14 +1,14 @@
-"""Tests for AIGlossaryService (unified per-document pipeline)."""
+"""Tests for LLMGlossaryService (unified per-document pipeline)."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from nest.core.models import AIGlossaryResult, LLMCompletionResult
-from nest.services.ai_glossary_service import (
+from nest.core.models import LLMCompletionResult, LLMGlossaryResult
+from nest.services.llm_glossary_service import (
     GLOSSARY_HEADER,
     GLOSSARY_TABLE_HEADER,
-    AIGlossaryService,
+    LLMGlossaryService,
 )
 
 # ---------------------------------------------------------------------------
@@ -17,7 +17,7 @@ from nest.services.ai_glossary_service import (
 
 
 class MockLLMProvider:
-    """Mock LLM provider for testing AI glossary."""
+    """Mock LLM provider for testing LLM glossary."""
 
     def __init__(self, responses: list[LLMCompletionResult | None] | None = None) -> None:
         self._responses = responses or []
@@ -117,7 +117,7 @@ class TestGenerateNewTerms:
             ),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([file_path], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -138,7 +138,7 @@ class TestGenerateNewTerms:
             _make_llm_table_response(["| ACME | Organization | The client organization. |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1, f2], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -167,7 +167,7 @@ class TestGenerateNewTerms:
             ),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1, f2], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -190,7 +190,7 @@ class TestIncrementalLogic:
             _make_llm_table_response(["| PDC | Acronym | New def (should skip). |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -209,7 +209,7 @@ class TestIncrementalLogic:
             _make_llm_table_response(["| PDC | Acronym | Second definition. |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1, f2], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -227,7 +227,7 @@ class TestIncrementalLogic:
             _make_llm_table_response(["| PDC | Acronym | New def. |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -243,7 +243,7 @@ class TestGracefulFailure:
         fs = MockFileSystem()
         f1 = _make_file(fs, "doc.md", "Some content.")
         provider = MockLLMProvider([None])
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -260,7 +260,7 @@ class TestGracefulFailure:
             _make_llm_table_response(["| ACME | Organization | The client. |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1, f2], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -281,7 +281,7 @@ class TestGracefulFailure:
             ),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -292,7 +292,7 @@ class TestGracefulFailure:
         fs = MockFileSystem()
         f1 = _make_file(fs, "empty.md", "   ")
         provider = MockLLMProvider([])
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -313,7 +313,7 @@ class TestHumanEditPreservation:
             _make_llm_table_response(["| Bravo | Domain Term | A new term. |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -336,7 +336,7 @@ class TestHumanEditPreservation:
             ),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -361,7 +361,7 @@ class TestFirstRunCreation:
             _make_llm_table_response(["| PDC | Acronym | Project Delivery Committee. |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -380,11 +380,11 @@ class TestNoOpConditions:
         """Empty changed_files -> empty result, zero tokens."""
         provider = MockLLMProvider([])
         fs = MockFileSystem()
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([], CONTEXT_DIR, GLOSSARY_PATH)
 
-        assert result == AIGlossaryResult()
+        assert result == LLMGlossaryResult()
         assert len(provider.calls) == 0
 
 
@@ -405,7 +405,7 @@ class TestCategoryValidation:
             ),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         result = service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -423,7 +423,7 @@ class TestCategoryValidation:
             _make_llm_table_response(["| PDC | UnknownCat | Some definition. |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -436,13 +436,13 @@ class TestPromptConstruction:
 
     def test_system_prompt_without_context(self) -> None:
         """Without project context, placeholder replaced with empty string."""
-        prompt = AIGlossaryService._build_system_prompt()
+        prompt = LLMGlossaryService._build_system_prompt()
         assert "{PROJECT_CONTEXT_BLOCK}" not in prompt
         assert "Project context:" not in prompt
 
     def test_system_prompt_with_context(self) -> None:
         """With project context, block inserted."""
-        prompt = AIGlossaryService._build_system_prompt("This is a billing project.")
+        prompt = LLMGlossaryService._build_system_prompt("This is a billing project.")
         assert "Project context:" in prompt
         assert "This is a billing project." in prompt
 
@@ -452,7 +452,7 @@ class TestPromptConstruction:
         f1 = _make_file(fs, "doc.md", "Content")
         responses = [_make_llm_table_response(["| PDC | Acronym | Def. |"])]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 
@@ -467,7 +467,7 @@ class TestChunking:
     def test_under_limit_single_chunk(self) -> None:
         """Content under limit -> single chunk."""
         content = "Short content"
-        chunks = AIGlossaryService._chunk_content(content, max_chars=100)
+        chunks = LLMGlossaryService._chunk_content(content, max_chars=100)
         assert len(chunks) == 1
         assert chunks[0] == content
 
@@ -477,7 +477,7 @@ class TestChunking:
         p2 = "B" * 50
         p3 = "C" * 50
         content = f"{p1}\n\n{p2}\n\n{p3}"
-        chunks = AIGlossaryService._chunk_content(content, max_chars=110)
+        chunks = LLMGlossaryService._chunk_content(content, max_chars=110)
         assert len(chunks) >= 2
         # All content should be preserved
         reconstructed = "\n\n".join(chunks)
@@ -489,7 +489,7 @@ class TestChunking:
         """Single paragraph larger than max_chars goes in its own chunk."""
         huge = "X" * 200
         content = f"short\n\n{huge}\n\nshort2"
-        chunks = AIGlossaryService._chunk_content(content, max_chars=50)
+        chunks = LLMGlossaryService._chunk_content(content, max_chars=50)
         assert any(huge in c for c in chunks)
 
     def test_chunked_file_dedup_across_chunks(self) -> None:
@@ -504,11 +504,11 @@ class TestChunking:
             _make_llm_table_response(["| PDC | Acronym | Chunk 2 def. |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         # Force chunking by patching _chunk_content to split into two chunks
         with patch.object(
-            AIGlossaryService,
+            LLMGlossaryService,
             "_chunk_content",
             return_value=["A" * 100, "B" * 100],
         ):
@@ -528,7 +528,7 @@ class TestResponseParsing:
         text = (
             "| PDC | Acronym | Project Delivery Committee. |\n| ACME | Organization | The client. |"
         )
-        results = AIGlossaryService._parse_table_rows(text)
+        results = LLMGlossaryService._parse_table_rows(text)
         assert len(results) == 2
         assert results[0] == ("PDC", "Acronym", "Project Delivery Committee.")
         assert results[1] == ("ACME", "Organization", "The client.")
@@ -540,14 +540,14 @@ class TestResponseParsing:
             "|------|----------|------------|\n"
             "| PDC | Acronym | Def. |"
         )
-        results = AIGlossaryService._parse_table_rows(text)
+        results = LLMGlossaryService._parse_table_rows(text)
         assert len(results) == 1
         assert results[0][0] == "PDC"
 
     def test_parse_skips_malformed(self) -> None:
         """Lines without enough pipes are skipped."""
         text = "Some random text\n| Only two |\n| PDC | Acronym | Valid. |"
-        results = AIGlossaryService._parse_table_rows(text)
+        results = LLMGlossaryService._parse_table_rows(text)
         assert len(results) == 1
 
 
@@ -556,19 +556,19 @@ class TestSanitization:
 
     def test_sanitize_removes_pipe_chars(self) -> None:
         """| replaced with -."""
-        result = AIGlossaryService._sanitize_definition("Alpha | Beta | Gamma")
+        result = LLMGlossaryService._sanitize_definition("Alpha | Beta | Gamma")
         assert "|" not in result
         assert result == "Alpha - Beta - Gamma"
 
     def test_sanitize_replaces_newlines(self) -> None:
         """newline replaced with space."""
-        result = AIGlossaryService._sanitize_definition("Line one\nLine two")
+        result = LLMGlossaryService._sanitize_definition("Line one\nLine two")
         assert result == "Line one Line two"
 
     def test_sanitize_strips_quotes(self) -> None:
         """Leading/trailing quotes removed."""
-        assert AIGlossaryService._sanitize_definition('"Quoted def"') == "Quoted def"
-        assert AIGlossaryService._sanitize_definition("'Single quoted'") == "Single quoted"
+        assert LLMGlossaryService._sanitize_definition('"Quoted def"') == "Quoted def"
+        assert LLMGlossaryService._sanitize_definition("'Single quoted'") == "Single quoted"
 
 
 class TestGlossaryFileIO:
@@ -582,7 +582,7 @@ class TestGlossaryFileIO:
             _make_llm_table_response(["| PDC | Acronym | Project Delivery Committee. |"]),
         ]
         provider = MockLLMProvider(responses)
-        service = AIGlossaryService(llm_provider=provider, filesystem=fs)
+        service = LLMGlossaryService(llm_provider=provider, filesystem=fs)
 
         service.generate([f1], CONTEXT_DIR, GLOSSARY_PATH)
 

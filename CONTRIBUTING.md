@@ -94,7 +94,7 @@ Two workflows guard every pull request (see [.github/workflows/](.github/workflo
   - `test`: unit + integration tests (single run - `uv` installs a compatible
     Python from the project's `requires-python`).
   - `e2e`: full end-to-end suite against real Docling. The ~2.5 GB of ML models
-    are cached between runs; AI-gated tests use the shared test proxy from
+    are cached between runs; LLM-gated tests use the shared test proxy from
     `tests/e2e/conftest.py`.
   - `ci-success`: single aggregate check to require in branch protection.
 

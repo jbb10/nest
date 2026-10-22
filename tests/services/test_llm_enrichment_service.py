@@ -1,4 +1,4 @@
-"""Tests for AIEnrichmentService."""
+"""Tests for LLMEnrichmentService."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ from nest.core.models import (
     HeadingInfo,
     LLMCompletionResult,
 )
-from nest.services.ai_enrichment_service import (
+from nest.services.llm_enrichment_service import (
     ENRICHMENT_SYSTEM_PROMPT,
-    AIEnrichmentService,
+    LLMEnrichmentService,
 )
 
 
 class MockLLMProvider:
-    """Mock LLM provider for testing AI enrichment."""
+    """Mock LLM provider for testing LLM enrichment."""
 
     def __init__(self, responses: list[LLMCompletionResult | None] | None = None) -> None:
         self._responses = responses or []
@@ -77,7 +77,7 @@ class TestEnrichGeneratesDescriptions:
             _make_result("Description for B"),
         ]
         provider = MockLLMProvider(responses)
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions={}, old_hints={})
 
@@ -94,7 +94,7 @@ class TestEnrichGeneratesDescriptions:
             _make_result("Desc B", prompt_tokens=60, completion_tokens=8),
         ]
         provider = MockLLMProvider(responses)
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions={}, old_hints={})
 
@@ -112,7 +112,7 @@ class TestIncrementalLogic:
         old_hints = {"doc.md": "same_hash"}
         old_descriptions = {"doc.md": "Existing description"}
         provider = MockLLMProvider([])
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions, old_hints)
 
@@ -128,7 +128,7 @@ class TestIncrementalLogic:
         old_descriptions = {"doc.md": "Old description"}
         responses = [_make_result("Updated description")]
         provider = MockLLMProvider(responses)
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions, old_hints)
 
@@ -143,7 +143,7 @@ class TestIncrementalLogic:
         old_descriptions = {"doc.md": ""}
         responses = [_make_result("New description")]
         provider = MockLLMProvider(responses)
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions, old_hints)
 
@@ -156,7 +156,7 @@ class TestIncrementalLogic:
         files = [_make_file("new.md", content_hash="brand_new")]
         responses = [_make_result("Brand new file description")]
         provider = MockLLMProvider(responses)
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions={}, old_hints={})
 
@@ -171,7 +171,7 @@ class TestIncrementalLogic:
         old_descriptions: dict[str, str] = {}  # Missing entirely
         responses = [_make_result("Generated description")]
         provider = MockLLMProvider(responses)
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions, old_hints)
 
@@ -186,7 +186,7 @@ class TestGracefulFailure:
         """LLM returns None → empty description, files_failed incremented."""
         files = [_make_file("fail.md")]
         provider = MockLLMProvider([None])
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions={}, old_hints={})
 
@@ -199,7 +199,7 @@ class TestGracefulFailure:
         files = [_make_file("fail.md", "h1"), _make_file("ok.md", "h2")]
         responses = [None, _make_result("Success")]
         provider = MockLLMProvider(responses)
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions={}, old_hints={})
 
@@ -223,7 +223,7 @@ class TestPromptConstruction:
             ],
             first_paragraph="This document outlines the agreement.",
         )
-        service = AIEnrichmentService(llm_provider=MockLLMProvider())
+        service = LLMEnrichmentService(llm_provider=MockLLMProvider())
 
         prompt = service._build_user_prompt(file)
 
@@ -235,7 +235,7 @@ class TestPromptConstruction:
     def test_build_user_prompt_handles_missing_headings(self) -> None:
         """No headings → 'Headings:' line not included."""
         file = _make_file(path="flat.md", lines=10, headings=[])
-        service = AIEnrichmentService(llm_provider=MockLLMProvider())
+        service = LLMEnrichmentService(llm_provider=MockLLMProvider())
 
         prompt = service._build_user_prompt(file)
 
@@ -250,7 +250,7 @@ class TestPromptConstruction:
             lines=500,
             table_columns=["id", "name", "amount"],
         )
-        service = AIEnrichmentService(llm_provider=MockLLMProvider())
+        service = LLMEnrichmentService(llm_provider=MockLLMProvider())
 
         prompt = service._build_user_prompt(file)
 
@@ -260,7 +260,7 @@ class TestPromptConstruction:
         """Only first 5 headings should be included."""
         headings = [HeadingInfo(level=1, text=f"H{i}") for i in range(8)]
         file = _make_file(path="big.md", headings=headings)
-        service = AIEnrichmentService(llm_provider=MockLLMProvider())
+        service = LLMEnrichmentService(llm_provider=MockLLMProvider())
 
         prompt = service._build_user_prompt(file)
 
@@ -272,7 +272,7 @@ class TestPromptConstruction:
         files = [_make_file("doc.md")]
         responses = [_make_result("Desc")]
         provider = MockLLMProvider(responses)
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         service.enrich(files, old_descriptions={}, old_hints={})
 
@@ -284,7 +284,7 @@ class TestSanitization:
 
     def test_sanitize_removes_pipe_chars(self) -> None:
         """Pipe characters should be replaced with dashes."""
-        service = AIEnrichmentService(llm_provider=MockLLMProvider())
+        service = LLMEnrichmentService(llm_provider=MockLLMProvider())
 
         result = service._sanitize_description("Alpha | Beta | Gamma overview")
 
@@ -293,7 +293,7 @@ class TestSanitization:
 
     def test_sanitize_truncates_to_10_words(self) -> None:
         """Descriptions longer than 10 words should be truncated."""
-        service = AIEnrichmentService(llm_provider=MockLLMProvider())
+        service = LLMEnrichmentService(llm_provider=MockLLMProvider())
         long_text = " ".join(f"word{i}" for i in range(20))
 
         result = service._sanitize_description(long_text)
@@ -302,20 +302,20 @@ class TestSanitization:
 
     def test_sanitize_strips_quotes(self) -> None:
         """Leading/trailing quotes should be removed."""
-        service = AIEnrichmentService(llm_provider=MockLLMProvider())
+        service = LLMEnrichmentService(llm_provider=MockLLMProvider())
 
         assert service._sanitize_description('"A quoted description"') == "A quoted description"
         assert service._sanitize_description("'Single quoted'") == "Single quoted"
 
     def test_sanitize_strips_whitespace(self) -> None:
         """Leading/trailing whitespace should be removed."""
-        service = AIEnrichmentService(llm_provider=MockLLMProvider())
+        service = LLMEnrichmentService(llm_provider=MockLLMProvider())
 
         assert service._sanitize_description("  spaces around  ") == "spaces around"
 
     def test_sanitize_replaces_newlines(self) -> None:
         """Newlines in LLM output should be replaced with spaces."""
-        service = AIEnrichmentService(llm_provider=MockLLMProvider())
+        service = LLMEnrichmentService(llm_provider=MockLLMProvider())
 
         assert service._sanitize_description("Line one\nLine two") == "Line one Line two"
         assert service._sanitize_description("A\n\nB") == "A  B"
@@ -327,7 +327,7 @@ class TestEdgeCases:
     def test_enrich_empty_file_list(self) -> None:
         """No files → empty result, zero tokens."""
         provider = MockLLMProvider()
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich([], old_descriptions={}, old_hints={})
 
@@ -348,7 +348,7 @@ class TestEdgeCases:
         old_hints = {"a.md": "h1", "b.md": "h2"}
         old_descriptions = {"a.md": "Desc A", "b.md": "Desc B"}
         provider = MockLLMProvider()
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions, old_hints)
 
@@ -367,7 +367,7 @@ class TestEdgeCases:
         old_descriptions = {"cached.md": "Existing desc"}
         responses = [_make_result("New file desc")]
         provider = MockLLMProvider(responses)
-        service = AIEnrichmentService(llm_provider=provider)
+        service = LLMEnrichmentService(llm_provider=provider)
 
         result = service.enrich(files, old_descriptions, old_hints)
 

@@ -32,7 +32,7 @@ from nest.services.sync_outcomes import OutcomeRecorder, ProgressCallback, SyncL
 
 if TYPE_CHECKING:
     from nest.adapters.docling_processor import DoclingProcessor
-    from nest.services.ai_transcription_service import AITranscriptionService
+    from nest.services.llm_transcription_service import LLMTranscriptionService
     from nest.services.output_service import OutputMirrorService
     from nest.services.picture_description_service import PictureDescriptionService
 
@@ -52,7 +52,7 @@ class ConvertService:
         picture_description: PictureDescriptionService | None = None,
         vision_processor: DoclingProcessor | None = None,
         image_processor: DoclingProcessor | None = None,
-        transcriber: AITranscriptionService | None = None,
+        transcriber: LLMTranscriptionService | None = None,
     ) -> None:
         """Initialize with required collaborators.
 
@@ -67,7 +67,7 @@ class ConvertService:
             image_processor: Optional classification-enabled Docling processor
                 for standalone image files when vision is unavailable.
             transcriber: Optional service that prepares the files it handles
-                by AI transcription instead of Docling.
+                by LLM transcription instead of Docling.
         """
         self._output = output
         self._file_discovery = file_discovery

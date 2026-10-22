@@ -23,7 +23,7 @@ class TestConsoleDiagnostics:
     ) -> None:
         # Fake credential, used only to prove the diagnostics channel redacts it.
         sentinel = "sample-sentinel-for-diagnostic-test"
-        monkeypatch.setenv("NEST_AI_API_KEY", sentinel)
+        monkeypatch.setenv("NEST_LLM_API_KEY", sentinel)
         output = StringIO()
         with ConsoleDiagnostics(Console(file=output, width=160), verbose=verbose) as diagnostics:
             logging.getLogger("httpx").warning("Request failed with %s", sentinel)

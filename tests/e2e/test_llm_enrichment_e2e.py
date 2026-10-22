@@ -1,15 +1,15 @@
-"""E2E tests for AI index enrichment (Story 6.7).
+"""E2E tests for LLM index enrichment (Story 6.7).
 
 Tests verify that sync with a real LLM produces enriched index
-descriptions and respects --no-ai and incremental caching.
-All tests are gated by AI API key availability.
+descriptions and respects --no-llm and incremental caching.
+All tests are gated by LLM API key availability.
 """
 
 from pathlib import Path
 
 import pytest
 
-from .conftest import ai_env_vars, run_cli, skip_without_ai
+from .conftest import llm_env_vars, run_cli, skip_without_llm
 
 _PROJECT_OVERVIEW = """\
 # Alpha Project Overview
@@ -68,18 +68,18 @@ def _index_descriptions_by_file(index_content: str) -> dict[str, str]:
 
 
 @pytest.mark.e2e
-class TestAIEnrichmentE2E:
-    """E2E tests for AI-powered index enrichment."""
+class TestLLMEnrichmentE2E:
+    """E2E tests for LLM index enrichment."""
 
-    @skip_without_ai
-    def test_sync_produces_enriched_index_with_ai_descriptions(
+    @skip_without_llm
+    def test_sync_produces_enriched_index_with_llm_descriptions(
         self, initialized_project: Path
     ) -> None:
-        """AC6: Sync with AI produces non-empty descriptions in master index."""
+        """AC6: Sync with an LLM produces non-empty descriptions in master index."""
         project_dir = initialized_project
         _add_sample_files(project_dir / "_nest_sources")
 
-        result = run_cli(["sync"], cwd=project_dir, timeout=120, env=ai_env_vars())
+        result = run_cli(["sync"], cwd=project_dir, timeout=120, env=llm_env_vars())
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
         # Index should have non-empty descriptions
@@ -95,33 +95,33 @@ class TestAIEnrichmentE2E:
             assert descriptions[filename], f"Expected non-empty description for {filename}"
 
         # Token usage should be reported
-        assert "AI tokens:" in result.stdout
+        assert "LLM tokens:" in result.stdout
 
-        # First-run AI discovery message
+        # First-run LLM discovery message
         combined = result.stdout + result.stderr
-        assert "AI enrichment" in combined or "🤖" in combined
+        assert "LLM enrichment" in combined or "🤖" in combined
 
-    @skip_without_ai
-    def test_sync_incremental_ai_skips_unchanged(self, initialized_project: Path) -> None:
+    @skip_without_llm
+    def test_sync_incremental_llm_skips_unchanged(self, initialized_project: Path) -> None:
         """AC8: Second sync without changes reports no token usage."""
         project_dir = initialized_project
         _add_sample_files(project_dir / "_nest_sources")
-        env = ai_env_vars()
+        env = llm_env_vars()
 
         # First sync — generates descriptions
         first = run_cli(["sync"], cwd=project_dir, timeout=120, env=env)
         assert first.exit_code == 0, f"First sync failed: {first.stderr}\n{first.stdout}"
-        assert "AI tokens:" in first.stdout
+        assert "LLM tokens:" in first.stdout
 
         # Capture descriptions from first sync
         index_path = project_dir / ".nest" / "00_MASTER_INDEX.md"
         first_index = index_path.read_text()
         first_descriptions = _index_descriptions_by_file(first_index)
 
-        # Second sync — no changes, should skip AI
+        # Second sync — no changes, should skip LLM
         second = run_cli(["sync"], cwd=project_dir, timeout=120, env=env)
         assert second.exit_code == 0, f"Second sync failed: {second.stderr}\n{second.stdout}"
-        assert "AI tokens:" not in second.stdout
+        assert "LLM tokens:" not in second.stdout
 
         # Descriptions preserved exactly for unchanged files.
         second_index = index_path.read_text()
@@ -136,13 +136,13 @@ class TestAIEnrichmentE2E:
                 f"Description changed unexpectedly for {filename}"
             )
 
-    @skip_without_ai
-    def test_sync_no_ai_flag_skips_enrichment(self, initialized_project: Path) -> None:
-        """AC9: --no-ai flag skips enrichment even with AI keys set."""
+    @skip_without_llm
+    def test_sync_no_llm_flag_skips_enrichment(self, initialized_project: Path) -> None:
+        """AC9: --no-llm flag skips enrichment even with LLM keys set."""
         project_dir = initialized_project
         _add_sample_files(project_dir / "_nest_sources")
 
-        result = run_cli(["sync", "--no-ai"], cwd=project_dir, timeout=120, env=ai_env_vars())
+        result = run_cli(["sync", "--no-llm"], cwd=project_dir, timeout=120, env=llm_env_vars())
         assert result.exit_code == 0, f"Sync failed: {result.stderr}\n{result.stdout}"
 
         # Index should exist but descriptions should be empty
@@ -154,8 +154,8 @@ class TestAIEnrichmentE2E:
         for filename in ("project-overview.md", "meeting-notes.txt", "technical-spec.md"):
             assert filename in descriptions, f"Expected index row for {filename}"
             assert not descriptions[filename], (
-                f"Expected empty description for {filename} with --no-ai"
+                f"Expected empty description for {filename} with --no-llm"
             )
 
         # No token usage reported
-        assert "AI tokens:" not in result.stdout
+        assert "LLM tokens:" not in result.stdout

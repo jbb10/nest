@@ -13,16 +13,17 @@ import typer
 from nest.adapters.classification_processor import create_classification_processor
 from nest.adapters.file_discovery import FileDiscoveryAdapter
 from nest.adapters.filesystem import FileSystemAdapter
-from nest.adapters.llm_provider import resolve_ai_config
+from nest.adapters.llm_provider import resolve_llm_config
 from nest.adapters.manifest import ManifestAdapter
 from nest.adapters.noop_processor import NoOpProcessor
 from nest.adapters.passthrough_processor import PassthroughProcessor
 from nest.core.exceptions import NestError, ProcessingError
 from nest.core.models import DryRunResult, SyncResult
 from nest.core.paths import (
-    AI_SEEN_MARKER,
     CONTEXT_DIR,
     ERROR_LOG_FILENAME,
+    LEGACY_LLM_SEEN_MARKER,
+    LLM_SEEN_MARKER,
     NEST_META_DIR,
     SOURCES_DIR,
 )
@@ -37,26 +38,26 @@ from nest.services.sync_service import SyncService
 from nest.ui.command import current_output
 from nest.ui.logger import setup_error_logger
 from nest.ui.messages import (
-    AI_DISABLED_NOTE,
-    AI_NOT_CONFIGURED_NOTE,
+    LLM_DISABLED_NOTE,
+    LLM_NOT_CONFIGURED_NOTE,
     display_path,
     error,
     get_console,
-    print_needs_ai_block,
+    print_needs_llm_block,
     success,
 )
 
 if TYPE_CHECKING:
     from rich.console import Console
 
-    from nest.adapters.llm_provider import AIConfig
+    from nest.adapters.llm_provider import LLMConfig
 
 
 def create_sync_service(
     project_root: Path,
     error_logger: "logging.Logger | logging.LoggerAdapter[logging.Logger] | None" = None,
-    no_ai: bool = False,
-    ai_config: "AIConfig | None" = None,
+    no_llm: bool = False,
+    llm_config: "LLMConfig | None" = None,
 ) -> SyncService:
     """Composition root for sync service.
 
@@ -85,8 +86,8 @@ def create_sync_service(
     Args:
         project_root: Root directory of the project.
         error_logger: Logger for writing errors to .nest/errors.log.
-        no_ai: If True, skip AI enrichment even when API key is configured.
-        ai_config: Pre-resolved AI configuration; resolved from the environment when omitted.
+        no_llm: If True, skip LLM enrichment even when API key is configured.
+        llm_config: Pre-resolved LLM configuration; resolved from the environment when omitted.
 
     Returns:
         Configured SyncService with real adapters.
@@ -106,33 +107,33 @@ def create_sync_service(
     raw_inbox = project_root / SOURCES_DIR
     output_dir = project_root / CONTEXT_DIR
 
-    # AI enrichment and vision (optional, independent of each other)
-    ai_enrichment = None
-    ai_glossary = None
+    # LLM enrichment and vision (optional, independent of each other)
+    llm_enrichment = None
+    llm_glossary = None
     vision_docling_processor = None
     picture_description_service = None
-    if not no_ai:
+    if not no_llm:
         from nest.adapters.llm_provider import (
             create_llm_provider,
             create_vision_provider,
-            resolve_ai_config,
+            resolve_llm_config,
         )
 
-        ai_config = ai_config or resolve_ai_config()
-        llm_provider = create_llm_provider(ai_config) if ai_config else None
+        llm_config = llm_config or resolve_llm_config()
+        llm_provider = create_llm_provider(llm_config) if llm_config else None
         if llm_provider is not None:
-            from nest.services.ai_enrichment_service import AIEnrichmentService
+            from nest.services.llm_enrichment_service import LLMEnrichmentService
 
-            ai_enrichment = AIEnrichmentService(llm_provider=llm_provider)
+            llm_enrichment = LLMEnrichmentService(llm_provider=llm_provider)
 
-            from nest.services.ai_glossary_service import AIGlossaryService
+            from nest.services.llm_glossary_service import LLMGlossaryService
 
-            ai_glossary = AIGlossaryService(
+            llm_glossary = LLMGlossaryService(
                 llm_provider=llm_provider,
                 filesystem=filesystem,
             )
 
-        vision_provider = create_vision_provider(ai_config) if ai_config else None
+        vision_provider = create_vision_provider(llm_config) if llm_config else None
         if vision_provider is not None:
             vision_docling_processor = create_classification_processor()
 
@@ -176,8 +177,8 @@ def create_sync_service(
         ),
         project_root=project_root,
         error_logger=error_logger,
-        ai_enrichment=ai_enrichment,
-        ai_glossary=ai_glossary,
+        llm_enrichment=llm_enrichment,
+        llm_glossary=llm_glossary,
         picture_description_service=picture_description_service,
         vision_docling_processor=vision_docling_processor,
         image_docling_processor=image_docling_processor,
@@ -230,11 +231,11 @@ def sync_command(
             help="Detect orphans but don't remove them",
         ),
     ] = False,
-    no_ai: Annotated[
+    no_llm: Annotated[
         bool,
         typer.Option(
-            "--no-ai",
-            help="Skip AI enrichment even when API key is configured",
+            "--no-llm",
+            help="Skip LLM enrichment even when API key is configured",
         ),
     ] = False,
     verbose: Annotated[
@@ -290,9 +291,9 @@ def sync_command(
     error_logger = setup_error_logger(error_log_path, service_name="sync")
 
     try:
-        ai_config = None if no_ai else resolve_ai_config()
+        llm_config = None if no_llm else resolve_llm_config()
         service = create_sync_service(
-            project_root, error_logger=error_logger, no_ai=no_ai, ai_config=ai_config
+            project_root, error_logger=error_logger, no_llm=no_llm, llm_config=llm_config
         )
 
         # 1. Discovery phase
@@ -315,16 +316,16 @@ def sync_command(
         # Calculate total for progress using discovered changes
         files_to_process_count = len(changes.new_files) + len(changes.modified_files)
 
-        ai_detected_key = ai_config.api_key_var if ai_config else ""
+        llm_detected_key = llm_config.api_key_var if llm_config else ""
 
-        ai_status_note = ""
-        if no_ai:
-            ai_status_note = AI_DISABLED_NOTE
-        elif not ai_detected_key:
-            ai_status_note = AI_NOT_CONFIGURED_NOTE
+        llm_status_note = ""
+        if no_llm:
+            llm_status_note = LLM_DISABLED_NOTE
+        elif not llm_detected_key:
+            llm_status_note = LLM_NOT_CONFIGURED_NOTE
 
-        # AI progress callback for console display
-        def ai_progress_callback(message: str) -> None:
+        # LLM progress callback for console display
+        def llm_progress_callback(message: str) -> None:
             if message == "start":
                 ui.stage("Generating document descriptions and glossary")
 
@@ -336,7 +337,7 @@ def sync_command(
             dry_run=False,
             force=force,
             progress_callback=ui.advance,
-            ai_progress_callback=ai_progress_callback,
+            llm_progress_callback=llm_progress_callback,
             activity_callback=ui.activity,
             changes=changes,
         )
@@ -348,8 +349,8 @@ def sync_command(
             result,  # type: ignore[arg-type]
             console,
             error_log_path,
-            ai_detected_key=ai_detected_key,
-            ai_status_note=ai_status_note,
+            llm_detected_key=llm_detected_key,
+            llm_status_note=llm_status_note,
             project_root=project_root,
             has_warnings=ui.has_warnings,
         )
@@ -390,8 +391,8 @@ def _display_sync_summary(
     result: SyncResult,
     console: "Console",
     error_log_path: Path,
-    ai_detected_key: str = "",
-    ai_status_note: str = "",
+    llm_detected_key: str = "",
+    llm_status_note: str = "",
     project_root: Path | None = None,
     has_warnings: bool = False,
 ) -> None:
@@ -411,8 +412,8 @@ def _display_sync_summary(
         result: SyncResult from sync with all counts.
         console: Rich console for output.
         error_log_path: Path to error log file.
-        ai_detected_key: Name of the env var that triggered AI (e.g., ``"OPENAI_API_KEY"``).
-        ai_status_note: Optional human-readable AI status note for disabled or unconfigured cases.
+        llm_detected_key: Name of the env var that triggered LLM (e.g., ``"OPENAI_API_KEY"``).
+        llm_status_note: Optional human-readable LLM status note for disabled or unconfigured cases.
         project_root: Project root directory for marker file operations.
     """
     if result.failed_count:
@@ -435,10 +436,10 @@ def _display_sync_summary(
         console.print(f"  Failed:    {result.failed_count}")
     for source, reason in result.failure_reasons.items():
         console.print(f"    {display_path(Path(source), project_root)}: {reason}", markup=False)
-    print_needs_ai_block(
+    print_needs_llm_block(
         console,
-        [display_path(Path(source), project_root) for source in result.needs_ai_files],
-        ai_disabled=ai_status_note == AI_DISABLED_NOTE,
+        [display_path(Path(source), project_root) for source in result.needs_llm_files],
+        llm_disabled=llm_status_note == LLM_DISABLED_NOTE,
         command="nest sync",
     )
 
@@ -457,32 +458,32 @@ def _display_sync_summary(
     console.print()
     console.print("  Index updated: .nest/00_MASTER_INDEX.md")
 
-    if ai_status_note:
-        console.print(f"  AI:          {ai_status_note}")
+    if llm_status_note:
+        console.print(f"  LLM:           {llm_status_note}")
 
-    # Aggregated AI token display
+    # Aggregated LLM token display
     total_prompt = (
-        result.ai_prompt_tokens + result.ai_glossary_prompt_tokens + result.vision_prompt_tokens
+        result.llm_prompt_tokens + result.llm_glossary_prompt_tokens + result.vision_prompt_tokens
     )
     total_completion = (
-        result.ai_completion_tokens
-        + result.ai_glossary_completion_tokens
+        result.llm_completion_tokens
+        + result.llm_glossary_completion_tokens
         + result.vision_completion_tokens
     )
     total_tokens = total_prompt + total_completion
 
     if total_tokens > 0:
         console.print(
-            f"  AI tokens:    {total_tokens:,} "
+            f"  LLM tokens:    {total_tokens:,} "
             f"(prompt: {total_prompt:,}, completion: {total_completion:,})"
         )
 
-    # Show AI activity counts (enrichment + glossary) on separate detail lines
-    if result.ai_files_enriched > 0:
-        console.print(f"  AI enriched:  {result.ai_files_enriched} descriptions")
+    # Show LLM activity counts (enrichment + glossary) on separate detail lines
+    if result.llm_files_enriched > 0:
+        console.print(f"  LLM enriched:  {result.llm_files_enriched} descriptions")
 
-    if result.ai_glossary_terms_added > 0:
-        console.print(f"  AI glossary:  {result.ai_glossary_terms_added} terms defined")
+    if result.llm_glossary_terms_added > 0:
+        console.print(f"  LLM glossary:  {result.llm_glossary_terms_added} terms defined")
 
     # Show image description counts
     if result.images_described > 0:
@@ -495,20 +496,26 @@ def _display_sync_summary(
     if result.images_failed > 0:
         console.print(f"  Image descriptions failed: {result.images_failed}")
 
-    # First-run AI discovery message
-    ai_was_used = (
-        result.ai_files_enriched > 0
-        or result.ai_glossary_terms_added > 0
-        or (result.ai_prompt_tokens + result.ai_glossary_prompt_tokens) > 0
+    # First-run LLM discovery message
+    llm_was_used = (
+        result.llm_files_enriched > 0
+        or result.llm_glossary_terms_added > 0
+        or (result.llm_prompt_tokens + result.llm_glossary_prompt_tokens) > 0
         or result.images_described > 0
         or result.vision_prompt_tokens > 0
     )
 
-    if ai_was_used and ai_detected_key and project_root is not None:
-        ai_marker = project_root / NEST_META_DIR / AI_SEEN_MARKER
-        if not ai_marker.exists():
+    if llm_was_used and llm_detected_key and project_root is not None:
+        meta_dir = project_root / NEST_META_DIR
+        llm_marker = meta_dir / LLM_SEEN_MARKER
+        legacy_marker = meta_dir / LEGACY_LLM_SEEN_MARKER
+        if legacy_marker.exists() and not llm_marker.exists():
+            legacy_marker.rename(llm_marker)
+        if not llm_marker.exists():
             console.print()
-            console.print(f"  🤖 AI enrichment enabled (found {ai_detected_key})")
-            console.print("  💡 Run 'nest config ai' to change AI settings. Use --no-ai to skip.")
+            console.print(f"  🤖 LLM enrichment enabled (found {llm_detected_key})")
+            console.print(
+                "  💡 Run 'nest config llm' to change LLM settings. Use --no-llm to skip."
+            )
             # Create marker file
-            ai_marker.touch()
+            llm_marker.touch()

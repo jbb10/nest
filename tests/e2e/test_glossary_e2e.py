@@ -13,8 +13,8 @@ import pytest
 from .conftest import run_cli
 
 
-def _has_ai_key() -> bool:
-    return bool(os.environ.get("NEST_AI_API_KEY") or os.environ.get("NEST_API_KEY"))
+def _has_llm_key() -> bool:
+    return bool(os.environ.get("NEST_LLM_API_KEY") or os.environ.get("NEST_API_KEY"))
 
 
 @pytest.mark.e2e
@@ -74,11 +74,11 @@ class TestGlossaryE2E:
         assert "00_GLOSSARY_HINTS.yaml" not in index_content
 
     @pytest.mark.skipif(
-        not _has_ai_key(),
-        reason="AI key not configured for incremental glossary E2E",
+        not _has_llm_key(),
+        reason="LLM key not configured for incremental glossary E2E",
     )
     def test_glossary_incremental_file_based(self, initialized_project: Path) -> None:
-        """Second sync without source changes should not consume AI glossary tokens."""
+        """Second sync without source changes should not consume LLM glossary tokens."""
         project_dir = initialized_project
         sources_dir = project_dir / "_nest_sources"
 
@@ -88,8 +88,8 @@ class TestGlossaryE2E:
 
         first = run_cli(["sync"], cwd=project_dir)
         assert first.exit_code == 0, f"First sync failed: {first.stderr}\n{first.stdout}"
-        assert "AI tokens:" in first.stdout
+        assert "LLM tokens:" in first.stdout
 
         second = run_cli(["sync"], cwd=project_dir)
         assert second.exit_code == 0, f"Second sync failed: {second.stderr}\n{second.stdout}"
-        assert "AI tokens:" not in second.stdout
+        assert "LLM tokens:" not in second.stdout

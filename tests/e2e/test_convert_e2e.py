@@ -228,13 +228,13 @@ class TestConvertE2E:
         assert CANNED_DESCRIPTION in (fresh_temp_dir / "report-0.md").read_text()
 
     @pytest.mark.parametrize("verbose", [False, True])
-    def test_convert_no_ai_skips_image_descriptions(
+    def test_convert_no_llm_skips_image_descriptions(
         self, fresh_temp_dir: Path, verbose: bool
     ) -> None:
-        """--no-ai converts without any AI call or description."""
+        """--no-llm converts without any LLM call or description."""
         _copy_fixture("image_doc.pdf", fresh_temp_dir / "image_doc.pdf")
 
-        args = ["convert", "image_doc.pdf", "--no-ai"]
+        args = ["convert", "image_doc.pdf", "--no-llm"]
         if verbose:
             args.append("--verbose")
         with MockVisionServer(response=CANNED_DESCRIPTION) as server:
@@ -246,7 +246,7 @@ class TestConvertE2E:
             )
 
         assert result.exit_code == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        assert server.call_count == 0, "Expected no AI calls with --no-ai"
+        assert server.call_count == 0, "Expected no LLM calls with --no-llm"
         output = result.stdout + result.stderr
         assert ("INFO [RapidOCR]" in output) is verbose, output
         if not verbose:
@@ -259,14 +259,14 @@ class TestConvertE2E:
                 assert diagnostic not in output, output
         content = (fresh_temp_dir / "image_doc.md").read_text()
         assert CANNED_DESCRIPTION not in content
-        assert "disabled (--no-ai)" in result.stdout
+        assert "disabled (--no-llm)" in result.stdout
 
 
 @pytest.mark.e2e
-class TestConvertAIOnlyE2E:
-    """E2E tests for nest convert --ai-only with a mocked vision model."""
+class TestConvertLLMOnlyE2E:
+    """E2E tests for nest convert --llm-only with a mocked vision model."""
 
-    def test_ai_only_writes_the_model_transcription_without_docling(
+    def test_llm_only_writes_the_model_transcription_without_docling(
         self, fresh_temp_dir: Path
     ) -> None:
         """An image file is prepared from the model's Markdown, without loading Docling models."""
@@ -275,7 +275,7 @@ class TestConvertAIOnlyE2E:
 
         with MockVisionServer(response=transcript) as server:
             result = run_cli(
-                ["convert", "notes.png", "--ai-only"],
+                ["convert", "notes.png", "--llm-only"],
                 cwd=fresh_temp_dir,
                 timeout=120,
                 env=server.env_vars(),
@@ -285,15 +285,15 @@ class TestConvertAIOnlyE2E:
         assert server.call_count == 1
         assert (fresh_temp_dir / "notes.md").read_text() == transcript + "\n"
         assert "Preparing conversion models" not in result.stdout
-        assert "Pages transcribed by AI: 1" in result.stdout
+        assert "Pages transcribed by the LLM: 1" in result.stdout
 
-    def test_ai_only_unreadable_page_fails_the_document(self, fresh_temp_dir: Path) -> None:
+    def test_llm_only_unreadable_page_fails_the_document(self, fresh_temp_dir: Path) -> None:
         """A page the model reports as unreadable fails the document and writes nothing."""
         _copy_fixture("notes.png", fresh_temp_dir / "notes.png")
 
         with MockVisionServer(response="NEST_UNREADABLE_PAGE") as server:
             result = run_cli(
-                ["convert", "notes.png", "--ai-only"],
+                ["convert", "notes.png", "--llm-only"],
                 cwd=fresh_temp_dir,
                 timeout=120,
                 env=server.env_vars(),

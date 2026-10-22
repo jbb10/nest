@@ -1,6 +1,6 @@
-# AI Transcription Is All-or-Nothing and Convert-Only
+# LLM Transcription Is All-or-Nothing and Convert-Only
 
-`nest convert --ai-only` prepares image files and PDFs by AI transcription instead of Docling layout analysis, OCR, and table recognition, because OCR misplaces values in dense tables and screenshots.
+`nest convert --llm-only` prepares image files and PDFs by LLM transcription instead of Docling layout analysis, OCR, and table recognition, because OCR misplaces values in dense tables and screenshots.
 A source document whose pages are not all transcribed is a failed document, consistent with ADR 0002: nothing is written, the summary lists the file, and the run exits nonzero.
 A partial transcription would look like a complete prepared document while silently missing pages.
 
@@ -10,7 +10,7 @@ A partial transcription would look like a complete prepared document while silen
   A prepared document missing a table page is worse than no document, because downstream readers cannot tell that values are absent.
 - **Fall back to Docling for unreadable pages (rejected).**
   The pages the model cannot read are the dense ones where OCR is least reliable, so the fallback would reintroduce the errors the flag exists to avoid, without signalling it.
-- **Offer AI transcription in `nest sync` (deferred).**
+- **Offer LLM transcription in `nest sync` (deferred).**
   Sync records outcomes in the manifest, so a project would need to remember which preparation produced each prepared document and re-prepare when that choice changes.
   Convert has no manifest, so the flag carries no such state.
 

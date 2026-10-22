@@ -54,7 +54,7 @@ def test_every_registered_command_owns_an_output_session() -> None:
         ["status"],
         ["doctor"],
         ["update"],
-        ["config", "ai"],
+        ["config", "llm"],
     ],
 )
 def test_verbose_is_available_on_every_command(arguments: list[str]) -> None:

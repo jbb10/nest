@@ -103,7 +103,7 @@ jobs:
   # Full e2e suite against real Docling. Requires ~2.5 GB of ML models, which we
   # cache between runs. Runs on all supported platforms (public repo = free).
   # windows needs UTF-8 mode for Rich.
-  # AI-gated e2e tests use the shared test proxy configured in tests/e2e/conftest.py.
+  # LLM-gated e2e tests use the shared test proxy configured in tests/e2e/conftest.py.
   e2e:
     name: E2E tests (${{ matrix.os }})
     strategy:
@@ -168,7 +168,7 @@ jobs:
         shell: bash
         run: make test-e2e E2E_TIMEOUT=180
         env:
-          NEST_AI_API_KEY: ${{ secrets.NEST_AI_API_KEY }}
+          NEST_LLM_API_KEY: ${{ secrets.NEST_AI_API_KEY }}
 
   # ── Aggregate status check ───────────────────────────────────────────────────
   # Single required check to configure in branch protection, independent of the

@@ -66,15 +66,15 @@ class TestConvertCommandHelp:
         assert "Convert" in result.output
 
     def test_convert_help_displays_all_flags(self) -> None:
-        """Help should show --output, --force and --no-ai."""
+        """Help should show --output, --force and --no-llm."""
         result = runner.invoke(app, ["convert", "--help"])
 
         assert result.exit_code == 0
         output = result.output
         assert "--output" in output
         assert "--force" in output
-        assert "--no-ai" in output
-        assert "--ai-only" in output
+        assert "--no-llm" in output
+        assert "--llm-only" in output
 
 
 class TestConvertCommandErrors:
@@ -133,7 +133,7 @@ class TestConvertCommandRun:
             return _make_result(root=tmp_path, processed_count=2, skipped_count=0, skips=[])
 
         service.execute.side_effect = execute
-        result = runner.invoke(app, ["convert", str(tmp_path), "--no-ai"])
+        result = runner.invoke(app, ["convert", str(tmp_path), "--no-llm"])
 
         assert result.exit_code == 0, result.output
         summary = result.output.split("Review recommended:")[1]
@@ -213,23 +213,23 @@ class TestConvertCommandRun:
         )
 
     @patch("nest.cli.convert_cmd.create_convert_service")
-    def test_convert_no_ai_disables_ai(
+    def test_convert_no_llm_disables_llm(
         self, mock_create_service: MagicMock, tmp_path: Path
     ) -> None:
-        """--no-ai is forwarded to the composition root."""
+        """--no-llm is forwarded to the composition root."""
         mock_service = MagicMock()
         mock_service.plan.return_value = _make_plan(tmp_path)
         mock_service.execute.return_value = _make_result()
         mock_create_service.return_value = mock_service
 
-        result = runner.invoke(app, ["convert", str(tmp_path), "--no-ai"])
+        result = runner.invoke(app, ["convert", str(tmp_path), "--no-llm"])
 
         assert result.exit_code == 0
-        mock_create_service.assert_called_once_with(no_ai=True, ai_config=None, ai_only=False)
+        mock_create_service.assert_called_once_with(no_llm=True, llm_config=None, llm_only=False)
 
-    @patch("nest.cli.convert_cmd.resolve_ai_config")
+    @patch("nest.cli.convert_cmd.resolve_llm_config")
     @patch("nest.cli.convert_cmd.create_convert_service")
-    def test_convert_ai_only_is_forwarded(
+    def test_convert_llm_only_is_forwarded(
         self, mock_create_service: MagicMock, mock_resolve: MagicMock, tmp_path: Path
     ) -> None:
         mock_service = MagicMock()
@@ -237,33 +237,33 @@ class TestConvertCommandRun:
         mock_service.execute.return_value = _make_result()
         mock_create_service.return_value = mock_service
 
-        result = runner.invoke(app, ["convert", str(tmp_path), "--ai-only"])
+        result = runner.invoke(app, ["convert", str(tmp_path), "--llm-only"])
 
         assert result.exit_code == 0
         mock_create_service.assert_called_once_with(
-            no_ai=False, ai_config=mock_resolve.return_value, ai_only=True
+            no_llm=False, llm_config=mock_resolve.return_value, llm_only=True
         )
 
     @patch("nest.cli.convert_cmd.create_convert_service")
-    def test_convert_ai_only_conflicts_with_no_ai(
+    def test_convert_llm_only_conflicts_with_no_llm(
         self, mock_create_service: MagicMock, tmp_path: Path
     ) -> None:
-        result = runner.invoke(app, ["convert", str(tmp_path), "--ai-only", "--no-ai"])
+        result = runner.invoke(app, ["convert", str(tmp_path), "--llm-only", "--no-llm"])
 
         assert result.exit_code == 1
         assert "Convert failed" in result.output
-        assert "--ai-only cannot be combined with --no-ai" in result.output
+        assert "--llm-only cannot be combined with --no-llm" in result.output
         mock_create_service.assert_not_called()
 
-    @patch("nest.cli.convert_cmd.resolve_ai_config", return_value=None)
-    def test_convert_ai_only_requires_ai(self, mock_resolve: MagicMock, tmp_path: Path) -> None:
-        result = runner.invoke(app, ["convert", str(tmp_path), "--ai-only"])
+    @patch("nest.cli.convert_cmd.resolve_llm_config", return_value=None)
+    def test_convert_llm_only_requires_llm(self, mock_resolve: MagicMock, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["convert", str(tmp_path), "--llm-only"])
 
         assert result.exit_code == 1
         mock_resolve.assert_called()
         assert "Convert failed" in result.output
-        assert "--ai-only requires an AI vision model" in result.output
-        assert "nest config ai" in result.output
+        assert "--llm-only requires an LLM vision model" in result.output
+        assert "nest config llm" in result.output
 
 
 class TestDisplayConvertSummary:
@@ -312,15 +312,15 @@ class TestDisplayConvertSummary:
         assert "corrupt.pdf" in full_output
         assert "Docling convert failed" in full_output
 
-    def test_summary_calls_out_images_that_need_ai(self) -> None:
+    def test_summary_calls_out_images_that_need_llm(self) -> None:
         console, lines = self._make_console()
         result = _make_result(
             failed_count=1,
             failures=[
                 ConvertFailure(
                     path=Path("/tmp/docs/flow.png"),
-                    reason="requires AI image description",
-                    kind="needs_ai",
+                    reason="requires LLM image description",
+                    kind="needs_llm",
                 )
             ],
         )
@@ -328,31 +328,31 @@ class TestDisplayConvertSummary:
         _display_convert_summary(
             result,
             console,
-            "not configured (run 'nest config ai' or set NEST_AI_API_KEY)",
+            "not configured (run 'nest config llm' or set NEST_LLM_API_KEY)",
         )
 
         output = "\n".join(lines)
-        assert "1 image file needs an AI image description and was not processed" in output
+        assert "1 image file needs an LLM image description and was not processed" in output
         assert "flow.png" in output
-        assert "Run 'nest config ai' or set NEST_AI_API_KEY" in output
+        assert "Run 'nest config llm' or set NEST_LLM_API_KEY" in output
         assert "then run 'nest convert' again" in output
 
-    def test_summary_tells_user_to_drop_no_ai_flag(self) -> None:
+    def test_summary_tells_user_to_drop_no_llm_flag(self) -> None:
         console, lines = self._make_console()
         result = _make_result(
             failed_count=1,
             failures=[
                 ConvertFailure(
                     path=Path("/tmp/docs/flow.png"),
-                    reason="requires AI image description",
-                    kind="needs_ai",
+                    reason="requires LLM image description",
+                    kind="needs_llm",
                 )
             ],
         )
 
-        _display_convert_summary(result, console, "disabled (--no-ai)")
+        _display_convert_summary(result, console, "disabled (--no-llm)")
 
-        assert "Run 'nest convert' again without --no-ai" in "\n".join(lines)
+        assert "Run 'nest convert' again without --no-llm" in "\n".join(lines)
 
     def test_summary_lists_skip_reasons(self) -> None:
         """Each skipped file is listed with its reason."""
@@ -376,16 +376,16 @@ class TestDisplayConvertSummary:
         full_output = "\n".join(lines)
         assert "Skipped files:" not in full_output
 
-    def test_summary_shows_ai_disabled_note(self) -> None:
-        """The AI status note is shown when given."""
+    def test_summary_shows_llm_disabled_note(self) -> None:
+        """The LLM status note is shown when given."""
         console, lines = self._make_console()
         result = _make_result()
 
-        _display_convert_summary(result, console, ai_status_note="disabled (--no-ai)")
+        _display_convert_summary(result, console, llm_status_note="disabled (--no-llm)")
 
         full_output = "\n".join(lines)
-        assert "AI:" in full_output
-        assert "disabled (--no-ai)" in full_output
+        assert "LLM:" in full_output
+        assert "disabled (--no-llm)" in full_output
 
     def test_summary_shows_image_description_counts(self) -> None:
         """Image description counts and tokens are shown when non-zero."""
@@ -410,7 +410,7 @@ class TestDisplayConvertSummary:
 
         _display_convert_summary(result, console)
 
-        assert "Pages transcribed by AI: 3" in "\n".join(lines)
+        assert "Pages transcribed by the LLM: 3" in "\n".join(lines)
 
     def test_summary_shows_paths_relative_to_root(self) -> None:
         """Skipped files are shown relative to the conversion root."""

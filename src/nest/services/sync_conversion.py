@@ -3,8 +3,8 @@
 Turns every pending source file into exactly one recorded outcome. Owns
 collision resolution between passthrough and Docling outputs, the two-pass
 vision pipeline (convert bounded batches, describe images in parallel),
-AI transcription of image files and PDFs, and the rule that a
-standalone image file needing an AI description is a failed document when no
+LLM transcription of image files and PDFs, and the rule that a
+standalone image file needing an LLM description is a failed document when no
 vision provider is available.
 """
 
@@ -24,7 +24,7 @@ from nest.core.paths import is_image_extension, is_passthrough_extension
 
 if TYPE_CHECKING:
     from nest.adapters.docling_processor import DoclingProcessor
-    from nest.services.ai_transcription_service import AITranscriptionService
+    from nest.services.llm_transcription_service import LLMTranscriptionService
     from nest.services.output_service import OutputMirrorService
     from nest.services.picture_description_service import PictureDescriptionService
     from nest.services.sync_outcomes import OutcomeRecorder, SyncLedger
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 _VISION_BATCH_SIZE = 4
 
-NEEDS_AI_REASON = "requires AI image description"
+NEEDS_LLM_REASON = "requires LLM image description"
 
 
 class ConversionPhase:
@@ -47,21 +47,21 @@ class ConversionPhase:
         picture_description: PictureDescriptionService | None = None,
         vision_processor: DoclingProcessor | None = None,
         image_processor: DoclingProcessor | None = None,
-        transcriber: AITranscriptionService | None = None,
+        transcriber: LLMTranscriptionService | None = None,
     ) -> None:
         """
         Args:
             output: Writes passthrough copies and plain Docling conversions.
             sources_dir: Root of the source documents.
             context_dir: Root of the prepared documents.
-            picture_description: Vision pass; None when AI is unavailable.
+            picture_description: Vision pass; None when no LLM is available.
             vision_processor: Classification-enabled Docling processor used
                 with ``picture_description``.
             image_processor: Classification-enabled Docling processor used for
                 standalone image files when vision is unavailable, so the
-                phase can tell whether an image needs an AI description.
+                phase can tell whether an image needs an LLM description.
             transcriber: When set, files it handles bypass Docling and are
-                prepared by AI transcription.
+                prepared by LLM transcription.
         """
         self._output = output
         self._sources_dir = sources_dir
@@ -157,7 +157,7 @@ class ConversionPhase:
             recorder.failed(file, e.message)
             return
         except Exception as e:
-            recorder.failed(file, f"AI transcription failed: {e}", cause=e)
+            recorder.failed(file, f"LLM transcription failed: {e}", cause=e)
             return
         ledger.transcriptions.append(transcript)
         output_path = self._output.compute_docling_output_path(
@@ -191,7 +191,7 @@ class ConversionPhase:
             recorder.failed(file, f"Docling convert failed: {e}", cause=e)
             return
         if requires_description(conversion):
-            recorder.failed(file, NEEDS_AI_REASON, kind="needs_ai")
+            recorder.failed(file, NEEDS_LLM_REASON, kind="needs_llm")
             return
         output_path = self._output.compute_docling_output_path(
             file.path, self._sources_dir, self._context_dir

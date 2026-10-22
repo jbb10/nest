@@ -19,7 +19,9 @@ GLOSSARY_TABLE_START = "<!-- nest:glossary-start -->"
 GLOSSARY_TABLE_END = "<!-- nest:glossary-end -->"
 MANIFEST_FILENAME = "manifest.json"
 ERROR_LOG_FILENAME = "errors.log"
-AI_SEEN_MARKER = ".ai_seen"
+LLM_SEEN_MARKER = ".llm_seen"
+# Marker name written before the AI-to-LLM rename; honoured and renamed on sight.
+LEGACY_LLM_SEEN_MARKER = ".ai_seen"
 SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".pptx", ".xlsx", ".html"]
 
 # Agent file constants (Epic 10: Multi-Agent Architecture)

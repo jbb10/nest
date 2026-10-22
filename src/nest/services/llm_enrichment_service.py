@@ -1,4 +1,4 @@
-"""AI-powered index enrichment service.
+"""LLM index enrichment service.
 
 Generates short descriptions for files in the master index using LLM calls.
 Operates incrementally — only files with changed or missing content_hash
@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from nest.core.models import AIEnrichmentResult, FileMetadata
+from nest.core.models import FileMetadata, LLMEnrichmentResult
 
 if TYPE_CHECKING:
     from nest.adapters.protocols import LLMProviderProtocol
@@ -22,8 +22,8 @@ _PROMPT_FILE = Path(__file__).parent / "prompts" / "enrichment_system_prompt.md"
 ENRICHMENT_SYSTEM_PROMPT = _PROMPT_FILE.read_text(encoding="utf-8").rstrip("\n")
 
 
-class AIEnrichmentService:
-    """Generates AI-powered descriptions for index files.
+class LLMEnrichmentService:
+    """Generates LLM descriptions for index files.
 
     Uses an LLM provider to generate ≤10-word descriptions for each file.
     Operates incrementally: unchanged files with existing descriptions
@@ -38,7 +38,7 @@ class AIEnrichmentService:
         files: list[FileMetadata],
         old_descriptions: dict[str, str],
         old_hints: dict[str, str],
-    ) -> AIEnrichmentResult:
+    ) -> LLMEnrichmentResult:
         """Generate descriptions for files needing enrichment.
 
         Args:
@@ -47,7 +47,7 @@ class AIEnrichmentService:
             old_hints: Previous content hashes keyed by file path.
 
         Returns:
-            AIEnrichmentResult with generated descriptions and token usage.
+            LLMEnrichmentResult with generated descriptions and token usage.
         """
         descriptions: dict[str, str] = {}
         prompt_tokens = 0
@@ -65,7 +65,7 @@ class AIEnrichmentService:
             result = self._llm.complete(ENRICHMENT_SYSTEM_PROMPT, user_prompt)
 
             if result is None:
-                logger.warning("AI enrichment failed for %s", file.path)
+                logger.warning("LLM enrichment failed for %s", file.path)
                 descriptions[file.path] = ""
                 files_failed += 1
                 continue
@@ -75,7 +75,7 @@ class AIEnrichmentService:
             completion_tokens += result.completion_tokens
             files_enriched += 1
 
-        return AIEnrichmentResult(
+        return LLMEnrichmentResult(
             descriptions=descriptions,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,

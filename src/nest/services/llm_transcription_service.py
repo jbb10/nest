@@ -1,4 +1,4 @@
-"""AI transcription of image files and PDFs.
+"""LLM transcription of image files and PDFs.
 
 Sends each page of a source document to the vision model as an image and
 takes the model's Markdown as the prepared document. Docling layout analysis,
@@ -54,7 +54,7 @@ class _PageImage(NamedTuple):
     mime_type: str
 
 
-class AITranscriptionService:
+class LLMTranscriptionService:
     """Transcribes images and PDFs to Markdown with a vision model, page by page."""
 
     def __init__(self, vision_provider: VisionLLMProviderProtocol) -> None:
@@ -79,14 +79,14 @@ class AITranscriptionService:
         failed = sum(answer is None for answer in answers)
         if failed:
             scope = f" for {failed} of {len(pages)} pages" if len(pages) > 1 else ""
-            raise ProcessingError(f"AI transcription failed{scope}", source_path=source)
+            raise ProcessingError(f"LLM transcription failed{scope}", source_path=source)
         completed = [answer for answer in answers if answer is not None]
         unreadable = sum(UNREADABLE_PAGE in answer.text for answer in completed)
         if unreadable:
             scope = f"{unreadable} of {len(pages)} pages" if len(pages) > 1 else "the page"
             raise ProcessingError(
-                f"AI vision model could not read {scope}; "
-                "a stronger model may help (NEST_AI_VISION_MODEL)",
+                f"LLM vision model could not read {scope}; "
+                "a stronger model may help (NEST_LLM_VISION_MODEL)",
                 source_path=source,
             )
         texts = [_unwrap(answer.text) for answer in completed]

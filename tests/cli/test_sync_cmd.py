@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from nest.cli.main import app
 from nest.cli.sync_cmd import _display_sync_summary, _validate_on_error
 from nest.core.models import SyncResult
-from nest.core.paths import AI_SEEN_MARKER, NEST_META_DIR
+from nest.core.paths import LEGACY_LLM_SEEN_MARKER, LLM_SEEN_MARKER, NEST_META_DIR
 
 runner = CliRunner()
 
@@ -48,7 +48,7 @@ class TestSyncCommandHelp:
         assert "--dry-run" in output
         assert "--force" in output
         assert "--no-clean" in output
-        assert "--no-ai" in output
+        assert "--no-llm" in output
         assert "--dir" in output
 
 
@@ -102,7 +102,7 @@ class TestSyncProjectValidation:
 
 
 class TestDisplaySyncSummaryAggregatedTokens:
-    """Tests for aggregated AI token display (Story 6.4)."""
+    """Tests for aggregated LLM token display (Story 6.4)."""
 
     def _make_console(self) -> tuple["Mock", list[str]]:
         from rich.console import Console
@@ -118,64 +118,64 @@ class TestDisplaySyncSummaryAggregatedTokens:
         """Combined prompt+completion from both services shown in single line."""
         console, lines = self._make_console()
         result = SyncResult(
-            ai_prompt_tokens=500,
-            ai_completion_tokens=100,
-            ai_glossary_prompt_tokens=300,
-            ai_glossary_completion_tokens=50,
-            ai_files_enriched=2,
-            ai_glossary_terms_added=3,
+            llm_prompt_tokens=500,
+            llm_completion_tokens=100,
+            llm_glossary_prompt_tokens=300,
+            llm_glossary_completion_tokens=50,
+            llm_files_enriched=2,
+            llm_glossary_terms_added=3,
         )
 
         _display_sync_summary(result, console, Path("/tmp/errors.log"))
 
-        token_lines = [line for line in lines if "AI tokens:" in line]
+        token_lines = [line for line in lines if "LLM tokens:" in line]
         assert len(token_lines) == 1
         assert "950" in token_lines[0]
         assert "prompt: 800" in token_lines[0]
         assert "completion: 150" in token_lines[0]
 
     def test_display_sync_summary_hides_tokens_when_zero(self) -> None:
-        """All tokens zero → no AI tokens line."""
+        """All tokens zero → no LLM tokens line."""
         console, lines = self._make_console()
         result = SyncResult()
 
         _display_sync_summary(result, console, Path("/tmp/errors.log"))
 
-        token_lines = [line for line in lines if "AI tokens:" in line]
+        token_lines = [line for line in lines if "LLM tokens:" in line]
         assert len(token_lines) == 0
 
     def test_display_sync_summary_shows_enrichment_count(self) -> None:
-        """'AI enriched: X descriptions' shown when > 0."""
+        """'LLM enriched: X descriptions' shown when > 0."""
         console, lines = self._make_console()
         result = SyncResult(
-            ai_files_enriched=4,
-            ai_prompt_tokens=100,
-            ai_completion_tokens=20,
+            llm_files_enriched=4,
+            llm_prompt_tokens=100,
+            llm_completion_tokens=20,
         )
 
         _display_sync_summary(result, console, Path("/tmp/errors.log"))
 
-        enriched_lines = [line for line in lines if "AI enriched:" in line]
+        enriched_lines = [line for line in lines if "LLM enriched:" in line]
         assert len(enriched_lines) == 1
         assert "4 descriptions" in enriched_lines[0]
 
     def test_display_sync_summary_shows_glossary_count(self) -> None:
-        """'AI glossary: X terms defined' shown when > 0."""
+        """'LLM glossary: X terms defined' shown when > 0."""
         console, lines = self._make_console()
         result = SyncResult(
-            ai_glossary_terms_added=5,
-            ai_glossary_prompt_tokens=200,
-            ai_glossary_completion_tokens=30,
+            llm_glossary_terms_added=5,
+            llm_glossary_prompt_tokens=200,
+            llm_glossary_completion_tokens=30,
         )
 
         _display_sync_summary(result, console, Path("/tmp/errors.log"))
 
-        glossary_lines = [line for line in lines if "AI glossary:" in line]
+        glossary_lines = [line for line in lines if "LLM glossary:" in line]
         assert len(glossary_lines) == 1
         assert "5 terms defined" in glossary_lines[0]
 
-    def test_display_sync_summary_shows_ai_not_configured_note(self) -> None:
-        """Users should see why AI enrichment did not run."""
+    def test_display_sync_summary_shows_llm_not_configured_note(self) -> None:
+        """Users should see why LLM enrichment did not run."""
         console, lines = self._make_console()
         result = SyncResult()
 
@@ -183,15 +183,15 @@ class TestDisplaySyncSummaryAggregatedTokens:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_status_note=("not configured (run 'nest config ai' or set NEST_AI_API_KEY)"),
+            llm_status_note=("not configured (run 'nest config llm' or set NEST_LLM_API_KEY)"),
         )
 
-        status_lines = [line for line in lines if "AI:" in line]
+        status_lines = [line for line in lines if "LLM:" in line]
         assert len(status_lines) == 1
         assert "not configured" in status_lines[0]
 
-    def test_display_sync_summary_shows_ai_disabled_note(self) -> None:
-        """Users should see when AI was explicitly disabled."""
+    def test_display_sync_summary_shows_llm_disabled_note(self) -> None:
+        """Users should see when the LLM was explicitly disabled."""
         console, lines = self._make_console()
         result = SyncResult()
 
@@ -199,16 +199,16 @@ class TestDisplaySyncSummaryAggregatedTokens:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_status_note="disabled (--no-ai)",
+            llm_status_note="disabled (--no-llm)",
         )
 
-        status_lines = [line for line in lines if "AI:" in line]
+        status_lines = [line for line in lines if "LLM:" in line]
         assert len(status_lines) == 1
-        assert "disabled (--no-ai)" in status_lines[0]
+        assert "disabled (--no-llm)" in status_lines[0]
 
 
-class TestDisplaySyncSummaryNeedsAI:
-    """Image files that need AI descriptions are called out with enablement guidance."""
+class TestDisplaySyncSummaryNeedsLLM:
+    """Image files that need LLM descriptions are called out with enablement guidance."""
 
     def _make_console(self) -> tuple["Mock", list[str]]:
         from rich.console import Console
@@ -220,53 +220,53 @@ class TestDisplaySyncSummaryNeedsAI:
         )
         return console, output_lines
 
-    def test_block_lists_files_and_how_to_enable_ai(self) -> None:
+    def test_block_lists_files_and_how_to_enable_llm(self) -> None:
         console, lines = self._make_console()
         root = Path("/proj")
         result = SyncResult(
             failed_count=2,
             failure_reasons={
-                "/proj/_nest_sources/flow.png": "requires AI image description",
-                "/proj/_nest_sources/arch.jpg": "requires AI image description",
+                "/proj/_nest_sources/flow.png": "requires LLM image description",
+                "/proj/_nest_sources/arch.jpg": "requires LLM image description",
             },
-            needs_ai_files=["/proj/_nest_sources/flow.png", "/proj/_nest_sources/arch.jpg"],
+            needs_llm_files=["/proj/_nest_sources/flow.png", "/proj/_nest_sources/arch.jpg"],
         )
 
         _display_sync_summary(
             result,
             console,
             Path("/proj/.nest/errors.log"),
-            ai_status_note="not configured (run 'nest config ai' or set NEST_AI_API_KEY)",
+            llm_status_note="not configured (run 'nest config llm' or set NEST_LLM_API_KEY)",
             project_root=root,
         )
 
         output = "\n".join(lines)
-        assert "2 image files need AI image descriptions and were not processed" in output
+        assert "2 image files need LLM image descriptions and were not processed" in output
         assert "_nest_sources/flow.png" in output
         assert "_nest_sources/arch.jpg" in output
-        assert "Run 'nest config ai' or set NEST_AI_API_KEY, then run 'nest sync' again" in output
+        assert "Run 'nest config llm' or set NEST_LLM_API_KEY, then run 'nest sync' again" in output
 
-    def test_block_tells_user_to_drop_no_ai_flag(self) -> None:
+    def test_block_tells_user_to_drop_no_llm_flag(self) -> None:
         console, lines = self._make_console()
         result = SyncResult(
             failed_count=1,
-            failure_reasons={"/proj/_nest_sources/flow.png": "requires AI image description"},
-            needs_ai_files=["/proj/_nest_sources/flow.png"],
+            failure_reasons={"/proj/_nest_sources/flow.png": "requires LLM image description"},
+            needs_llm_files=["/proj/_nest_sources/flow.png"],
         )
 
         _display_sync_summary(
             result,
             console,
             Path("/proj/.nest/errors.log"),
-            ai_status_note="disabled (--no-ai)",
+            llm_status_note="disabled (--no-llm)",
             project_root=Path("/proj"),
         )
 
         output = "\n".join(lines)
-        assert "1 image file needs an AI image description and was not processed" in output
-        assert "Run 'nest sync' again without --no-ai" in output
+        assert "1 image file needs an LLM image description and was not processed" in output
+        assert "Run 'nest sync' again without --no-llm" in output
 
-    def test_no_block_when_nothing_needs_ai(self) -> None:
+    def test_no_block_when_nothing_needs_llm(self) -> None:
         console, lines = self._make_console()
         result = SyncResult(
             failed_count=1,
@@ -275,11 +275,11 @@ class TestDisplaySyncSummaryNeedsAI:
 
         _display_sync_summary(result, console, Path("/proj/.nest/errors.log"))
 
-        assert "need AI image description" not in "\n".join(lines)
+        assert "need LLM image description" not in "\n".join(lines)
 
 
 class TestDisplaySyncSummaryFirstRun:
-    """Tests for first-run AI discovery message (Story 6.4)."""
+    """Tests for first-run LLM discovery message (Story 6.4)."""
 
     def _make_console(self) -> tuple["Mock", list[str]]:
         from rich.console import Console
@@ -292,98 +292,119 @@ class TestDisplaySyncSummaryFirstRun:
         return console, output_lines
 
     def test_display_sync_summary_shows_first_run_message(self, tmp_path: Path) -> None:
-        """No .ai_seen marker → discovery message shown."""
+        """No .llm_seen marker → discovery message shown."""
         meta_dir = tmp_path / NEST_META_DIR
         meta_dir.mkdir()
 
         console, lines = self._make_console()
         result = SyncResult(
-            ai_files_enriched=2,
-            ai_prompt_tokens=100,
-            ai_completion_tokens=20,
+            llm_files_enriched=2,
+            llm_prompt_tokens=100,
+            llm_completion_tokens=20,
         )
 
         _display_sync_summary(
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="NEST_API_KEY",
+            llm_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
         full_output = "\n".join(lines)
-        assert "AI enrichment enabled" in full_output
+        assert "LLM enrichment enabled" in full_output
         assert "NEST_API_KEY" in full_output
 
     def test_display_sync_summary_creates_marker_file(self, tmp_path: Path) -> None:
-        """.ai_seen file created after first AI use."""
+        """.llm_seen file created after first LLM use."""
         meta_dir = tmp_path / NEST_META_DIR
         meta_dir.mkdir()
 
         console, _ = self._make_console()
         result = SyncResult(
-            ai_files_enriched=1,
-            ai_prompt_tokens=50,
-            ai_completion_tokens=10,
+            llm_files_enriched=1,
+            llm_prompt_tokens=50,
+            llm_completion_tokens=10,
         )
 
         _display_sync_summary(
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="NEST_API_KEY",
+            llm_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
-        marker = meta_dir / AI_SEEN_MARKER
+        marker = meta_dir / LLM_SEEN_MARKER
         assert marker.exists()
 
     def test_display_sync_summary_suppresses_message_on_subsequent_runs(
         self, tmp_path: Path
     ) -> None:
-        """.ai_seen exists → no discovery message."""
+        """.llm_seen exists → no discovery message."""
         meta_dir = tmp_path / NEST_META_DIR
         meta_dir.mkdir()
-        (meta_dir / AI_SEEN_MARKER).touch()
+        (meta_dir / LLM_SEEN_MARKER).touch()
 
         console, lines = self._make_console()
         result = SyncResult(
-            ai_files_enriched=2,
-            ai_prompt_tokens=100,
-            ai_completion_tokens=20,
+            llm_files_enriched=2,
+            llm_prompt_tokens=100,
+            llm_completion_tokens=20,
         )
 
         _display_sync_summary(
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="NEST_API_KEY",
+            llm_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
         full_output = "\n".join(lines)
-        assert "AI enrichment enabled" not in full_output
+        assert "LLM enrichment enabled" not in full_output
 
-    def test_display_sync_summary_no_message_when_no_ai_used(self, tmp_path: Path) -> None:
-        """AI not active → no discovery message even without marker."""
+    def test_display_sync_summary_honours_legacy_ai_seen_marker(self, tmp_path: Path) -> None:
+        """A pre-rename .ai_seen marker suppresses the message and is renamed."""
+        meta_dir = tmp_path / NEST_META_DIR
+        meta_dir.mkdir()
+        (meta_dir / LEGACY_LLM_SEEN_MARKER).touch()
+
+        console, lines = self._make_console()
+        result = SyncResult(llm_files_enriched=2, llm_prompt_tokens=100)
+
+        _display_sync_summary(
+            result,
+            console,
+            Path("/tmp/errors.log"),
+            llm_detected_key="NEST_API_KEY",
+            project_root=tmp_path,
+        )
+
+        assert "LLM enrichment enabled" not in "\n".join(lines)
+        assert (meta_dir / LLM_SEEN_MARKER).exists()
+        assert not (meta_dir / LEGACY_LLM_SEEN_MARKER).exists()
+
+    def test_display_sync_summary_no_message_when_no_llm_used(self, tmp_path: Path) -> None:
+        """LLM not active → no discovery message even without marker."""
         meta_dir = tmp_path / NEST_META_DIR
         meta_dir.mkdir()
 
         console, lines = self._make_console()
-        result = SyncResult()  # Zero AI activity
+        result = SyncResult()  # Zero LLM activity
 
         _display_sync_summary(
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="NEST_API_KEY",
+            llm_detected_key="NEST_API_KEY",
             project_root=tmp_path,
         )
 
         full_output = "\n".join(lines)
-        assert "AI enrichment enabled" not in full_output
+        assert "LLM enrichment enabled" not in full_output
         # Marker should NOT be created
-        assert not (meta_dir / AI_SEEN_MARKER).exists()
+        assert not (meta_dir / LLM_SEEN_MARKER).exists()
 
 
 class TestDisplaySyncSummaryVisionStats:
@@ -456,20 +477,20 @@ class TestDisplaySyncSummaryVisionStats:
         assert len(skipped_lines) == 0
 
     def test_vision_tokens_included_in_total(self) -> None:
-        """Vision tokens aggregated into the 'AI tokens:' line with text enrichment tokens."""
+        """Vision tokens aggregated into the 'LLM tokens:' line with text enrichment tokens."""
         console, lines = self._make_console()
         result = SyncResult(
-            ai_prompt_tokens=200,
-            ai_completion_tokens=50,
-            ai_glossary_prompt_tokens=100,
-            ai_glossary_completion_tokens=25,
+            llm_prompt_tokens=200,
+            llm_completion_tokens=50,
+            llm_glossary_prompt_tokens=100,
+            llm_glossary_completion_tokens=25,
             vision_prompt_tokens=100,
             vision_completion_tokens=50,
         )
 
         _display_sync_summary(result, console, Path("/tmp/errors.log"))
 
-        token_lines = [line for line in lines if "AI tokens:" in line]
+        token_lines = [line for line in lines if "LLM tokens:" in line]
         assert len(token_lines) == 1
         # Total = (200+100+100) prompt + (50+25+50) completion = 400 + 125 = 525
         assert "525" in token_lines[0]
@@ -477,7 +498,7 @@ class TestDisplaySyncSummaryVisionStats:
         assert "completion: 125" in token_lines[0]
 
     def test_vision_tokens_only_no_text_enrichment(self) -> None:
-        """Vision-only tokens still show the 'AI tokens:' line."""
+        """Vision-only tokens still show the 'LLM tokens:' line."""
         console, lines = self._make_console()
         result = SyncResult(
             vision_prompt_tokens=100,
@@ -487,12 +508,12 @@ class TestDisplaySyncSummaryVisionStats:
 
         _display_sync_summary(result, console, Path("/tmp/errors.log"))
 
-        token_lines = [line for line in lines if "AI tokens:" in line]
+        token_lines = [line for line in lines if "LLM tokens:" in line]
         assert len(token_lines) == 1
         assert "150" in token_lines[0]
 
-    def test_vision_triggers_ai_was_used_for_first_run_message(self, tmp_path: Path) -> None:
-        """images_described > 0 triggers first-run AI discovery message."""
+    def test_vision_triggers_llm_was_used_for_first_run_message(self, tmp_path: Path) -> None:
+        """images_described > 0 triggers first-run LLM discovery message."""
         meta_dir = tmp_path / NEST_META_DIR
         meta_dir.mkdir()
 
@@ -503,20 +524,20 @@ class TestDisplaySyncSummaryVisionStats:
             result,
             console,
             Path("/tmp/errors.log"),
-            ai_detected_key="OPENAI_API_KEY",
+            llm_detected_key="OPENAI_API_KEY",
             project_root=tmp_path,
         )
 
         full_output = "\n".join(lines)
-        assert "AI enrichment enabled" in full_output
+        assert "LLM enrichment enabled" in full_output
 
-    def test_create_sync_service_no_ai_disables_vision(self, tmp_path: Path) -> None:
-        """create_sync_service with no_ai=True creates no vision provider or PDS."""
+    def test_create_sync_service_no_llm_disables_vision(self, tmp_path: Path) -> None:
+        """create_sync_service with no_llm=True creates no vision provider or PDS."""
         from nest.cli.sync_cmd import create_sync_service
 
         project_root = tmp_path
         (project_root / ".nest").mkdir()
 
-        service = create_sync_service(project_root, no_ai=True)
+        service = create_sync_service(project_root, no_llm=True)
 
         assert not service.vision_enabled

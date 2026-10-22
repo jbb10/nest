@@ -285,7 +285,7 @@ def fake_conversion(markdown: str, *, pictures: list[str | None]) -> MagicMock:
 
 
 class TestStandaloneImagesWithoutVision:
-    """Image files need AI only when they hold a picture the vision pass would describe."""
+    """Image files need an LLM only when they hold a picture the vision pass would describe."""
 
     def make_service(self, conversions: dict[str, MagicMock]) -> ConvertService:
         image_processor = MagicMock()
@@ -308,8 +308,8 @@ class TestStandaloneImagesWithoutVision:
         assert result.processed_count == 0
         assert not (tmp_path / "flow.md").exists()
         assert result.failures[0].path == source
-        assert result.failures[0].kind == "needs_ai"
-        assert result.failures[0].reason == "requires AI image description"
+        assert result.failures[0].kind == "needs_llm"
+        assert result.failures[0].reason == "requires LLM image description"
 
     def test_image_without_describable_picture_is_written(self, tmp_path: Path) -> None:
         write(tmp_path / "notes.png")
@@ -346,7 +346,7 @@ class StubTranscription:
 
     def transcribe(self, source: Path) -> TranscriptionResult:
         if source.name in self.fail_names:
-            raise ProcessingError("AI transcription failed", source_path=source)
+            raise ProcessingError("LLM transcription failed", source_path=source)
         self.transcribed.append(source)
         return TranscriptionResult(
             markdown=f"transcribed: {source.name}\n",
@@ -356,8 +356,8 @@ class StubTranscription:
         )
 
 
-class TestAIOnlyTranscription:
-    """With a transcriber, image files and PDFs skip Docling for AI transcription."""
+class TestLLMOnlyTranscription:
+    """With a transcriber, image files and PDFs skip Docling for LLM transcription."""
 
     def make_service(
         self, transcription: StubTranscription
@@ -411,7 +411,7 @@ class TestAIOnlyTranscription:
         assert not (tmp_path / "scan.md").exists()
         assert result.processed_count == 1
         assert [f.path.name for f in result.failures] == ["scan.png"]
-        assert result.failures[0].reason == "AI transcription failed"
+        assert result.failures[0].reason == "LLM transcription failed"
         assert "Unexpected error" not in caplog.text
 
     def test_failed_transcription_preserves_existing_output(self, tmp_path: Path) -> None:

@@ -1,4 +1,4 @@
-"""Tests for AITranscriptionService: AI transcription of image files and PDF pages."""
+"""Tests for LLMTranscriptionService: LLM transcription of image files and PDF pages."""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ from PIL import Image
 
 from nest.core.exceptions import ProcessingError
 from nest.core.models import LLMCompletionResult
-from nest.services.ai_transcription_service import (
+from nest.services.llm_transcription_service import (
     TRANSCRIPTION_PROMPT,
     UNREADABLE_PAGE,
-    AITranscriptionService,
+    LLMTranscriptionService,
 )
 
 
@@ -67,11 +67,11 @@ def save_pdf(path: Path, widths: list[int]) -> Path:
 class TestHandles:
     @pytest.mark.parametrize("name", ["scan.png", "photo.JPG", "fax.tiff", "report.pdf"])
     def test_images_and_pdfs_are_transcribed(self, name: str) -> None:
-        assert AITranscriptionService(PageEchoProvider()).handles(Path(name))
+        assert LLMTranscriptionService(PageEchoProvider()).handles(Path(name))
 
     @pytest.mark.parametrize("name", ["deck.pptx", "memo.docx", "sheet.xlsx", "notes.md"])
     def test_other_formats_are_not_transcribed(self, name: str) -> None:
-        assert not AITranscriptionService(PageEchoProvider()).handles(Path(name))
+        assert not LLMTranscriptionService(PageEchoProvider()).handles(Path(name))
 
 
 class TestTranscribeImages:
@@ -81,7 +81,7 @@ class TestTranscribeImages:
         provider = PageEchoProvider()
         source = save_image(tmp_path / "scan.jpg", 300, "JPEG")
 
-        result = AITranscriptionService(provider).transcribe(source)
+        result = LLMTranscriptionService(provider).transcribe(source)
 
         assert provider.calls == [(TRANSCRIPTION_PROMPT, source.read_bytes(), "image/jpeg")]
         assert result.markdown == "page width 300\n"
@@ -91,7 +91,7 @@ class TestTranscribeImages:
         provider = PageEchoProvider()
         source = save_image(tmp_path / "scan.bmp", 320, "BMP")
 
-        result = AITranscriptionService(provider).transcribe(source)
+        result = LLMTranscriptionService(provider).transcribe(source)
 
         [(_, data, mime_type)] = provider.calls
         assert mime_type == "image/png"
@@ -104,7 +104,7 @@ class TestTranscribeImages:
         source = tmp_path / "fax.tiff"
         frames[0].save(source, "TIFF", save_all=True, append_images=frames[1:])
 
-        result = AITranscriptionService(provider).transcribe(source)
+        result = LLMTranscriptionService(provider).transcribe(source)
 
         assert result.markdown == "page width 200\n\npage width 210\n"
         assert result.pages == 2
@@ -113,7 +113,7 @@ class TestTranscribeImages:
         provider = PageEchoProvider(wrap="```markdown\n{}\n```")
         source = save_image(tmp_path / "scan.png", 300, "PNG")
 
-        result = AITranscriptionService(provider).transcribe(source)
+        result = LLMTranscriptionService(provider).transcribe(source)
 
         assert result.markdown == "page width 300\n"
 
@@ -123,7 +123,7 @@ class TestTranscribePdfs:
         provider = PageEchoProvider()
         source = save_pdf(tmp_path / "report.pdf", [100, 150, 200])
 
-        result = AITranscriptionService(provider).transcribe(source)
+        result = LLMTranscriptionService(provider).transcribe(source)
 
         widths = [int(line.split()[-1]) for line in result.markdown.split("\n\n")]
         assert widths == sorted(widths)
@@ -135,7 +135,7 @@ class TestTranscribePdfs:
         provider = PageEchoProvider()
         source = save_pdf(tmp_path / "report.pdf", [100])
 
-        AITranscriptionService(provider).transcribe(source)
+        LLMTranscriptionService(provider).transcribe(source)
 
         [(_, data, _)] = provider.calls
         assert Image.open(io.BytesIO(data)).width >= 200
@@ -143,19 +143,19 @@ class TestTranscribePdfs:
     def test_a_failed_page_fails_the_document(self, tmp_path: Path) -> None:
         source = save_pdf(tmp_path / "report.pdf", [100, 150])
         probe = PageEchoProvider()
-        AITranscriptionService(probe).transcribe(source)
+        LLMTranscriptionService(probe).transcribe(source)
         second_page_width = max(Image.open(io.BytesIO(data)).width for _, data, _ in probe.calls)
         provider = PageEchoProvider(fail_widths={second_page_width})
 
-        with pytest.raises(ProcessingError, match="AI transcription failed for 1 of 2 pages"):
-            AITranscriptionService(provider).transcribe(source)
+        with pytest.raises(ProcessingError, match="LLM transcription failed for 1 of 2 pages"):
+            LLMTranscriptionService(provider).transcribe(source)
 
     def test_a_page_the_model_cannot_read_fails_the_document(self, tmp_path: Path) -> None:
         provider = PageEchoProvider(wrap=f"  {UNREADABLE_PAGE}\n")
         source = save_image(tmp_path / "scan.png", 300, "PNG")
 
-        with pytest.raises(ProcessingError, match="AI vision model could not read the page"):
-            AITranscriptionService(provider).transcribe(source)
+        with pytest.raises(ProcessingError, match="LLM vision model could not read the page"):
+            LLMTranscriptionService(provider).transcribe(source)
 
     def test_prompt_asks_for_the_unreadable_marker_instead_of_a_refusal(self) -> None:
         assert UNREADABLE_PAGE in TRANSCRIPTION_PROMPT

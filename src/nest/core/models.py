@@ -15,9 +15,9 @@ FileStatus = Literal["new", "modified", "unchanged"]
 # Type alias for processing status
 ProcessingStatus = Literal["success", "skipped", "failed"]
 
-# Why a document failed. "needs_ai" marks a standalone image that holds a
-# picture requiring an AI description while no vision provider is available.
-FailureKind = Literal["error", "needs_ai"]
+# Why a document failed. "needs_llm" marks a standalone image that holds a
+# picture requiring an LLM description while no vision provider is available.
+FailureKind = Literal["error", "needs_llm"]
 
 
 class ProcessingResult(BaseModel):
@@ -176,12 +176,12 @@ class SyncResult(BaseModel):
     skipped_orphan_cleanup: bool = False
     user_curated_count: int = 0
     enrichment_needed: int = 0
-    ai_prompt_tokens: int = 0
-    ai_completion_tokens: int = 0
-    ai_files_enriched: int = 0
-    ai_glossary_terms_added: int = 0
-    ai_glossary_prompt_tokens: int = 0
-    ai_glossary_completion_tokens: int = 0
+    llm_prompt_tokens: int = 0
+    llm_completion_tokens: int = 0
+    llm_files_enriched: int = 0
+    llm_glossary_terms_added: int = 0
+    llm_glossary_prompt_tokens: int = 0
+    llm_glossary_completion_tokens: int = 0
     vision_prompt_tokens: int = 0
     vision_completion_tokens: int = 0
     images_described: int = 0
@@ -189,7 +189,7 @@ class SyncResult(BaseModel):
     images_skipped: int = 0
     images_failed: int = 0
     failure_reasons: dict[str, str] = Field(default_factory=lambda: {})
-    needs_ai_files: list[str] = Field(default_factory=lambda: [])
+    needs_llm_files: list[str] = Field(default_factory=lambda: [])
 
 
 class ConvertFileOutcome(BaseModel):
@@ -270,7 +270,7 @@ class ConvertResult(BaseModel):
         failures: Failed files with reasons.
         images_described: Number of images described by the vision model.
         images_skipped: Number of images intentionally skipped (logos/signatures).
-        pages_transcribed: Number of pages prepared by AI transcription.
+        pages_transcribed: Number of pages prepared by LLM transcription.
         vision_prompt_tokens: Total prompt tokens used by the vision model.
         vision_completion_tokens: Total completion tokens used by the vision model.
     """
@@ -291,14 +291,14 @@ class ConvertResult(BaseModel):
     vision_completion_tokens: int = 0
 
 
-class AIEnrichmentResult(BaseModel):
-    """Result of AI index enrichment.
+class LLMEnrichmentResult(BaseModel):
+    """Result of LLM index enrichment.
 
     Attributes:
         descriptions: Dict mapping file path to generated description.
         prompt_tokens: Total prompt tokens used across all LLM calls.
         completion_tokens: Total completion tokens used across all LLM calls.
-        files_enriched: Number of files that received AI descriptions.
+        files_enriched: Number of files that received LLM descriptions.
         files_skipped: Number of files that carried forward existing descriptions.
         files_failed: Number of files where LLM call failed.
     """
@@ -311,8 +311,8 @@ class AIEnrichmentResult(BaseModel):
     files_failed: int = 0
 
 
-class AIGlossaryResult(BaseModel):
-    """Result of AI glossary generation.
+class LLMGlossaryResult(BaseModel):
+    """Result of LLM glossary generation.
 
     Attributes:
         terms_added: Number of new terms added to glossary.
@@ -508,7 +508,7 @@ class PictureDescriptionResult(BaseModel):
 
 
 class TranscriptionResult(BaseModel):
-    """Result of an AITranscriptionService.transcribe() call.
+    """Result of an LLMTranscriptionService.transcribe() call.
 
     Attributes:
         markdown: The document's Markdown, pages joined in order.

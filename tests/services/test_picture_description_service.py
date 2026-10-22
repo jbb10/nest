@@ -466,7 +466,7 @@ class TestExceptionGuard:
 
 
 class TestRequiresDescription:
-    """A conversion requires AI when it holds a picture that would be described."""
+    """A conversion requires an LLM when it holds a picture that would be described."""
 
     def test_true_for_describable_picture(self) -> None:
         conv = make_conversion_result([make_picture_item(label="bar_chart", confidence=0.9)])

@@ -41,7 +41,7 @@ class CommandUI:
 
     def __enter__(self) -> CommandUI:
         self._token = _current.set(self)
-        if self.name != "ai":
+        if self.name != "llm":
             self.stage(f"Preparing {self.name}")
         try:
             self._diagnostics.__enter__()
