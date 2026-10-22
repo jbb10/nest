@@ -2,6 +2,17 @@
 
 All notable changes to Nest.
 
+## [3.0.0](https://github.com/jbb10/nest/compare/v2.3.0...v3.0.0) (2026-10-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* `--no-ai` is now `--no-llm`, `--ai-only` is now `--llm-only`, `nest config ai` is now `nest config llm`, and the `NEST_AI_API_KEY`, `NEST_AI_ENDPOINT`, `NEST_AI_MODEL`, and `NEST_AI_VISION_MODEL` environment variables are now `NEST_LLM_API_KEY`, `NEST_LLM_ENDPOINT`, `NEST_LLM_MODEL`, and `NEST_LLM_VISION_MODEL`. The `_nest_meta/.ai_seen` marker is now `_nest_meta/.llm_seen`.
+
+### Features
+
+* rename AI to LLM for remote model calls and add --llm-only transcription ([#42](https://github.com/jbb10/nest/issues/42)) ([b5ae43f](https://github.com/jbb10/nest/commit/b5ae43f57a1abd6b987e8fc3e00b6d8661a5dc1e))
+
 ## [2.3.0](https://github.com/jbb10/nest/compare/v2.2.0...v2.3.0) (2026-10-21)
 
 
