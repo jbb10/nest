@@ -1,0 +1,5 @@
+interface:
+  display_name: "File Bug"
+  short_description: "Diagnose a reported bug and file a ticket"
+policy:
+  allow_implicit_invocation: false

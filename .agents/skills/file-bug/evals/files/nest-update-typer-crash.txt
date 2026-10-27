@@ -1,0 +1,99 @@
+/file-bug I just came across this bug:
+
+Last login: Mon Oct 26 15:22:59 on ttys003
+
+jbjornsson@DK-M2JJRXJL43 ~ % nest update
+
+╭───────────────────────────────────────── **Traceback ****(most recent call last)** ──────────────────────────────────────────╮
+
+│ /Users/jbjornsson/.local/bin/**nest**:10 in <module>                                                                     │
+
+│                                                                                                                      │
+
+│    7 │   │   sys.argv[0] = sys.argv[0][:-11]                                                                         │
+
+│    8 │   elif sys.argv[0].endswith(".exe"):                                                                          │
+
+│    9 │   │   sys.argv[0] = sys.argv[0][:-4]                                                                          │
+
+│ ❱ 10 │   sys.exit(**main()**)                                                                                            │
+
+│   11                                                                                                                 │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/nest/cli/**main.py**:28 in main                │
+
+│                                                                                                                      │
+
+│   25                                                                                                                 │
+
+│   26 def main() -> None:                                                                                             │
+
+│   27 │   """Entry point for the nest CLI."""                                                                         │
+
+│ ❱ 28 │   **app()**                                                                                                       │
+
+│   29                                                                                                                 │
+
+│   30                                                                                                                 │
+
+│   31 if __name__ == "__main__":                                                                                      │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/typer/**main.py**:1154 in __call__             │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/typer/**main.py**:1137 in __call__             │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/typer/_click/**core.py**:807 in __call__       │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/typer/**core.py**:1193 in main                 │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/typer/**core.py**:183 in _main                 │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/typer/**core.py**:1113 in invoke               │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/typer/_click/**core.py**:714 in make_context   │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/typer/_click/**core.py**:725 in parse_args     │
+
+│                                                                                                                      │
+
+│ /Users/jbjornsson/.local/share/uv/tools/nest/lib/python3.13/site-packages/click/**core.py**:2750 in handle_parse_result  │
+
+│                                                                                                                      │
+
+│   2747 │   │   # the slot (if any).                                                                                  │
+
+│   2748 │   │   existing_value = ctx.params.get(self.name, UNSET)                                                     │
+
+│   2749 │   │   existing_source = ctx.get_parameter_source(self.name)                                                 │
+
+│ ❱ 2750 │   │   existing_default_explicit = **ctx._param_default_explicit**.get(self.name, False)                         │
+
+│   2751 │   │                                                                                                         │
+
+│   2752 │   │   with augment_usage_errors(ctx, param=self):                                                           │
+
+│   2753 │   │   │   value, source = self.consume_value(ctx, opts)                                                     │
+
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+**AttributeError: **'Context' object has no attribute '_param_default_explicit'
+
+jbjornsson@DK-M2JJRXJL43 ~ %

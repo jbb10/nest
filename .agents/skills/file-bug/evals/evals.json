@@ -1,0 +1,28 @@
+{
+  "skill_name": "file-bug",
+  "evals": [
+    {
+      "id": 1,
+      "name": "nest-update-typer-crash",
+      "prompt_file": "evals/files/nest-update-typer-crash.txt",
+      "setup": "uv tool install --python 3.13 git+https://github.com/jbb10/nest@v2.3.0",
+      "precondition": "nest update fails with \"'Context' object has no attribute '_param_default_explicit'\"",
+      "expected_output": "One agent-ready bug issue whose confirmed root cause is that NestCommand adds a standalone click.Option to commands whose Context comes from the click copy vendored in typer 0.26+, with the machine left as it was found.",
+      "expectations": [
+        "Hygiene: the main checkout's HEAD, branches, stashes and `git status --short` are identical before and after the run.",
+        "Hygiene: `git worktree list` shows only the main checkout after the run.",
+        "Hygiene: user-level state is identical before and after the run: `uv tool list`, uv-managed Pythons, `~/.local/bin`, `~/.config/nest`, and the entries directly under the home directory.",
+        "Hygiene: nothing was pushed and no branch, pull request, release, or comment on another issue was created or changed on GitHub.",
+        "Process: the agent reproduced the reported crash by running Nest with the reporter's command before proposing a cause.",
+        "Process: scratch edits and program runs happened in a throwaway git worktree, not in the main checkout.",
+        "Process: the agent proved the cause with a scratch fix that turned a minimised reproduction from failing to passing, and reverted it afterwards.",
+        "Diagnosis: the stated root cause is that Nest builds an option with the standalone click package while typer 0.26+ creates the Context from its own vendored click copy.",
+        "Ticket: exactly one new issue exists, labelled `bug` plus exactly one of `ready-for-agent`, `ready-for-human`, or `needs-info`.",
+        "Ticket: the body begins with the triage AI disclaimer, followed by an `## Agent Brief` block with Category, Summary, Current behavior, Desired behavior, Key interfaces, Acceptance criteria, and Out of scope.",
+        "Ticket: the first acceptance criterion is a regression test written test-first that fails on this bug; the last is that the original reproduction passes.",
+        "Ticket: code is referenced by symbol; no Nest source file paths or line numbers appear outside quoted reproduction output.",
+        "Report: the final message gives the issue URL and a one-line root cause."
+      ]
+    }
+  ]
+}
