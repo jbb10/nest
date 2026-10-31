@@ -206,6 +206,10 @@ so without this secret the release PR gets no CI checks: its runs sit at
 When the token expires, release-please falls back to `GITHUB_TOKEN` and that manual
 approval step returns; rotate the secret to restore automatic checks.
 
+To create or rotate the token, run `scripts/setup-release-token.sh`.
+It opens the token form with the exact settings to use, verifies the pasted token can
+read the repository, and stores it as the secret with `gh`.
+
 ```mermaid
 flowchart LR
     A[PRs merged to main] --> B[release.yml on push]
