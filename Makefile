@@ -6,6 +6,8 @@
 #   format-check - Verify code formatting
 #   format       - Auto-format code
 #   typecheck    - Run pyright strict mode
+#   check-deps   - Verify direct dependency ranges agree with uv.lock
+#   deptry       - Verify nest imports only declared dependencies
 #   test         - Run unit/integration tests (excludes e2e)
 #   test-e2e     - Run end-to-end tests (requires Docling models)
 #   test-all     - Run all tests
@@ -15,7 +17,7 @@
 # Releases are cut automatically by release-please in CI - there is no local
 # release target. See CONTRIBUTING.md.
 
-.PHONY: lint format-check format typecheck test test-e2e test-all scan-secrets ci
+.PHONY: lint format-check format typecheck check-deps deptry test test-e2e test-all scan-secrets ci
 
 E2E_TIMEOUT ?= 60
 
@@ -31,6 +33,12 @@ format:
 typecheck:
 	uv run pyright
 
+check-deps:
+	uv run python scripts/check_dependency_ranges.py
+
+deptry:
+	uv run deptry src
+
 test:
 	uv run pytest tests/ -v --ignore=tests/e2e
 
@@ -42,4 +50,4 @@ test-all: test test-e2e
 scan-secrets:
 	gitleaks dir --config .gitleaks.toml -v
 
-ci: lint format-check typecheck scan-secrets test-all
+ci: lint format-check typecheck check-deps deptry scan-secrets test-all

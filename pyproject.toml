@@ -43,7 +43,7 @@ path = "src/nest/__init__.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "scripts"]
 addopts = "-v --tb=short"
 markers = [
     "e2e: End-to-end tests (require real Docling, may be slow)",
@@ -53,13 +53,13 @@ markers = [
 pythonVersion = "3.11"
 pythonPlatform = "All"
 typeCheckingMode = "strict"
-include = ["src"]
+include = ["src", "scripts"]
 exclude = ["tests"]
 
 [tool.ruff]
 target-version = "py311"
 line-length = 100
-src = ["src", "tests"]
+src = ["src", "tests", "scripts"]
 # Ruff only lints and formats Python files. Since ruff 0.16 the formatter
 # also reformats Python code blocks inside Markdown files by default;
 # those blocks are documentation, out of the formatter's scope here.
