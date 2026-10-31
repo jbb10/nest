@@ -13,6 +13,11 @@ updates:
     groups:
       python-dev:
         dependency-type: "development"
+      # Runtime bumps travel as one weekly PR (issue #52): raising a direct
+      # dependency range is a reviewed change, and a grouped PR keeps the
+      # review load inside the open-PR limit.
+      python-prod:
+        dependency-type: "production"
 
   # Keep GitHub Actions pinned versions current.
   - package-ecosystem: "github-actions"

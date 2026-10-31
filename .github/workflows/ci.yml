@@ -21,8 +21,10 @@ permissions:
   contents: read
 
 env:
-  # Fail fast and keep uv output deterministic in CI.
-  UV_FROZEN: "1"
+  # Fail fast and keep uv output deterministic in CI: assert that uv.lock
+  # matches pyproject.toml instead of silently using a stale lock. Jobs that
+  # deliberately re-resolve (quality, install-smoke) override this to "0".
+  UV_LOCKED: "1"
 
 jobs:
   # ── Static quality gate: lint, formatting, and strict type checking ──────────
@@ -32,14 +34,14 @@ jobs:
   # UV_INDEX (CPU PyTorch) takes priority over UV_DEFAULT_INDEX (PyPI), and
   # UV_INDEX_STRATEGY=unsafe-best-match lets uv pick the best version across
   # both indexes. --upgrade-package torch/torchvision/triton forces uv to
-  # re-resolve those packages (ignoring lockfile pins to the CUDA wheel).
-  # UV_FROZEN is not overridden here; the lockfile is still used for all other
-  # packages, keeping the resolution fast and deterministic.
+  # re-resolve those packages (ignoring lockfile pins to the CUDA wheel), so
+  # UV_LOCKED is disabled here; the lockfile still seeds every other package,
+  # keeping the resolution fast and deterministic.
   quality:
     name: Lint · Format · Types
     runs-on: ubuntu-latest
     env:
-      UV_FROZEN: "0"
+      UV_LOCKED: "0"
       UV_INDEX: https://download.pytorch.org/whl/cpu
       UV_DEFAULT_INDEX: https://pypi.org/simple
       UV_INDEX_STRATEGY: unsafe-best-match
@@ -67,6 +69,12 @@ jobs:
 
       - name: Type check (pyright strict)
         run: make typecheck
+
+      - name: Check dependency ranges
+        run: make check-deps
+
+      - name: Check declared dependencies (deptry)
+        run: make deptry
 
       - name: Install gitleaks
         run: |
@@ -173,13 +181,56 @@ jobs:
         env:
           NEST_LLM_API_KEY: ${{ secrets.NEST_AI_API_KEY }}
 
+  # ── Install smoke: test what users actually install ─────────────────────────
+  # `uv tool install` ignores uv.lock and resolves the newest versions the
+  # pyproject.toml ranges permit - exactly what a user gets (issue #52). This
+  # job installs the tool from the checkout into an isolated UV_TOOL_DIR /
+  # UV_TOOL_BIN_DIR and exercises the executable from an empty directory with
+  # no NEST_* configuration, so a broken fresh install (like the typer 0.26
+  # crash in #51) fails CI instead of reaching users. UV_LOCKED is disabled:
+  # the whole point is a fresh resolution. scripts/install_smoke.py fails the
+  # job on any unexpected exit code or Python traceback.
+  install-smoke:
+    name: Install smoke (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      UV_LOCKED: "0"
+      # windows needs UTF-8 mode for Rich output through pipes.
+      PYTHONUTF8: "1"
+      UV_TOOL_DIR: ${{ runner.temp }}/nest-smoke-tool
+      UV_TOOL_BIN_DIR: ${{ runner.temp }}/nest-smoke-tool-bin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.0
+        with:
+          enable-cache: true
+          # The fresh resolution ignores uv.lock, so key the cache on the
+          # ranges that drive it.
+          cache-dependency-glob: "pyproject.toml"
+          cache-suffix: ${{ runner.os }}-install-smoke
+          prune-cache: true
+
+      - name: Install nest the way a user does
+        run: uv tool install .
+
+      - name: Smoke-test the installed tool
+        run: uv run --no-project python scripts/install_smoke.py
+
   # ── Aggregate status check ───────────────────────────────────────────────────
   # Single required check to configure in branch protection, independent of the
   # matrix dimensions above.
   ci-success:
     name: CI success
     if: always()
-    needs: [quality, test, e2e]
+    needs: [quality, test, e2e, install-smoke]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all jobs succeeded
@@ -189,7 +240,8 @@ jobs:
           for job_result in \
             "${{ needs.quality.result }}" \
             "${{ needs.test.result }}" \
-            "${{ needs.e2e.result }}"; do
+            "${{ needs.e2e.result }}" \
+            "${{ needs.install-smoke.result }}"; do
             if [[ "$job_result" != "success" ]]; then
               echo "One or more CI jobs failed."
               exit 1

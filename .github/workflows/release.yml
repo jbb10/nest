@@ -9,12 +9,13 @@ name: Release
 # How it works:
 #   1. On every push to main, release-please inspects the Conventional Commits
 #      since the last release and maintains a standing "release PR" that bumps
-#      the version (pyproject.toml + src/nest/__init__.py) and updates
-#      CHANGELOG.md.
+#      the version (src/nest/__init__.py, the single source of truth;
+#      pyproject.toml reads it dynamically) and updates CHANGELOG.md.
 #   2. When you merge that release PR, release-please creates the git tag and a
 #      GitHub Release with the accumulated notes.
-#   3. This workflow then builds the sdist + wheel and attaches them to the
-#      release.
+#   3. This workflow then smoke-tests the tagged commit installed the way a
+#      user installs it, builds the sdist + wheel, and attaches them to the
+#      release. A failed smoke stops the job: no artifacts are uploaded.
 on:
   push:
     branches: [main]
@@ -51,6 +52,21 @@ jobs:
         uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: false
+
+      # Same smoke as the install-smoke CI job (issue #52): install the tagged
+      # commit the way a user does - `uv tool install` from a checkout, which
+      # ignores uv.lock and freshly resolves the pyproject.toml ranges - and
+      # exercise the executable. A failure stops the job before any artifact
+      # is built or uploaded.
+      - name: Smoke-test the installed tool
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          UV_TOOL_DIR: ${{ runner.temp }}/nest-smoke-tool
+          UV_TOOL_BIN_DIR: ${{ runner.temp }}/nest-smoke-tool-bin
+          PYTHONUTF8: "1"
+        run: |
+          uv tool install .
+          uv run --no-project python scripts/install_smoke.py
 
       - name: Build sdist and wheel
         if: ${{ steps.release.outputs.release_created }}
