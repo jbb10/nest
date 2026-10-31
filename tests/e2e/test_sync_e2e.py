@@ -524,6 +524,8 @@ class TestSyncLinkedFoldersE2E:
         assert not (project_dir / "_nest_context" / "shared" / "team" / "notes.txt").exists()
         assert (shared / "team" / "notes.txt").exists(), "Link target must never be touched"
 
+    # Below the suite default on purpose: this test exists to detect a hang,
+    # so it must fail fast rather than burn the full budget.
     @pytest.mark.timeout(120)
     def test_link_loop_does_not_hang_sync(
         self, initialized_project: Path, shared: Path, link_kind: str

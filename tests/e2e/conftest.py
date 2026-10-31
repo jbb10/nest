@@ -138,14 +138,26 @@ def run_cli(
     else:
         merged_env["PYTHONPATH"] = str(src_path)
 
-    result = subprocess.run(
-        [sys.executable, "-m", "nest.cli.main", *args],
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        env=merged_env,
-    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "nest.cli.main", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=merged_env,
+        )
+    except subprocess.TimeoutExpired as exc:
+        # The expired subprocess is killed with its output captured so far;
+        # surface it instead of letting the bare TimeoutExpired discard it.
+        partial_stdout = exc.stdout or ""
+        partial_stderr = exc.stderr or ""
+        pytest.fail(
+            f"CLI did not exit within {timeout}s: nest {' '.join(args)}\n"
+            f"--- partial stdout ---\n{partial_stdout}\n"
+            f"--- partial stderr ---\n{partial_stderr}",
+            pytrace=False,
+        )
     return CLIResult(
         exit_code=result.returncode,
         stdout=result.stdout,
