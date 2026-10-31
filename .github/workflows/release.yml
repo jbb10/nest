@@ -16,6 +16,13 @@ name: Release
 #   3. This workflow then smoke-tests the tagged commit installed the way a
 #      user installs it, builds the sdist + wheel, and attaches them to the
 #      release. A failed smoke stops the job: no artifacts are uploaded.
+#
+# Token: release-please runs with RELEASE_PLEASE_TOKEN, a fine-grained PAT
+# (Contents + Pull requests: read and write, scoped to this repo). Events
+# created with the default GITHUB_TOKEN never start other workflows, so with
+# it the release PR gets no CI checks and sits at "action required" until a
+# maintainer approves the run by hand. If the secret is unset, the action
+# falls back to GITHUB_TOKEN and that manual approval is needed again.
 on:
   push:
     branches: [main]
@@ -38,6 +45,7 @@ jobs:
         id: release
         uses: googleapis/release-please-action@v5
         with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
 
