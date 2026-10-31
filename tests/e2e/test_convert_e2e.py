@@ -277,7 +277,6 @@ class TestConvertLLMOnlyE2E:
             result = run_cli(
                 ["convert", "notes.png", "--llm-only"],
                 cwd=fresh_temp_dir,
-                timeout=120,
                 env=server.env_vars(),
             )
 
@@ -295,7 +294,6 @@ class TestConvertLLMOnlyE2E:
             result = run_cli(
                 ["convert", "notes.png", "--llm-only"],
                 cwd=fresh_temp_dir,
-                timeout=120,
                 env=server.env_vars(),
             )
 

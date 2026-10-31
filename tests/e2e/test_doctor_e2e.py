@@ -1,4 +1,9 @@
-"""E2E tests for nest doctor command."""
+"""E2E tests for nest doctor command.
+
+Every run_cli call passes timeout=30, deliberately below the 300s suite
+default: doctor loads no Docling models and makes no LLM calls, so 30s is
+ample headroom while still failing fast if the command hangs.
+"""
 
 from pathlib import Path
 

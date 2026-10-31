@@ -3,11 +3,14 @@ name: CI
 # Continuous integration gate.
 # Runs on every pull request targeting main and on direct pushes to main.
 # main is protected: this workflow must pass before a PR can be merged.
+# workflow_dispatch lets maintainers re-run the suite on demand, e.g. to
+# gather consecutive first-attempt Windows passes for flakiness checks.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 # Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
 concurrency:

@@ -1,5 +1,9 @@
 """Main CLI entry point for nest command."""
 
+import os
+import sys
+from typing import NoReturn
+
 import typer
 
 from nest.cli.config_cmd import config_app
@@ -23,9 +27,43 @@ app.command(name="update", cls=NestCommand)(update_command)
 app.add_typer(config_app, name="config")
 
 
+def _terminate(exit_code: int) -> NoReturn:
+    """Flush the output streams and terminate the process immediately.
+
+    The CLI runs Docling's native stack (torch, OpenMP, pdfium), which
+    intermittently faults on Windows while CPython joins worker threads and
+    runs atexit handlers after the command's work is done (issue #41).
+    Terminating directly skips that teardown. Every nest write is
+    synchronous, so once the streams are flushed nothing is lost.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except Exception:
+            # A broken pipe must not mask the command's own exit code.
+            pass
+    os._exit(exit_code)
+
+
+def _exit_status(code: object) -> int:
+    """Map a SystemExit code to a process exit status."""
+    if code is None:
+        return 0
+    return code if isinstance(code, int) else 1
+
+
 def main() -> None:
-    """Entry point for the nest CLI."""
-    app()
+    """Entry point for the nest CLI.
+
+    Terminates the process instead of returning, so the console script and
+    ``python -m nest.cli.main`` both skip interpreter finalization.
+    Unexpected exceptions still propagate for a normal traceback exit.
+    """
+    try:
+        app()
+    except SystemExit as exit_signal:
+        _terminate(_exit_status(exit_signal.code))
+    _terminate(0)
 
 
 if __name__ == "__main__":
