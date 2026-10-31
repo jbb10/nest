@@ -57,7 +57,7 @@ jobs:
 
       - name: Set up uv
         if: ${{ steps.release.outputs.release_created }}
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: false
 
