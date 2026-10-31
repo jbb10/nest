@@ -2,10 +2,11 @@
 
 import os
 import sys
-from typing import NoReturn
+from typing import Annotated, NoReturn
 
 import typer
 
+import nest
 from nest.cli.config_cmd import config_app
 from nest.cli.convert_cmd import convert_command
 from nest.cli.doctor_cmd import doctor_command
@@ -25,6 +26,33 @@ app.command(name="status", cls=NestCommand)(status_command)
 app.command(name="doctor", cls=NestCommand)(doctor_command)
 app.command(name="update", cls=NestCommand)(update_command)
 app.add_typer(config_app, name="config")
+
+
+def _version_callback(value: bool) -> None:
+    """Print the running Nest version and exit.
+
+    ``nest.__version__`` is the single source of truth: pyproject.toml reads
+    it dynamically at build time, so the printed value always matches the
+    installed wheel.
+    """
+    if value:
+        typer.echo(nest.__version__)
+        raise typer.Exit
+
+
+@app.callback()
+def nest_callback(
+    version: Annotated[
+        bool,
+        typer.Option(
+            "--version",
+            callback=_version_callback,
+            is_eager=True,
+            help="Show Nest's version and exit.",
+        ),
+    ] = False,
+) -> None:
+    """AI-powered document context tool for projects."""
 
 
 def _terminate(exit_code: int) -> NoReturn:

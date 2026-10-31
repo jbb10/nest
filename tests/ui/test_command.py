@@ -99,6 +99,12 @@ def test_nest_source_never_imports_standalone_click() -> None:
     assert offenders == []
 
 
+def test_version_option_prints_the_package_version() -> None:
+    result = CliRunner().invoke(app, ["--version"])
+    assert result.exit_code == 0, result.output
+    assert result.output.strip() == nest.__version__
+
+
 @pytest.mark.parametrize("arguments", _REGISTERED_COMMANDS)
 def test_verbose_is_available_on_every_command(arguments: list[str]) -> None:
     result = CliRunner().invoke(app, [*arguments, "--help"])
