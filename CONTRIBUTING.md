@@ -195,6 +195,17 @@ extra to approve.
 The version bump is derived from commit types (`feat` → minor, `fix` → patch,
 `feat!`/`BREAKING CHANGE:` → major).
 
+### Release PR token
+
+`release.yml` runs release-please with the `RELEASE_PLEASE_TOKEN` repository secret,
+a fine-grained personal access token scoped to this repository with
+*Contents: read and write* and *Pull requests: read and write*.
+GitHub never starts a workflow from an event created with the default `GITHUB_TOKEN`,
+so without this secret the release PR gets no CI checks: its runs sit at
+"action required" and a maintainer must approve them by hand before the PR can merge.
+When the token expires, release-please falls back to `GITHUB_TOKEN` and that manual
+approval step returns; rotate the secret to restore automatic checks.
+
 ```mermaid
 flowchart LR
     A[PRs merged to main] --> B[release.yml on push]
