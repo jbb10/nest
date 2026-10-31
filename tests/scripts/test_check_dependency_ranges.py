@@ -17,23 +17,21 @@ from check_dependency_ranges import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
-NEWLINE = chr(10)
-
 
 def _write_pyproject(path: Path, dependencies: list[str]) -> None:
     lines = ["[project]", 'name = "example"', 'version = "1.0.0"', "dependencies = ["]
-    lines += ['    "' + dependency + '",' for dependency in dependencies]
+    lines += [f'    "{dependency}",' for dependency in dependencies]
     lines += ["]"]
-    path.write_text(NEWLINE.join(lines) + NEWLINE, encoding="utf-8")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _write_lock(path: Path, packages: list[tuple[str, str | None]]) -> None:
     lines = ["version = 1"]
     for name, version in packages:
-        lines += ["", "[[package]]", 'name = "' + name + '"']
+        lines += ["", "[[package]]", f'name = "{name}"']
         if version is not None:
-            lines += ['version = "' + version + '"']
-    path.write_text(NEWLINE.join(lines) + NEWLINE, encoding="utf-8")
+            lines += [f'version = "{version}"']
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 class TestSatisfiesAnchor:
@@ -109,7 +107,7 @@ class TestCheckRanges:
         pyproject = tmp_path / "pyproject.toml"
         lock = tmp_path / "uv.lock"
         _write_pyproject(pyproject, ["typer~=0.26.8"])
-        _write_lock(lock, [("typer", "0.26.8")])
+        _write_lock(lock, [("typer", "0.26.9")])
 
         assert check_ranges(pyproject, lock) == []
 

@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 
-import install_smoke
 import nest
 from install_smoke import (
     SmokeCheck,
@@ -19,14 +18,10 @@ from install_smoke import (
     find_nest_executable,
     find_tool_python,
     installed_nest_version,
+    main,
     run_checks,
     sanitized_environment,
 )
-
-
-def _make_executable(path: Path) -> None:
-    path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
 class TestSanitizedEnvironment:
@@ -156,11 +151,10 @@ class TestRunChecks:
         )
         return script
 
-    def checks(self) -> list[SmokeCheck]:
-        return build_checks(["status"], "3.0.0")
-
     def test_all_passing_checks_produce_no_failures(self, fake_nest: Path, tmp_path: Path) -> None:
-        failures = run_checks([sys.executable, str(fake_nest)], self.checks(), tmp_path, {})
+        checks = build_checks(["status"], "3.0.0")
+
+        failures = run_checks([sys.executable, str(fake_nest)], checks, tmp_path, {})
 
         assert failures == []
 
@@ -221,81 +215,49 @@ class TestRunChecks:
         assert failures == []
 
 
+def _install_fake_tool(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, nest_command: str) -> None:
+    """Create a fake ``uv tool install`` layout and point ``UV_TOOL_*`` at it.
+
+    The nest shim runs ``nest_command`` under the tool python. Both shims are
+    wrappers rather than symlinks: CPython locates pyvenv.cfg next to argv[0],
+    so an extra symlink layer would lose the venv's site-packages.
+    """
+    tool_dir = tmp_path / "tool"
+    bin_dir = tmp_path / "tool-bin"
+    venv_bin = tool_dir / "nest" / "bin"
+    venv_bin.mkdir(parents=True)
+    bin_dir.mkdir()
+    python_shim = venv_bin / "python"
+    python_shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n', encoding="utf-8")
+    python_shim.chmod(python_shim.stat().st_mode | stat.S_IXUSR)
+    nest_shim = bin_dir / "nest"
+    nest_shim.write_text(f'#!/bin/sh\nexec "{python_shim}" {nest_command} "$@"\n', encoding="utf-8")
+    nest_shim.chmod(nest_shim.stat().st_mode | stat.S_IXUSR)
+    monkeypatch.setenv("UV_TOOL_DIR", str(tool_dir))
+    monkeypatch.setenv("UV_TOOL_BIN_DIR", str(bin_dir))
+
+
 class TestMain:
-    def test_missing_environment_variables_fail_fast(self, monkeypatch) -> None:
+    def test_missing_environment_variables_fail_fast(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("UV_TOOL_DIR", raising=False)
         monkeypatch.delenv("UV_TOOL_BIN_DIR", raising=False)
 
-        assert install_smoke.main() == 2
+        assert main() == 2
 
     @pytest.mark.skipif(sys.platform != "linux", reason="posix executable shims")
-    def test_main_passes_against_a_real_tool_layout(self, tmp_path: Path, monkeypatch) -> None:
-        tool_dir = tmp_path / "tool"
-        bin_dir = tmp_path / "tool-bin"
-        venv_bin = tool_dir / "nest" / "bin"
-        venv_bin.mkdir(parents=True)
-        bin_dir.mkdir(parents=True)
-        # A wrapper rather than a symlink: CPython locates pyvenv.cfg next to
-        # argv[0], so an extra symlink layer would lose the venv's site-packages.
-        python_shim = venv_bin / "python"
-        python_shim.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/bin/sh
-                exec "{sys.executable}" "$@"
-                """
-            ),
-            encoding="utf-8",
-        )
-        python_shim.chmod(python_shim.stat().st_mode | stat.S_IXUSR)
-        nest_shim = bin_dir / "nest"
-        nest_shim.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/bin/sh
-                exec "{python_shim}" -m nest.cli.main "$@"
-                """
-            ),
-            encoding="utf-8",
-        )
-        nest_shim.chmod(nest_shim.stat().st_mode | stat.S_IXUSR)
-        monkeypatch.setenv("UV_TOOL_DIR", str(tool_dir))
-        monkeypatch.setenv("UV_TOOL_BIN_DIR", str(bin_dir))
+    def test_main_passes_against_a_real_tool_layout(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _install_fake_tool(tmp_path, monkeypatch, "-m nest.cli.main")
         monkeypatch.setenv("NEST_LLM_API_KEY", "must-be-ignored")
         monkeypatch.setenv("PYTHONPATH", "must-be-ignored")
 
-        assert install_smoke.main() == 0
+        assert main() == 0
 
     @pytest.mark.skipif(sys.platform != "linux", reason="posix executable shims")
-    def test_main_fails_when_the_cli_crashes(self, tmp_path: Path, monkeypatch) -> None:
-        tool_dir = tmp_path / "tool"
-        bin_dir = tmp_path / "tool-bin"
-        venv_bin = tool_dir / "nest" / "bin"
-        venv_bin.mkdir(parents=True)
-        bin_dir.mkdir(parents=True)
-        python_shim = venv_bin / "python"
-        python_shim.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/bin/sh
-                exec "{sys.executable}" "$@"
-                """
-            ),
-            encoding="utf-8",
-        )
-        python_shim.chmod(python_shim.stat().st_mode | stat.S_IXUSR)
-        nest_shim = bin_dir / "nest"
-        nest_shim.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/bin/sh
-                exec "{python_shim}" -c "raise SystemExit(3)" "$@"
-                """
-            ),
-            encoding="utf-8",
-        )
-        nest_shim.chmod(nest_shim.stat().st_mode | stat.S_IXUSR)
-        monkeypatch.setenv("UV_TOOL_DIR", str(tool_dir))
-        monkeypatch.setenv("UV_TOOL_BIN_DIR", str(bin_dir))
+    def test_main_fails_when_the_cli_crashes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _install_fake_tool(tmp_path, monkeypatch, '-c "raise SystemExit(3)"')
 
-        assert install_smoke.main() == 1
+        assert main() == 1

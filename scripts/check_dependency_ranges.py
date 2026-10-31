@@ -38,6 +38,9 @@ class VersionAnchor(NamedTuple):
     minor: int
     patch: int
 
+    def __str__(self) -> str:
+        return f"{self.major}.{self.minor}.{self.patch}"
+
 
 def _canonical(name: str) -> str:
     """Normalize a distribution name per PEP 503."""
@@ -113,8 +116,7 @@ def check_ranges(pyproject_path: Path, lock_path: Path) -> list[str]:
             problems.append(f"{name}: not recorded in {lock_path.name}")
         elif not satisfies_anchor(version, anchor):
             problems.append(
-                f"{name}~={anchor.major}.{anchor.minor}.{anchor.patch}: "
-                f"{lock_path.name} resolves {version}, outside the range"
+                f"{name}~={anchor}: {lock_path.name} resolves {version}, outside the range"
             )
     return problems
 
