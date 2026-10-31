@@ -2,6 +2,13 @@
 
 All notable changes to Nest.
 
+## [3.1.1](https://github.com/jbb10/nest/compare/v3.1.0...v3.1.1) (2026-10-31)
+
+
+### CI/CD
+
+* **release:** run release-please with a PAT so release PRs get CI checks ([#59](https://github.com/jbb10/nest/issues/59)) ([2ca2805](https://github.com/jbb10/nest/commit/2ca2805bb12241bfb114436b731bccd7705a7496))
+
 ## [3.1.0](https://github.com/jbb10/nest/compare/v3.0.0...v3.1.0) (2026-10-31)
 
 
