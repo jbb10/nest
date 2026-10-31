@@ -18,6 +18,16 @@ import nest
 from nest.cli.main import app
 from nest.ui.command import CommandUI, NestCommand, current_output
 
+_REGISTERED_COMMANDS: list[list[str]] = [
+    ["config", "llm"],
+    ["convert"],
+    ["doctor"],
+    ["init"],
+    ["status"],
+    ["sync"],
+    ["update"],
+]
+
 
 def test_lightweight_command_does_not_import_ml_libraries(tmp_path: Path) -> None:
     script = (
@@ -36,25 +46,23 @@ def test_lightweight_command_does_not_import_ml_libraries(tmp_path: Path) -> Non
 
 
 def test_every_registered_command_owns_an_output_session() -> None:
-    def check(command: TyperCommand, path: str) -> list[str]:
-        if isinstance(command, TyperGroup):
-            leaves: list[str] = []
-            for name, child in command.commands.items():
-                leaves.extend(check(child, f"{path} {name}".strip()))
-            return leaves
+    def leaf_commands(
+        command: TyperCommand | TyperGroup, path: str
+    ) -> list[tuple[str, TyperCommand]]:
+        if not isinstance(command, TyperGroup):
+            return [(path, command)]
+        leaves: list[tuple[str, TyperCommand]] = []
+        for name, child in command.commands.items():
+            leaves.extend(leaf_commands(child, f"{path} {name}".strip()))
+        return leaves
+
+    leaves = leaf_commands(get_command(app), "")
+    assert sorted(path for path, _ in leaves) == sorted(
+        " ".join(arguments) for arguments in _REGISTERED_COMMANDS
+    )
+    for path, command in leaves:
         assert isinstance(command, NestCommand), path
         assert any(parameter.name == "verbose" for parameter in command.params), path
-        return [path]
-
-    assert sorted(check(get_command(app), "")) == [
-        "config llm",
-        "convert",
-        "doctor",
-        "init",
-        "status",
-        "sync",
-        "update",
-    ]
 
 
 def test_nest_source_never_imports_standalone_click() -> None:
@@ -64,16 +72,20 @@ def test_nest_source_never_imports_standalone_click() -> None:
     typer command crashes parsing on typer 0.26+ (issue #51).
     """
 
+    def is_click_module(name: str) -> bool:
+        return name == "click" or name.startswith("click.")
+
     def imports_standalone_click(source: str) -> bool:
         for node in ast.walk(ast.parse(source)):
             if isinstance(node, ast.Import) and any(
-                alias.name == "click" or alias.name.startswith("click.") for alias in node.names
+                is_click_module(alias.name) for alias in node.names
             ):
                 return True
             if (
                 isinstance(node, ast.ImportFrom)
                 and node.level == 0
-                and (node.module == "click" or node.module.startswith("click."))
+                and node.module is not None
+                and is_click_module(node.module)
             ):
                 return True
         return False
@@ -87,18 +99,7 @@ def test_nest_source_never_imports_standalone_click() -> None:
     assert offenders == []
 
 
-@pytest.mark.parametrize(
-    "arguments",
-    [
-        ["init"],
-        ["sync"],
-        ["convert"],
-        ["status"],
-        ["doctor"],
-        ["update"],
-        ["config", "llm"],
-    ],
-)
+@pytest.mark.parametrize("arguments", _REGISTERED_COMMANDS)
 def test_verbose_is_available_on_every_command(arguments: list[str]) -> None:
     result = CliRunner().invoke(app, [*arguments, "--help"])
     assert result.exit_code == 0, result.output
