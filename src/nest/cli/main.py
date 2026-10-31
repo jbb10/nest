@@ -2,6 +2,7 @@
 
 import os
 import sys
+from typing import NoReturn
 
 import typer
 
@@ -26,7 +27,7 @@ app.command(name="update", cls=NestCommand)(update_command)
 app.add_typer(config_app, name="config")
 
 
-def _terminate(exit_code: int) -> None:
+def _terminate(exit_code: int) -> NoReturn:
     """Flush the output streams and terminate the process immediately.
 
     The CLI runs Docling's native stack (torch, OpenMP, pdfium), which

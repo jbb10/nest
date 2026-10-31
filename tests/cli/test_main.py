@@ -35,13 +35,13 @@ def _probe_script(args: list[str]) -> str:
     )
 
 
-def _run_probe(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+def _run_probe(args: list[str], work_dir: Path) -> subprocess.CompletedProcess[str]:
     """Run the probe script as a child process and collect its output.
 
     The 60s timeout is ample for commands that load no Docling models; it
     only guards against a hang.
     """
-    script = cwd / "cli_exit_probe.py"
+    script = work_dir / "cli_exit_probe.py"
     script.write_text(_probe_script(args), encoding="utf-8")
     env = {**os.environ, "PYTHONPATH": str(_SRC_PATH)}
     return subprocess.run(
