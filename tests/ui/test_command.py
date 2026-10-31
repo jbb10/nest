@@ -1,5 +1,6 @@
 """Whole-app output policy tested through command registration and the public session interface."""
 
+import ast
 import logging
 import subprocess
 import sys
@@ -7,12 +8,13 @@ import threading
 from io import StringIO
 from pathlib import Path
 
-import click
 import pytest
 from rich.console import Console
+from typer.core import TyperCommand, TyperGroup
 from typer.main import get_command
 from typer.testing import CliRunner
 
+import nest
 from nest.cli.main import app
 from nest.ui.command import CommandUI, NestCommand, current_output
 
@@ -34,15 +36,55 @@ def test_lightweight_command_does_not_import_ml_libraries(tmp_path: Path) -> Non
 
 
 def test_every_registered_command_owns_an_output_session() -> None:
-    def check(command: click.Command) -> None:
-        if isinstance(command, click.Group):
-            for child in command.commands.values():
-                check(child)
-        else:
-            assert isinstance(command, NestCommand), command.name
-            assert any(parameter.name == "verbose" for parameter in command.params)
+    def check(command: TyperCommand, path: str) -> list[str]:
+        if isinstance(command, TyperGroup):
+            leaves: list[str] = []
+            for name, child in command.commands.items():
+                leaves.extend(check(child, f"{path} {name}".strip()))
+            return leaves
+        assert isinstance(command, NestCommand), path
+        assert any(parameter.name == "verbose" for parameter in command.params), path
+        return [path]
 
-    check(get_command(app))
+    assert sorted(check(get_command(app), "")) == [
+        "config llm",
+        "convert",
+        "doctor",
+        "init",
+        "status",
+        "sync",
+        "update",
+    ]
+
+
+def test_nest_source_never_imports_standalone_click() -> None:
+    """The nest package must not import click, which is not a declared dependency.
+
+    typer vendors its own Click; a standalone-Click parameter injected into a
+    typer command crashes parsing on typer 0.26+ (issue #51).
+    """
+
+    def imports_standalone_click(source: str) -> bool:
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Import) and any(
+                alias.name == "click" or alias.name.startswith("click.") for alias in node.names
+            ):
+                return True
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.level == 0
+                and (node.module == "click" or node.module.startswith("click."))
+            ):
+                return True
+        return False
+
+    package_root = Path(nest.__file__).parent
+    offenders = [
+        str(path.relative_to(package_root))
+        for path in sorted(package_root.rglob("*.py"))
+        if imports_standalone_click(path.read_text(encoding="utf-8"))
+    ]
+    assert offenders == []
 
 
 @pytest.mark.parametrize(

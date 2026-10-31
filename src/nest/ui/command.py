@@ -9,9 +9,9 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any
 
-import click
+import typer
 from rich.console import Console
-from typer.core import TyperCommand
+from typer.core import TyperCommand, TyperOption
 
 from nest.core.models import Activity
 from nest.ui.logger import ConsoleDiagnostics
@@ -164,7 +164,7 @@ def finish_output(failed: bool = False) -> bool:
     return output.has_warnings
 
 
-def _verbose_option(ctx: click.Context, parameter: click.Parameter, value: bool) -> bool:
+def _verbose_option(ctx: typer.Context, parameter: TyperOption, value: bool) -> bool:
     ctx.meta["nest_verbose"] = value
     return value
 
@@ -176,8 +176,8 @@ class NestCommand(TyperCommand):
         super().__init__(*args, **kwargs)
         if not any(parameter.name == "verbose" for parameter in self.params):
             self.params.append(
-                click.Option(
-                    ["--verbose", "-v"],
+                TyperOption(
+                    param_decls=["--verbose", "-v"],
                     is_flag=True,
                     expose_value=False,
                     callback=_verbose_option,
@@ -185,7 +185,10 @@ class NestCommand(TyperCommand):
                 )
             )
 
-    def invoke(self, ctx: click.Context) -> Any:
+    # typer.Context is typer's public context type. It only narrows the vendored
+    # Context the base class passes (it adds no members), which pyright's
+    # override check cannot see.
+    def invoke(self, ctx: typer.Context) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
         from nest.ui.messages import get_console
 
         verbose = bool(ctx.params.get("verbose", ctx.meta.get("nest_verbose", False)))

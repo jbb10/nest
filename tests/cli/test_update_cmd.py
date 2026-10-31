@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from click.exceptions import Exit as ClickExit
+import typer
 from rich.console import Console  # noqa: F401
 
 from nest.cli.update_cmd import (
@@ -174,7 +174,7 @@ class TestUpdateCheckFlag:
         )
         mock_create_update.return_value = (mock_service, mock_adapter)
 
-        with pytest.raises(ClickExit) as exc_info:
+        with pytest.raises(typer.Exit) as exc_info:
             update_command(check=True, target_dir=None)
 
         assert exc_info.value.exit_code == 0
@@ -191,7 +191,7 @@ class TestUpdateCheckFlag:
         mock_service.check_for_updates.return_value = _make_check_result()
         mock_create_update.return_value = (mock_service, mock_adapter)
 
-        with pytest.raises(ClickExit) as exc_info:
+        with pytest.raises(typer.Exit) as exc_info:
             update_command(check=True, target_dir=None)
 
         assert exc_info.value.exit_code == 1
@@ -225,7 +225,7 @@ class TestUpdateAlreadyUpToDate:
         )
         mock_create_update.return_value = (mock_service, mock_adapter)
 
-        with pytest.raises(ClickExit) as exc_info:
+        with pytest.raises(typer.Exit) as exc_info:
             update_command(check=False, target_dir=None)
 
         assert exc_info.value.exit_code == 0
@@ -256,7 +256,7 @@ class TestUpdateNetworkError:
         mock_service.check_for_updates.side_effect = ConfigError("network timeout")
         mock_create_update.return_value = (mock_service, mock_adapter)
 
-        with pytest.raises(ClickExit) as exc_info:
+        with pytest.raises(typer.Exit) as exc_info:
             update_command(check=False, target_dir=None)
 
         assert exc_info.value.exit_code == 1
@@ -291,7 +291,7 @@ class TestUpdateNoVersions:
         )
         mock_create_update.return_value = (mock_service, mock_adapter)
 
-        with pytest.raises(ClickExit) as exc_info:
+        with pytest.raises(typer.Exit) as exc_info:
             update_command(check=False, target_dir=None)
 
         assert exc_info.value.exit_code == 0
@@ -370,7 +370,7 @@ class TestUpdateFailure:
         mock_create_update.return_value = (mock_service, mock_adapter)
         mock_prompt.ask.return_value = "Y"
 
-        with pytest.raises(ClickExit) as exc_info:
+        with pytest.raises(typer.Exit) as exc_info:
             update_command(check=False, target_dir=None)
 
         assert exc_info.value.exit_code == 1
@@ -405,7 +405,7 @@ class TestUserCancellation:
         mock_create_update.return_value = (mock_service, mock_adapter)
         mock_prompt.ask.return_value = "n"
 
-        with pytest.raises(ClickExit) as exc_info:
+        with pytest.raises(typer.Exit) as exc_info:
             update_command(check=False, target_dir=None)
 
         assert exc_info.value.exit_code == 0
