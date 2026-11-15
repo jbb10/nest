@@ -21,27 +21,37 @@ class TestPythonVersionCheck:
     """Tests for Python version validation."""
 
     def test_supported_python_version_passes(self) -> None:
-        """Python 3.11+ should pass validation."""
+        """Python 3.11.5+ should pass validation."""
+        service = DoctorService()
+
+        with patch("sys.version_info", (3, 12, 4)):
+            status = service._check_python_version()
+
+        assert status.name == "Python"
+        assert status.status == "pass"
+        assert status.current_value == "3.12.4"
+        assert status.message is None
+        assert status.suggestion is None
+
+    def test_minimum_python_version_passes(self) -> None:
+        """Python 3.11.5 exactly should pass."""
+        service = DoctorService()
+
+        with patch("sys.version_info", (3, 11, 5)):
+            status = service._check_python_version()
+
+        assert status.status == "pass"
+        assert status.current_value == "3.11.5"
+
+    def test_python_311_patch_below_minimum_fails(self) -> None:
+        """Python 3.11.4 predates the minimum and should fail."""
         service = DoctorService()
 
         with patch("sys.version_info", (3, 11, 4)):
             status = service._check_python_version()
 
-        assert status.name == "Python"
-        assert status.status == "pass"
-        assert status.current_value == "3.11.4"
-        assert status.message is None
-        assert status.suggestion is None
-
-    def test_minimum_python_version_passes(self) -> None:
-        """Python 3.11.0 exactly should pass."""
-        service = DoctorService()
-
-        with patch("sys.version_info", (3, 11, 0)):
-            status = service._check_python_version()
-
-        assert status.status == "pass"
-        assert status.current_value == "3.11.0"
+        assert status.status == "fail"
+        assert "3.11.5" in status.message
 
     def test_unsupported_python_version_fails(self) -> None:
         """Python <3.11 should fail validation."""
@@ -53,7 +63,7 @@ class TestPythonVersionCheck:
         assert status.name == "Python"
         assert status.status == "fail"
         assert status.current_value == "3.10.14"
-        assert "3.11" in status.message
+        assert "3.11.5" in status.message
         assert status.suggestion is not None
 
 
@@ -219,7 +229,7 @@ class TestCheckEnvironment:
         """check_environment() should return report with all checks."""
         service = DoctorService()
 
-        with patch("sys.version_info", (3, 11, 4)):
+        with patch("sys.version_info", (3, 11, 5)):
             with patch("shutil.which", return_value="/usr/local/bin/uv"):
                 with patch("subprocess.run") as mock_run:
                     mock_run.return_value = MagicMock(returncode=0, stdout="uv 0.4.12\n")
@@ -235,7 +245,7 @@ class TestCheckEnvironment:
     def test_all_pass_property_true_when_no_failures(self) -> None:
         """all_pass should be True when no failures."""
         report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "warning", "1.0.0", message="update available"),
         )
@@ -335,7 +345,7 @@ class TestLLMConfigCheck:
 
     def test_list_issues_includes_llm_check_failures(self) -> None:
         report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
             llm=EnvironmentStatus("LLM", "fail", "broken", message="bad"),
@@ -1015,7 +1025,7 @@ class TestRemediateIssuesAuto:
         )
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -1045,7 +1055,7 @@ class TestRemediateIssuesAuto:
         service = DoctorService()
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -1092,7 +1102,7 @@ class TestRemediateIssuesInteractive:
         )
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -1129,7 +1139,7 @@ class TestRemediateIssuesInteractive:
         )
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -1178,7 +1188,7 @@ class TestRemediateIssuesInteractive:
         )
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )

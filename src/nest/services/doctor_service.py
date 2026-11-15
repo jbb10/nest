@@ -39,7 +39,7 @@ class EnvironmentStatus:
 
     name: str  # "Python", "uv", "Nest"
     status: Literal["pass", "fail", "warning"]
-    current_value: str  # "3.11.4", "0.4.12", "1.0.0"
+    current_value: str  # "3.11.5", "0.4.12", "1.0.0"
     message: str | None = None  # Optional detail message
     suggestion: str | None = None  # Optional remediation
 
@@ -306,7 +306,8 @@ class DoctorService:
             Environment status for Python version check.
         """
         current = sys.version_info
-        required = (3, 11, 0)
+        # Matches requires-python in pyproject.toml.
+        required = (3, 11, 5)
 
         version_str = f"{current[0]}.{current[1]}.{current[2]}"
 
@@ -321,8 +322,8 @@ class DoctorService:
                 name="Python",
                 status="fail",
                 current_value=version_str,
-                message="requires 3.11+",
-                suggestion="Upgrade Python to 3.11 or higher",
+                message="requires 3.11.5+",
+                suggestion="Upgrade Python to 3.11.5 or higher",
             )
 
     def _check_uv_installation(self) -> EnvironmentStatus:

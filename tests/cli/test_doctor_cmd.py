@@ -33,7 +33,7 @@ def _make_env_report(
     python_msg: str | None = None,
 ) -> EnvironmentReport:
     return EnvironmentReport(
-        python=EnvironmentStatus("Python", python, "3.11.4", message=python_msg),
+        python=EnvironmentStatus("Python", python, "3.11.5", message=python_msg),
         uv=EnvironmentStatus("uv", uv, "0.4.12"),
         nest=EnvironmentStatus("Nest", nest, "1.0.0"),
     )
@@ -91,13 +91,13 @@ class TestCountIssues:
     def test_env_failure_reported(self) -> None:
         """Environment failure appears in issue list."""
         issues = _count_issues(
-            _make_env_report(python="fail", python_msg="requires 3.11+"),
+            _make_env_report(python="fail", python_msg="requires 3.11.5+"),
             None,
             None,
         )
         assert len(issues) == 1
         assert "Python check failed" in issues[0]
-        assert "requires 3.11+" in issues[0]
+        assert "requires 3.11.5+" in issues[0]
 
     def test_model_not_cached(self) -> None:
         """Missing ML models appear in issue list."""
@@ -353,7 +353,7 @@ class TestDoctorCommand:
     def test_doctor_executes_service(self) -> None:
         """Doctor should call service and display report."""
         mock_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -388,7 +388,7 @@ class TestDoctorCommand:
         """Doctor should show message when run outside project."""
         monkeypatch.chdir(tmp_path)
         mock_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )

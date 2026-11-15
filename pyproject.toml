@@ -6,7 +6,7 @@ name = "nest"
 dynamic = ["version"]
 description = "AI-powered document context tool for projects"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 # Compatible-release ranges (~=X.Y.Z): a fresh `uv tool install` resolves the
 # newest PATCH release only. Minor and major upstream releases reach users
 # solely through a reviewed PR that raises a range (issue #52).

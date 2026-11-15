@@ -62,7 +62,7 @@ class TestDisplayEnvironmentReport:
         buffer = StringIO()
         console = Console(file=buffer, force_terminal=False, width=120)
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
             llm=EnvironmentStatus(
@@ -90,7 +90,7 @@ class TestDisplayModelReport:
         console = Console(file=MagicMock(), force_terminal=True, width=120)
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -112,7 +112,7 @@ class TestDisplayModelReport:
         console = Console(file=MagicMock(), force_terminal=True, width=120)
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -135,7 +135,7 @@ class TestDisplayModelReport:
         console = Console(file=MagicMock(), force_terminal=True, width=120)
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -162,7 +162,7 @@ class TestDisplayDoctorReport:
         console = Console(file=MagicMock(), force_terminal=True, width=120)
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -184,7 +184,7 @@ class TestDisplayDoctorReport:
         console = Console(file=MagicMock(), force_terminal=True, width=120)
 
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -199,7 +199,7 @@ class TestDisplayProjectReport:
     def test_display_doctor_report_with_valid_project(self) -> None:
         """Test display with project report showing valid project."""
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -226,7 +226,7 @@ class TestDisplayProjectReport:
     def test_display_doctor_report_with_issues(self) -> None:
         """Test display with project report showing multiple issues."""
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
@@ -261,7 +261,7 @@ class TestDisplayProjectReport:
     def test_display_doctor_report_with_version_mismatch(self) -> None:
         """Test display with project report showing version mismatch."""
         env_report = EnvironmentReport(
-            python=EnvironmentStatus("Python", "pass", "3.11.4"),
+            python=EnvironmentStatus("Python", "pass", "3.11.5"),
             uv=EnvironmentStatus("uv", "pass", "0.4.12"),
             nest=EnvironmentStatus("Nest", "pass", "1.0.0"),
         )
