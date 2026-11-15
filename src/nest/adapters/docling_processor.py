@@ -58,7 +58,10 @@ class DoclingProcessor:
         )
 
         # The direction classifier flips short cells such as "69%" into "%69".
-        ocr_options = RapidOcrOptions(backend="torch", use_cls=False)
+        # print_verbose keeps the RapidOCR logger at INFO: ConsoleDiagnostics owns
+        # what reaches the console, and its OCR download status reads the
+        # "Initiating download:" INFO records that Docling otherwise suppresses.
+        ocr_options = RapidOcrOptions(backend="torch", use_cls=False, print_verbose=True)
 
         if enable_classification:
             # Classification-enabled pipeline: activates local image classifier
