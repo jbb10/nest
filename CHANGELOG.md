@@ -2,6 +2,49 @@
 
 All notable changes to Nest.
 
+## [3.1.0](https://github.com/jbb10/nest/compare/v3.0.0...v3.1.0) (2026-10-31)
+
+
+### Features
+
+* **cli:** add --version option printing the package version ([1a2ad69](https://github.com/jbb10/nest/commit/1a2ad690501faaf7f9f0055beb7913c86695f29e)), closes [#52](https://github.com/jbb10/nest/issues/52)
+
+
+### Bug Fixes
+
+* **ci:** export the install-smoke tool directories from a step ([#58](https://github.com/jbb10/nest/issues/58)) ([0df4c81](https://github.com/jbb10/nest/commit/0df4c8168f3d192bcd87b067c91c640341c5ad88))
+* **cli:** build the shared --verbose option as a typer parameter ([f01577d](https://github.com/jbb10/nest/commit/f01577dd7533601ab60ca2c17203ebedff0cbb3a)), closes [#51](https://github.com/jbb10/nest/issues/51)
+* **cli:** terminate the process directly after the command finishes ([7a8651f](https://github.com/jbb10/nest/commit/7a8651f09e2bb273b25d0ae0b85e67d0cb8fff54)), closes [#41](https://github.com/jbb10/nest/issues/41)
+
+
+### Refactoring
+
+* **cli:** annotate _terminate as NoReturn and clarify probe helper ([22c03d7](https://github.com/jbb10/nest/commit/22c03d78eeb0a3d04a69d097f9ab904fedea4ca5))
+* **scripts:** clarify the dependency check and install smoke tests ([1be573b](https://github.com/jbb10/nest/commit/1be573b7f326b8cc65aaf08b6a74ea582e72aae6))
+* **tests:** share the registered-command list between command tests ([e63fd77](https://github.com/jbb10/nest/commit/e63fd776560a0a14c2f9201f8d3536822cccc4bf))
+
+
+### Documentation
+
+* **contributing:** explain the dependency policy and install smoke ([9f1a2cd](https://github.com/jbb10/nest/commit/9f1a2cdbc1090dbd62f3bf4b39b2c28c95cb78c8)), closes [#52](https://github.com/jbb10/nest/issues/52)
+
+
+### Testing
+
+* **e2e:** surface CLI output on timeout and normalize sub-default timeouts ([87d1dd5](https://github.com/jbb10/nest/commit/87d1dd545d28395b098a568cb54259ddd497e580)), closes [#41](https://github.com/jbb10/nest/issues/41)
+
+
+### Build System
+
+* **deps:** bound direct dependency ranges and make the version dynamic ([3966740](https://github.com/jbb10/nest/commit/3966740cd45400273551b4f01e9ea509096177f3)), closes [#52](https://github.com/jbb10/nest/issues/52)
+
+
+### CI/CD
+
+* **e2e:** allow manual workflow runs ([6e09d92](https://github.com/jbb10/nest/commit/6e09d927479f6aea8e68c158ab04dd91bc9de30f)), closes [#41](https://github.com/jbb10/nest/issues/41)
+* **scripts:** add dependency range check and install smoke scripts ([3a14026](https://github.com/jbb10/nest/commit/3a14026c87635594c13329178cf99095e746272a)), closes [#52](https://github.com/jbb10/nest/issues/52)
+* **workflows:** smoke-test the installed tool and lock the CI resolution ([2a97124](https://github.com/jbb10/nest/commit/2a97124bb220ba4b6a412f4e024617b98ca606d1)), closes [#52](https://github.com/jbb10/nest/issues/52)
+
 ## [3.0.0](https://github.com/jbb10/nest/compare/v2.3.0...v3.0.0) (2026-10-22)
 
 

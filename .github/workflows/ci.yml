@@ -202,11 +202,17 @@ jobs:
       UV_LOCKED: "0"
       # windows needs UTF-8 mode for Rich output through pipes.
       PYTHONUTF8: "1"
-      UV_TOOL_DIR: ${{ runner.temp }}/nest-smoke-tool
-      UV_TOOL_BIN_DIR: ${{ runner.temp }}/nest-smoke-tool-bin
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # `runner.temp` is only available in step contexts, so the isolated tool
+      # directories are exported here instead of in the job-level env block.
+      - name: Isolate the uv tool directories
+        shell: bash
+        run: |
+          echo "UV_TOOL_DIR=${RUNNER_TEMP}/nest-smoke-tool" >> "$GITHUB_ENV"
+          echo "UV_TOOL_BIN_DIR=${RUNNER_TEMP}/nest-smoke-tool-bin" >> "$GITHUB_ENV"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v10.3.0
