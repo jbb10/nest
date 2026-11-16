@@ -388,6 +388,19 @@ class TestDoclingProcessorPipelineOptions:
             assert kwargs.get("images_scale") == 2.0
             assert kwargs.get("do_table_structure") is True
 
+    def test_rapidocr_logs_at_info_for_console_diagnostics(self) -> None:
+        """RapidOCR INFO records reach ConsoleDiagnostics (download status, --verbose)."""
+        from docling.datamodel.base_models import InputFormat
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+
+        from nest.adapters.docling_processor import DoclingProcessor
+
+        processor = DoclingProcessor()
+
+        pipeline_options = processor._converter.format_to_options[InputFormat.PDF].pipeline_options
+        assert isinstance(pipeline_options, PdfPipelineOptions)
+        assert pipeline_options.ocr_options.print_verbose is True
+
 
 class TestDoclingProcessorImageFormat:
     """Standalone image files are converted as one-page scanned documents."""
