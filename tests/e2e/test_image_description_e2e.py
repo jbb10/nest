@@ -276,9 +276,9 @@ class TestImageDescriptionE2E:
 
         with MockVisionServer() as server:
             retried = run_cli(args, cwd=initialized_project, env=server.env_vars())
-            assert server.call_count > 0
 
         assert retried.exit_code == 0, retried.stdout + retried.stderr
+        assert server.call_count > 0
         assert CANNED_DESCRIPTION in output.read_text()
 
     @skip_without_docling
@@ -629,9 +629,9 @@ class TestStandaloneImageFilesE2E:
 
         with MockVisionServer(response=CANNED_DESCRIPTION) as server:
             retried = run_cli(args, cwd=initialized_project, env=server.env_vars())
-            assert server.call_count > 0
 
         assert retried.exit_code == 0, retried.stdout + retried.stderr
+        assert server.call_count > 0
         assert CANNED_DESCRIPTION in output.read_text()
 
     @skip_without_docling
