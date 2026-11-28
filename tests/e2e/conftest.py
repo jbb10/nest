@@ -24,8 +24,8 @@ load_dotenv()
 # CI). LLM-gated tests will skip when the key is absent.
 _TEST_LLM_DEFAULTS: dict[str, str] = {
     "NEST_LLM_ENDPOINT": "https://jbb-ai-proxy.azurewebsites.net/v1",
-    "NEST_LLM_MODEL": "gpt-5-nano",
-    "NEST_LLM_VISION_MODEL": "gpt-5-nano",
+    "NEST_LLM_MODEL": "gpt-6-luna",
+    "NEST_LLM_VISION_MODEL": "gpt-6-luna",
 }
 
 for _key, _val in _TEST_LLM_DEFAULTS.items():
