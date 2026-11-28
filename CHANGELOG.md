@@ -2,6 +2,23 @@
 
 All notable changes to Nest.
 
+## [3.1.2](https://github.com/jbb10/nest/compare/v3.1.1...v3.1.2) (2026-11-28)
+
+
+### Bug Fixes
+
+* **deps:** raise docling-parse to 7.28.0 to fix Windows render crash ([#73](https://github.com/jbb10/nest/issues/73)) ([2dfa068](https://github.com/jbb10/nest/commit/2dfa068387e1035d7fc9935b831ad307d25e2f44))
+
+
+### Testing
+
+* **e2e:** switch LLM test model to gpt-6-luna ([#74](https://github.com/jbb10/nest/issues/74)) ([e1a138b](https://github.com/jbb10/nest/commit/e1a138bf2e08922690419bd5b8e7f45c7cbf8e7f))
+
+
+### CI/CD
+
+* **deps:** bump astral-sh/setup-uv from 10.3.3 to 10.4.0 ([#69](https://github.com/jbb10/nest/issues/69)) ([a2d6ce0](https://github.com/jbb10/nest/commit/a2d6ce070a2d28d485accce8b222f7285c99c19c))
+
 ## [3.1.1](https://github.com/jbb10/nest/compare/v3.1.0...v3.1.1) (2026-11-16)
 
 
